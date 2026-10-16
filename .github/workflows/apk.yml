@@ -1,0 +1,43 @@
+name: Android APK
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "android/**"
+      - ".github/workflows/apk.yml"
+permissions:
+  contents: write
+concurrency:
+  group: apk
+  cancel-in-progress: true
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+      - name: Build APK
+        run: |
+          gradle -p android assembleRelease --no-daemon \
+            -PappUrl="${{ vars.APP_URL || 'https://tezkor-v9wd.onrender.com' }}" \
+            -PversionCode=${{ github.run_number }}
+          cp android/app/build/outputs/apk/release/app-release.apk apps/web/public/tezkor.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tezkor-apk
+          path: apps/web/public/tezkor.apk
+      - name: Put the APK on the site
+        run: |
+          git config user.name "tezkor-bot"
+          git config user.email "tezkor-bot@users.noreply.github.com"
+          git add apps/web/public/tezkor.apk
+          git commit -m "APK v1.${{ github.run_number }}" || exit 0
+          git pull --rebase origin main
+          git push origin HEAD:main
