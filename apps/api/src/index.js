@@ -1,9 +1,9 @@
-/* SOMON FOOD — HTTP API (Node.js, zero dependencies).
+/* Тезкор — HTTP API (Node.js, zero dependencies).
    Runs the SAME business logic as the browser prototype (apps/web/src/core) behind real HTTP:
      GET/POST/PATCH/DELETE /api/*   → JSON API ({ ok, data } | { ok:false, error })
      everything else                 → the web app (apps/web/dist/index.html) wired to this API
-   Storage: JSON file (DATA_FILE). Swap for PostgreSQL via db/schema.sql + a repository layer (see README). */
-const http = require("http"), fs = require("fs"), path = require("path"), crypto = require("crypto");
+   Storage (storage.js): a JSON file on a disk (DATA_FILE), or PostgreSQL when DATABASE_URL is set (e.g. Neon free tier). */
+const http = require("http"), fs = require("fs"), path = require("path"), crypto = require("crypto"), zlib = require("zlib");
 const { createServer } = require("../../web/src/core/server.js");
 const payments = require("./providers/payments.js");
 const maps = require("./providers/maps.js");
@@ -20,23 +20,7 @@ const STATIC = { "/og.png": "image/png", "/sw.js": "application/javascript", "/m
 const ORIGINS = (process.env.CORS_ORIGINS || "*").split(",");
 
 const DEMO = process.env.DEMO === "1";          // DEMO=1: example restaurants, test cards, demo logins
-const BACKUP_DIR = path.join(path.dirname(DATA_FILE), "backups");
-let lastBackup = 0;
-const store = {
-  load() {
-    if (!fs.existsSync(DATA_FILE)) return null;
-    return JSON.parse(fs.readFileSync(DATA_FILE, "utf8"));   // a corrupt file stops the start instead of silently starting empty
-  },
-  save(db) {
-    fs.mkdirSync(path.dirname(DATA_FILE), { recursive: true });
-    const tmp = DATA_FILE + ".tmp"; fs.writeFileSync(tmp, JSON.stringify(db)); fs.renameSync(tmp, DATA_FILE);
-    if (Date.now() - lastBackup > 3600e3) {   // hourly copy, the last 7 days kept
-      lastBackup = Date.now(); fs.mkdirSync(BACKUP_DIR, { recursive: true });
-      fs.copyFileSync(DATA_FILE, path.join(BACKUP_DIR, "db-" + new Date().toISOString().slice(0, 13).replace(/[-T:]/g, "") + ".json"));
-      fs.readdirSync(BACKUP_DIR).sort().slice(0, -168).forEach(f => fs.unlinkSync(path.join(BACKUP_DIR, f)));
-    }
-  },
-};
+const { openStorage } = require("./storage.js");
 /* passwords: scrypt with a random salt per user */
 function hashPassword(pw) { const salt = crypto.randomBytes(16).toString("hex"); return "s1$" + salt + "$" + crypto.scryptSync(String(pw), salt, 32).toString("hex"); }
 function checkPassword(pw, stored) {
@@ -44,30 +28,9 @@ function checkPassword(pw, stored) {
   const [, salt, hex] = stored.split("$"), a = crypto.scryptSync(String(pw), salt, 32), b = Buffer.from(hex, "hex");
   return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
-/* payment receipt photos: files next to the data, never inside db.json */
-const RECEIPTS = path.join(path.dirname(DATA_FILE), "receipts");
-const files = {
-  put(id, dataUrl) { const m = /^data:image\/(jpeg|png|webp);base64,(.+)$/.exec(dataUrl); if (!m) return; fs.mkdirSync(RECEIPTS, { recursive: true }); fs.writeFileSync(path.join(RECEIPTS, id + "." + m[1]), Buffer.from(m[2], "base64")); },
-  get(id) { for (const ext of ["jpeg", "png", "webp"]) { const f = path.join(RECEIPTS, id + "." + ext); if (fs.existsSync(f)) return "data:image/" + ext + ";base64," + fs.readFileSync(f).toString("base64"); } return null; },
-};
-/* dish photos, restaurant covers and ads: public files served at /media/… */
-const MEDIA = path.join(path.dirname(DATA_FILE), "media");
-const media = {
-  put(id, dataUrl) { const m = /^data:image\/(jpeg|png|webp);base64,(.+)$/.exec(dataUrl); fs.mkdirSync(MEDIA, { recursive: true }); const name = id + "." + m[1]; fs.writeFileSync(path.join(MEDIA, name), Buffer.from(m[2], "base64")); return "/media/" + name; },
-  del(url) { const n = path.basename(String(url || "")); if (/^[\w-]+\.(jpeg|png|webp)$/.test(n)) fs.rm(path.join(MEDIA, n), { force: true }, () => {}); },
-};
 /* Android app: the file built by GitHub Actions, or APK_URL (e.g. a GitHub release link) */
 const APK = path.join(DIST, "tezkor.apk");
 const apkAvailable = () => fs.existsSync(APK) || !!process.env.APK_URL;
-const api = createServer(DEMO ? { store, files, media, apkAvailable, verify, verifyStatus: verify.status } : {
-  store, files, media, apkAvailable, verify, verifyStatus: verify.status, production: true, hashPassword, checkPassword,
-  newToken: () => crypto.randomBytes(24).toString("base64url"),
-  newPassword: () => String(crypto.randomInt(100000, 1000000)),
-  cardProvider: process.env.PAYMENT_PROVIDER && process.env.PAYMENT_PROVIDER !== "mock" ? process.env.PAYMENT_PROVIDER : null,
-  admin: { phone: process.env.ADMIN_PHONE, password: process.env.ADMIN_PASSWORD, name: process.env.ADMIN_NAME || "Admin" },
-  resetAdmin: process.env.ADMIN_RESET_PASSWORD ? { phone: process.env.ADMIN_PHONE, password: process.env.ADMIN_RESET_PASSWORD } : null,
-});
-
 function cors(req, res) {
   const o = req.headers.origin; const ok = ORIGINS.includes("*") || (o && ORIGINS.includes(o));
   if (ok) { res.setHeader("Access-Control-Allow-Origin", ORIGINS.includes("*") ? "*" : o); res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization"); res.setHeader("Access-Control-Allow-Methods", "GET,POST,PATCH,DELETE,OPTIONS"); }
@@ -94,7 +57,26 @@ function webPage(base) {
   return pages.get(base);
 }
 
-http.createServer(async (req, res) => {
+let api = null, be = null;
+async function main() {
+  be = await openStorage(process.env, console.log);
+  const keep = { store: be.store, files: be.files, media: be.media, archive: be.archive, storageInfo: be.storageInfo, afterCleanup: be.sweepMedia, apkAvailable, verify, verifyStatus: verify.status };
+  api = createServer(DEMO ? keep : Object.assign(keep, {
+    production: true, hashPassword, checkPassword,
+    newToken: () => crypto.randomBytes(24).toString("base64url"),
+    newPassword: () => String(crypto.randomInt(100000, 1000000)),
+    cardProvider: process.env.PAYMENT_PROVIDER && process.env.PAYMENT_PROVIDER !== "mock" ? process.env.PAYMENT_PROVIDER : null,
+    admin: { phone: process.env.ADMIN_PHONE, password: process.env.ADMIN_PASSWORD, name: process.env.ADMIN_NAME || "Admin" },
+    resetAdmin: process.env.ADMIN_RESET_PASSWORD ? { phone: process.env.ADMIN_PHONE, password: process.env.ADMIN_RESET_PASSWORD } : null,
+  }));
+  /* housekeeping once a day (also a minute after start), so the storage never fills up */
+  const housekeeping = async () => { try { const r = api.cleanup(); r.media = be.sweepMedia(api._db()); await be.backup(api._db()); console.log("cleanup:", JSON.stringify(r)); } catch (e) { console.error("cleanup failed:", e.message); } };
+  setTimeout(housekeeping, +process.env.FIRST_CLEANUP_MS || 60e3).unref(); setInterval(housekeeping, 24 * 3600e3).unref();
+  /* Render / systemd stop the server with SIGTERM: write what is still in memory first */
+  const stop = async () => { try { verify.stop(); await be.flush(); } finally { process.exit(0); } };
+  process.once("SIGTERM", stop); process.once("SIGINT", stop);
+
+  const server = http.createServer(async (req, res) => {
   cors(req, res);
   if (req.method === "OPTIONS") return send(res, 204, "");
   const url = new URL(req.url, "http://x");
@@ -117,6 +99,10 @@ http.createServer(async (req, res) => {
     }
     if (url.pathname === "/api/maps/route") { const q = Object.fromEntries(url.searchParams); return send(res, 200, { ok: true, data: await maps.get().route({ lat: +q.fromLat, lng: +q.fromLng }, { lat: +q.toLat, lng: +q.toLng }) }); }
     const token = (req.headers.authorization || "").replace(/^Bearer\s+/i, "") || null;
+    /* receipt photo: the core checks who may see it, the storage reads the bytes */
+    const rm = /^\/api\/orders\/([^/]+)\/receipt$/.exec(url.pathname);
+    if (rm && req.method === "GET") { const ref = api.handle("GET", "/orders/" + rm[1] + "/receipt-ref", null, token); if (!ref.body.ok) return send(res, ref.status, ref.body);
+      const image = await be.readReceipt(ref.body.data.receiptId); return image ? send(res, 200, { ok: true, data: { image } }) : send(res, 404, { ok: false, error: { code: "NOT_FOUND" } }); }
     const r = api.handle(req.method, url.pathname.slice(4) + url.search, body, token);
     return send(res, r.status, r.body);
   }
@@ -131,7 +117,7 @@ http.createServer(async (req, res) => {
   }
   if (req.method === "GET" && url.pathname.startsWith("/media/")) {
     const n = path.basename(url.pathname), m = /^[\w-]+\.(jpeg|png|webp)$/.exec(n);
-    if (m) { try { const body = fs.readFileSync(path.join(MEDIA, n)); res.writeHead(200, { "Content-Type": "image/" + m[1], "Cache-Control": "public, max-age=31536000, immutable", "X-Content-Type-Options": "nosniff" }); return res.end(body); } catch {} }
+    if (m) { const f = await be.readMedia(n).catch(() => null); if (f) { res.writeHead(200, { "Content-Type": f.mime, "Cache-Control": "public, max-age=31536000, immutable", "X-Content-Type-Options": "nosniff" }); return res.end(f.buf); } }
     return send(res, 404, { ok: false, error: { code: "NOT_FOUND" } });
   }
   if (req.method === "GET" && (url.pathname === "/download" || url.pathname === "/download/" || url.pathname === "/app")) {
@@ -140,4 +126,7 @@ http.createServer(async (req, res) => {
   if (req.method === "GET" && url.pathname === "/sitemap.xml") return send(res, 200, site.sitemap(site.baseUrl(req)), "application/xml; charset=utf-8");
   if (req.method === "GET") return send(res, 200, webPage(site.baseUrl(req)), "text/html; charset=utf-8");
   send(res, 404, { ok: false, error: { code: "NOT_FOUND" } });
-}).listen(PORT, () => { console.log(`Tezkor API on http://localhost:${PORT}  (data: ${DATA_FILE})`); verify.attach(api); console.log("Phone verification:", JSON.stringify(verify.status())); });
+});
+  server.listen(PORT, () => { console.log(`Tezkor API on http://localhost:${PORT}  (data: ${be.kind} ${be.where})`); verify.attach(api); console.log("Phone verification:", JSON.stringify(verify.status())); });
+}
+main().catch(e => { console.error("Could not start:", e.message); process.exit(1); });

@@ -1,0 +1,28 @@
+# Render blueprint — FREE setup, no card: Render free web service + a free PostgreSQL database (e.g. Neon).
+# The free service has no disk, so everything (orders, people, dish photos, receipts) is kept in the database.
+# It sleeps after 15 minutes without visitors — keep it awake with UptimeRobot (see ИШГА-ТУШИРИШ.md, section 2б).
+# To move to the paid plan later: change "plan: free" to "plan: starter" — the data stays in the database.
+services:
+  - type: web
+    name: tezkor
+    runtime: node
+    plan: free
+    region: frankfurt
+    buildCommand: cd apps/web && node build.mjs
+    startCommand: node apps/api/src/index.js
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL          # from neon.tech: postgresql://…?sslmode=require
+        sync: false
+      - key: ADMIN_PHONE
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: MAP_TILES
+        value: https://tile.openstreetmap.org/{z}/{x}/{y}.png
+      - key: MAP_TILES_ATTR
+        value: © OpenStreetMap
+      - key: NODE_VERSION
+        value: "20"

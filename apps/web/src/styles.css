@@ -964,3 +964,4 @@ label.f.inline{flex-direction:row;align-items:center}
 .vok{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:var(--green);color:#fff;margin-left:5px;vertical-align:-2px}
 @media (prefers-reduced-motion:reduce){.spin{animation:none}}
 .vcode:focus{outline:none}
+.stbar{height:10px;border-radius:6px;background:var(--surface-2);overflow:hidden}.stbar i{display:block;height:100%;background:var(--green);border-radius:6px}.stbar.hot i{background:var(--bad,#D92D20)}

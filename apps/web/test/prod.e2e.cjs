@@ -82,7 +82,7 @@ const log = (...a) => console.log("•", ...a);
   await cour.click("[data-act=deliver]"); await cour.waitForTimeout(600);
   await go(cust, "/o/" + oid, 900); await cust.waitForTimeout(2600); log("customer status:", (await cust.textContent(".lbody h1")).trim()); await shot(cust, "07-delivered");
   await go(admin, "/admin", 900); await shot(admin, "08-admin"); log("admin dashboard today:", (await admin.textContent(".kpi")).replace(/\s+/g, " "));
-  log("data file saved:", fs.statSync(DATA).size, "bytes; backups:", fs.readdirSync(path.join(path.dirname(DATA), "backups")).length);
+  if (process.env.DATABASE_URL) log("data in PostgreSQL"); else log("data file saved:", fs.statSync(DATA).size, "bytes; backups:", fs.readdirSync(path.join(path.dirname(DATA), "backups")).length);
   console.log(errs.length ? "PAGE ERRORS:\n" + errs.join("\n") : "NO PAGE ERRORS");
   await b.close(); srv.kill();
 })().catch(e => { console.error("FAIL", e.message.split("\n")[0]); try { process.kill(-0); } catch (x) {} process.exit(1); });

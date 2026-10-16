@@ -1,5 +1,6 @@
 # Тезкор (Tezkor) — food delivery for Shahrituz
 
+> **Storage:** a JSON file on a disk by default; set `DATABASE_URL` (PostgreSQL, e.g. Neon free) to keep everything in the database — `render.free.yaml` is the no-card setup.
 > **Ишга тушириш йўриқномаси (ўзбекча):** [ИШГА-ТУШИРИШ.md](ИШГА-ТУШИРИШ.md) · Android APK: `android/` + `.github/workflows/apk.yml`
 
 A food delivery platform for Tajikistan with four apps on one order system:
@@ -12,7 +13,7 @@ Food delivery for **Shahrituz**, delivery only within **5 km** of the centre (ad
 ```bash
 npm start  # production: set ADMIN_PHONE and ADMIN_PASSWORD first (or DEMO=1 for example data); server install: deploy/install.sh
 #           # builds apps/web → dist/index.html and starts the API on http://localhost:8080
-npm test             # 59 API tests (roles, full order lifecycle, payments, refunds, menu CRUD, admin)
+npm test             # 60 API tests (roles, full order lifecycle, payments, refunds, menu CRUD, admin)
 npm run test:ui      # Playwright: every screen × every role × 3 languages + a full order end-to-end
 ```
 

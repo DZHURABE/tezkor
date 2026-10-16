@@ -66,7 +66,7 @@
     function payOn(m) { var s = db.settings; return m === "card" ? cardOn() : m === "transfer" ? s.payTransfer !== false : m === "cash" ? s.payCash !== false : false; }
     /* subscription: a restaurant is shown to customers only while its paid period lasts (no date = no limit) */
     var DAY = 86400000;
-    function setting(k) { var d = { subFee: 300, trialDays: 30, handoffMin: 7 }; return db.settings[k] == null ? d[k] : db.settings[k]; }
+    function setting(k) { var d = { subFee: 300, trialDays: 30, handoffMin: 7, receiptDays: 30, archiveDays: 90 }; return db.settings[k] == null ? d[k] : db.settings[k]; }
     function paid(r) { return !r.paidUntil || r.paidUntil > clock(); }
     function live(r) { return r.active && paid(r); }
     /* shown in lists only when a customer can really order: dishes on the menu and a way to pay */
@@ -134,7 +134,32 @@
     function tick() { var t = clock(), ms = handoffMs(), changed = false;
       db.orders.forEach(function (o) { if (o.delivery === "mixed" && !o.handedOff && !o.courierId && !o.selfDelivery && (o.status === "cooking" || o.status === "ready") && o.cookingAt && t - o.cookingAt >= ms) {
         o.handedOff = true; changed = true; var r = find(db.restaurants, o.restaurantId); notify("couriers:" + o.cityId, "n.courierNew", { n: o.number, rest: r.name, km: o.km }, o.id); } });
-      if (changed) save(); }
+      if (changed) save();
+      if (!db.meta.lastCleanup || t - db.meta.lastCleanup.at > DAY) cleanup(); }
+
+    /* ---------- housekeeping: once a day the data stays small by itself ----------
+       · payment receipt photos of finished orders — deleted after receiptDays (30)
+       · finished orders — moved to the archive after archiveDays (90): the Node API writes them to compressed monthly files
+       · old notifications, sessions, verification codes — dropped
+       Menus, dish photos, restaurants and people are never touched. */
+    function cleanup() {
+      var t = clock(), rd = setting("receiptDays") * DAY, ad = setting("archiveDays") * DAY, FIN = Rules.FINAL, rep = { at: t, receipts: 0, orders: 0, notes: 0, sessions: 0 };
+      var age = function (o) { return t - (o.deliveredAt || o.updatedAt || o.createdAt); };
+      db.orders.forEach(function (o) { if (o.payment && o.payment.receiptId && FIN.indexOf(o.status) >= 0 && age(o) > rd) {
+        try { if (files.del) files.del(o.payment.receiptId); } catch (e) {} o.payment.receiptId = null; o.payment.receiptPurgedAt = t; rep.receipts++; } });
+      var old = db.orders.filter(function (o) { return FIN.indexOf(o.status) >= 0 && age(o) > ad; });
+      if (old.length) {
+        var ok = true; try { if (opts.archive) opts.archive(JSON.parse(JSON.stringify(old))); } catch (e) { ok = false; }
+        if (ok) { var gone = {}; old.forEach(function (o) { gone[o.id] = 1; });
+          var ar = db.meta.archived || (db.meta.archived = { orders: 0, delivered: 0, gmv: 0 });
+          old.forEach(function (o) { ar.orders++; if (o.status === "delivered") { ar.delivered++; ar.gmv += o.subtotal || 0; } });
+          db.orders = db.orders.filter(function (o) { return !gone[o.id]; }); db.payments = db.payments.filter(function (p) { return !gone[p.orderId]; });
+          rep.orders = old.length; }
+      }
+      var n0 = db.notifications.length; db.notifications = db.notifications.filter(function (n) { return !n.gone && t - n.at < 30 * DAY; }); rep.notes = n0 - db.notifications.length;
+      Object.keys(db.sessions).forEach(function (k) { if (t - (db.sessions[k].at || 0) > 180 * DAY) { delete db.sessions[k]; rep.sessions++; } });
+      if (db.verifications) db.verifications = db.verifications.filter(function (v) { return t - v.createdAt < DAY; });
+      db.meta.lastCleanup = rep; save(); return rep; }
 
     /* ---------- orders ---------- */
     function setStatus(o, to, actor) {
@@ -335,6 +360,8 @@
       o.payment.status = "paid"; o.payment.last4 = num.slice(-4); db.payments.forEach(function (x) { if (x.orderId === o.id) { x.status = "paid"; x.last4 = num.slice(-4); } });
       setStatus(o, "pending", null); save(); return pubOrder(o, req.user);
     });
+    /* the Node API reads the receipt bytes from its storage after this check */
+    route("GET", "/orders/:id/receipt-ref", "*", function (req, b, q, p) { var o = orderFor(req, p.id); if (req.user.role === "courier") E(403, "FORBIDDEN"); if (!o.payment.receiptId) E(404, "NOT_FOUND"); return { receiptId: o.payment.receiptId }; });
     route("GET", "/orders/:id/receipt", "*", function (req, b, q, p) { var o = orderFor(req, p.id); if (req.user.role === "courier") E(403, "FORBIDDEN");
       var img = o.payment.receiptId ? files.get(o.payment.receiptId) : null; if (!img) E(404, "NOT_FOUND"); return { image: img }; });
     route("GET", "/orders/my", ["customer"], function (req) { return by(db.orders, "customerId", req.user.id).map(function (o) { return pubOrder(o, req.user); }); });
@@ -586,11 +613,15 @@
       if (!(la > 36 && la < 41.5 && ln > 67 && ln < 75.5)) E(400, "BAD_COORDS"); var c = { id: id("c"), name: L(n), lat: la, lng: ln, active: true }; db.cities.push(c); save(); return c; });
     route("PATCH", "/admin/cities/:id", ["admin"], function (req, b, q, p) { var c = find(db.cities, p.id); if (!c) E(404, "NOT_FOUND"); if (b.active != null) c.active = !!b.active; save(); return c; });
     route("GET", "/admin/payments", ["admin"], function () { return db.payments.slice(0, 120).map(function (x) { var o = find(db.orders, x.orderId); return Object.assign({}, x, { number: o ? o.number : null }); }); });
-    route("GET", "/admin/settings", ["admin"], function () { return Object.assign({ verifyStatus: opts.verifyStatus ? opts.verifyStatus() : null, verifyChannels: vChannels().map(function (c) { return c.id; }), verifyActive: verifyRequired(),  subFee: setting("subFee"), trialDays: setting("trialDays"), handoffMin: setting("handoffMin") }, db.settings); });
-    route("PATCH", "/admin/settings", ["admin"], function (req, b) { var s = db.settings, keys = ["deliveryBase", "deliveryPerKm", "deliveryMin", "courierPct", "zoneKm", "subFee", "trialDays", "handoffMin"];
+    /* storage: how much the data takes, the last cleanup, run it now */
+    route("GET", "/admin/storage", ["admin"], function () { return { info: opts.storageInfo ? opts.storageInfo() : null, lastCleanup: db.meta.lastCleanup || null, archived: db.meta.archived || null,
+      receiptDays: setting("receiptDays"), archiveDays: setting("archiveDays"), orders: db.orders.length }; });
+    route("POST", "/admin/cleanup", ["admin"], function () { var r = cleanup(); if (opts.afterCleanup) try { r.media = opts.afterCleanup(db); } catch (e) {} return r; });
+    route("GET", "/admin/settings", ["admin"], function () { return Object.assign({ verifyStatus: opts.verifyStatus ? opts.verifyStatus() : null, verifyChannels: vChannels().map(function (c) { return c.id; }), verifyActive: verifyRequired(),  subFee: setting("subFee"), trialDays: setting("trialDays"), handoffMin: setting("handoffMin"), receiptDays: setting("receiptDays"), archiveDays: setting("archiveDays") }, db.settings); });
+    route("PATCH", "/admin/settings", ["admin"], function (req, b) { var s = db.settings, keys = ["deliveryBase", "deliveryPerKm", "deliveryMin", "courierPct", "zoneKm", "subFee", "trialDays", "handoffMin", "receiptDays", "archiveDays"];
       if (b.payCash != null) s.payCash = !!b.payCash; if (b.payTransfer != null) s.payTransfer = !!b.payTransfer; if (b.verifyRequired != null) s.verifyRequired = !!b.verifyRequired;
       if (s.payCash === false && s.payTransfer === false && !cardOn()) E(400, "NO_PAY_METHOD");
-      var next = {}; keys.forEach(function (k) { var v = b[k] == null ? (s[k] == null ? setting(k) : s[k]) : int(b[k]); if (!(v >= (k === "zoneKm" || k === "handoffMin" ? 1 : 0) && v <= (k === "courierPct" ? 100 : k === "zoneKm" ? 30 : k === "subFee" ? 100000 : k === "trialDays" ? 365 : k === "handoffMin" ? 60 : 500))) E(400, "BAD_SETTINGS", { field: k }); next[k] = v; });
+      var next = {}; keys.forEach(function (k) { var v = b[k] == null ? (s[k] == null ? setting(k) : s[k]) : int(b[k]); if (!(v >= (k === "zoneKm" || k === "handoffMin" ? 1 : k === "receiptDays" ? 7 : k === "archiveDays" ? 30 : 0) && v <= (k === "courierPct" ? 100 : k === "zoneKm" ? 30 : k === "subFee" ? 100000 : k === "trialDays" ? 365 : k === "handoffMin" ? 60 : k === "receiptDays" ? 3650 : k === "archiveDays" ? 3650 : 500))) E(400, "BAD_SETTINGS", { field: k }); next[k] = v; });
       if (b.supportPhone != null) { if (!Rules.normPhone(b.supportPhone)) E(400, "BAD_PHONE"); next.supportPhone = Rules.fmtPhone(Rules.normPhone(b.supportPhone)); }
       Object.assign(s, next); save(); return s; });
     route("POST", "/admin/reset-demo", ["admin"], function () { if (PROD) E(404, "NOT_FOUND"); var keep = db.sessions; db = Seed.build(clock()); db.sessions = keep; save(); return true; });
@@ -619,7 +650,7 @@
         return { status: 500, body: { ok: false, error: { code: "SERVER_ERROR" } } };
       }
     }
-    return { handle: handle, inbound: inbound, version: function () { return db.meta.version; }, reload: function () { var d = store.load(); if (d) db = d; }, _db: function () { return db; } };
+    return { handle: handle, inbound: inbound, cleanup: cleanup, version: function () { return db.meta.version; }, reload: function () { var d = store.load(); if (d) db = d; }, _db: function () { return db; } };
   }
   var KINDS = ["plov", "qurutob", "lagman", "mantu", "soup", "tea", "burger", "fries", "drink", "pizza", "salad", "juice", "shashlik", "kebab", "bread", "samsa", "dessert", "cake", "icecream", "coffee", "shawarma", "ayran", "plate"];
   return { createServer: createServer, KINDS: KINDS };

@@ -90,6 +90,22 @@
   SF.forms.asub = function (fd, f) { return api().post("/admin/restaurants/" + f.dataset.id + "/subscription", { months: SF.state.subM, amount: Number(fd.amount), note: fd.note }).then(function (r) {
     SF.closeModal(); SF.toast(t("sub.done", { name: tx(r.name), d: SF.fullDate(r.sub.until) })); SF.render({ quiet: true }); }); };
   SF.actions.asubdel = function (el) { return api().del("/admin/subscriptions/" + el.dataset.id).then(function () { SF.closeModal(); SF.toast(t("sub.undone"), "info"); SF.render({ quiet: true }); }); };
+  /* storage: how full the disk is and the daily cleanup */
+  function mb(n) { return n == null ? "—" : n < 1048576 ? Math.max(1, Math.round(n / 1024)) + " KB" : (n / 1048576).toFixed(n < 104857600 ? 1 : 0) + " MB"; }
+  function storageCard(st) {
+    var i = st.info, lc = st.lastCleanup, cap = i && i.disk ? i.disk : 1073741824, used = i ? (i.disk && i.free != null ? i.disk - i.free : i.total) : null, pct = used != null ? Math.min(100, Math.round(used / cap * 100)) : null;
+    var row = function (k, v) { return '<div class="line"><span>' + t(k) + '</span><b class="num">' + mb(v) + "</b></div>"; };
+    return '<form class="card stack" data-form="aclean"><h3>' + I("box", 18) + t("st.title") + '</h3><p class="fine">' + t("st.sub") + "</p>" +
+      (i ? '<div class="stbar' + (pct > 80 ? " hot" : "") + '"><i style="width:' + pct + '%"></i></div><div class="line"><span>' + t("st.used") + '</span><b class="num">' + mb(used) + " / " + mb(cap) + " · " + pct + "%</b></div>" +
+        row("st.db", i.db) + row("st.receipts", i.receipts) + row("st.media", i.media) + row("st.archive", i.archive) + row("st.backups", i.backups)
+        : '<div class="msg info">' + I("info", 16) + t("st.demo") + "</div>") +
+      '<div class="line"><span>' + t("st.orders") + '</span><b class="num">' + st.orders + (st.archived ? " + " + t("st.inArchive", { n: st.archived.orders }) : "") + "</b></div>" +
+      '<p class="fine">' + (lc ? t("st.last", { d: SF.dt(lc.at), r: lc.receipts, o: lc.orders }) : t("st.never")) + "</p>" +
+      '<div class="grid2"><label class="f">' + t("st.receiptDays") + '<input name="receiptDays" inputmode="numeric" value="' + st.receiptDays + '"></label><label class="f">' + t("st.archiveDays") + '<input name="archiveDays" inputmode="numeric" value="' + st.archiveDays + '"></label></div>' +
+      '<div class="row2"><button class="btn ghost">' + t("btn.save") + '</button><button type="button" class="btn primary" data-act="acleannow">' + I("trash", 16) + t("st.now") + "</button></div></form>";
+  }
+  SF.forms.aclean = function (fd) { return api().patch("/admin/settings", { receiptDays: Number(fd.receiptDays), archiveDays: Number(fd.archiveDays) }).then(function () { SF.toast(t("btn.saved")); SF.render({ quiet: true }); }); };
+  SF.actions.acleannow = function () { return api().post("/admin/cleanup").then(function (r) { SF.toast(t("st.done", { r: r.receipts, o: r.orders })); SF.render({ quiet: true }); }); };
   /* phone verification: which channels are on (they turn on from the server settings) and whether sign-up requires it */
   function verifyCard(s) {
     var st = s.verifyStatus, row = function (icon, name, val) { var on = val && val !== "off" && val !== "error";
@@ -214,13 +230,13 @@
 
   /* ---------- Settings ---------- */
   R("/admin/settings", { title: "adm.settings", render: function () {
-    return api().get("/admin/settings").then(function (s) {
+    return Promise.all([api().get("/admin/settings"), api().get("/admin/storage")]).then(function (a) { var s = a[0]; SF.state.storage = a[1];
       return '<div class="two"><form class="card stack" data-form="aset"><h3>' + t("adm.pricing") + '</h3><p class="fine">' + t("adm.pricingNote") + '</p><div class="grid2"><label class="f">' + t("adm.base") + '<input name="deliveryBase" inputmode="numeric" value="' + s.deliveryBase + '"></label><label class="f">' + t("adm.perKm") + '<input name="deliveryPerKm" inputmode="numeric" value="' + s.deliveryPerKm + '"></label>' +
         '<label class="f">' + t("adm.minFee") + '<input name="deliveryMin" inputmode="numeric" value="' + s.deliveryMin + '"></label><label class="f">' + t("adm.courierPct") + '<input name="courierPct" inputmode="numeric" value="' + s.courierPct + '"></label><label class="f">' + t("adm.zoneKm") + '<input name="zoneKm" inputmode="numeric" value="' + (s.zoneKm || 5) + '"></label><label class="f">' + t("dl.handoff") + '<input name="handoffMin" inputmode="numeric" value="' + s.handoffMin + '"></label></div><label class="f">' + t("adm.payWays") + '</label><label class="checkrow"><input type="checkbox" name="payTransfer"' + (s.payTransfer !== false ? " checked" : "") + '><span>' + t("pay.transfer") + '</span></label><label class="checkrow"><input type="checkbox" name="payCash"' + (s.payCash !== false ? " checked" : "") + '><span>' + t("pay.cash") + '</span></label><label class="f">' + t("foot.support") + '<input name="supportPhone" value="' + esc(s.supportPhone) + '"></label><button class="btn primary">' + t("btn.save") + "</button></form>" +
         '<section class="card"><h3>' + t("adm.example") + '</h3><div class="ptable"><span class="pth">' + t("u.km") + '</span><span class="pth">' + t("role.customer") + '</span><span class="pth">' + t("role.courier") + '</span><span class="pth">' + esc(SF.brand()) + '</span>' +
         [1, 2, 3, 4, 5].map(function (k) { var f = SomonRules.deliveryFee(s, k), c = Math.round(f * s.courierPct / 100); return '<span class="num">' + k + '</span><b class="num">' + money(f) + '</b><span class="num">' + money(c) + '</span><span class="num">' + money(f - c) + "</span>"; }).join("") + "</div>" +
         (SF.state.pub.demo ? '<h3 style="margin-top:20px">' + t("adm.demo") + '</h3><p class="fine">' + t("adm.demoNote") + '</p><button class="btn ghost" data-act="areset">' + I("route", 16) + t("adm.resetDemo") + "</button>" : "") + "</section>" +
-        verifyCard(s) +
+        verifyCard(s) + storageCard(a[1]) +
         '<form class="card stack" data-form="asubset"><h3>' + t("sub.title") + '</h3><p class="fine">' + t("sub.setNote") + '</p><div class="grid2"><label class="f">' + t("sub.fee") + '<input name="subFee" inputmode="numeric" value="' + s.subFee + '"></label><label class="f">' + t("sub.trialDays") + '<input name="trialDays" inputmode="numeric" value="' + s.trialDays + '"></label></div><button class="btn primary">' + t("btn.save") + "</button></form>" + SF.pwForm() + "</div>";
     });
   } });

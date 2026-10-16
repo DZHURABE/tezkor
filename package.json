@@ -4,6 +4,6 @@
     "build": "cd apps/web && node build.mjs",
     "start": "npm run build && node apps/api/src/index.js",
     "test": "cd apps/web && node test/api.test.js",
-    "test:ui": "cd apps/web && node build.mjs && node test/ui.smoke.cjs && node test/ui.e2e.cjs && node test/prod.e2e.cjs && node test/password.e2e.cjs && node test/channels.int.cjs && node test/verify.e2e.cjs && node test/site.e2e.cjs && node test/audit.cjs"
+    "test:ui": "cd apps/web && node build.mjs && node test/ui.smoke.cjs && node test/ui.e2e.cjs && node test/prod.e2e.cjs && node test/password.e2e.cjs && node test/channels.int.cjs && node test/verify.e2e.cjs && node test/site.e2e.cjs && node test/cleanup.int.cjs && node test/pg.int.cjs && node test/audit.cjs"
   },
   "engines": { "node": ">=18" } }
