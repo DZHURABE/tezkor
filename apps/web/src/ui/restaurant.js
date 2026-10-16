@@ -1,0 +1,261 @@
+/* SOMON FOOD — restaurant panel: Dashboard → Orders → Menu → History → Settings */
+(function () {
+  var t = SF.t, esc = SF.esc, I = SF.icon, tx = SF.tx, money = SF.money, api = function () { return SF.api; };
+  var P = { roles: ["restaurant"], shell: function (h, r, m) { return SF.shells.panel(h, r, m); } };
+  function R(path, o) { SF.route(path, Object.assign({}, P, o)); }
+
+  /* chart: bars drawn to one scale */
+  SF.bars = function (series, fmt, label) {
+    var W = 560, H = 190, pad = 26, max = Math.max.apply(null, series.map(function (s) { return s.sum; }).concat([1])), bw = (W - pad * 2) / series.length;
+    var nice = Math.pow(10, Math.floor(Math.log10(max))), top = Math.ceil(max / nice) * nice, g = "";
+    [0, 0.5, 1].forEach(function (f) { var y = H - pad - f * (H - pad * 2); g += '<line x1="' + pad + '" x2="' + (W - 4) + '" y1="' + y + '" y2="' + y + '" class="gl"/><text x="2" y="' + (y + 4) + '" class="gt">' + (f ? esc(fmt(top * f)) : "0") + "</text>"; });
+    series.forEach(function (s, i) { var h = s.sum / top * (H - pad * 2), x = pad + i * bw + bw * 0.18, y = H - pad - h, last = i === series.length - 1;
+      g += '<rect class="cbar' + (last ? " last" : "") + '" x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + (bw * 0.64).toFixed(1) + '" height="' + Math.max(0, h).toFixed(1) + '" rx="5"><title>' + SF.date(s.day) + ": " + esc(fmt(s.sum)) + "</title></rect>";
+      if (i % 2 === series.length % 2 || last) g += '<text x="' + (x + bw * 0.32).toFixed(1) + '" y="' + (H - 8) + '" class="gx">' + new Date(s.day).getDate() + "</text>"; });
+    return '<svg class="chart" viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="' + esc(label) + '">' + g + "</svg>";
+  };
+  SF.kpi = function (icon, label, value, sub, tone) { return '<div class="kpi' + (tone ? " " + tone : "") + '"><span class="kic">' + I(icon, 18) + "</span><small>" + label + '</small><b class="num">' + value + "</b>" + (sub ? '<span class="ksub">' + sub + "</span>" : "") + "</div>"; };
+
+  /* ---------- Dashboard ---------- */
+  R("/rest", { title: "rest.dash", live: true, render: function () {
+    return Promise.all([api().get("/restaurant/me"), api().get("/restaurant/stats"), api().get("/restaurant/orders?scope=new")]).then(function (a) {
+      var r = a[0], s = a[1], fresh = a[2]; SF.state.newCount = fresh.length;
+      return '<section class="banner-rest" style="--tone:' + esc(r.tone) + '"><div><span class="eyebrow">' + t("rest.yourPlace") + "</span><h2 class=\"h1\">" + esc(tx(r.name)) + '</h2><span class="muted">' + esc(r.hours.from) + "–" + esc(r.hours.to) + " · " + (r.isOpenNow ? t("rest.openNow") : t("rest.closedShort")) + "</span></div>" +
+        '<label class="switchrow"><span>' + t("rest.accepting") + '</span><button class="switch' + (r.open ? " on" : "") + '" role="switch" aria-checked="' + r.open + '" data-act="ropen" aria-label="' + t("rest.accepting") + '"></button></label></section>' +
+        subBanner(r) + startList(r) +
+        (fresh.length ? '<a class="alert" href="#/rest/orders">' + I("bell", 18) + "<b>" + t("rest.newWaiting", { n: fresh.length }) + "</b>" + I("chevR", 18) + "</a>" : "") +
+        '<div class="kpis k4">' + SF.kpi("wallet", t("k.todaySales"), money(s.todaySales), t("k.orders", { n: s.todayCount })) + SF.kpi("chart", t("k.monthSales"), money(s.monthSales), t("k.orders", { n: s.monthCount })) +
+        SF.kpi("receipt", t("k.avgCheck"), money(s.avgCheck)) + SF.kpi("star", t("k.rating"), s.rating == null ? "—" : s.rating.toFixed(1), t("k.active", { n: s.active })) + "</div>" +
+        '<div class="two"><section class="card"><div class="rowhead"><h3>' + t("k.sales14") + "</h3></div>" + SF.bars(s.series, money, t("k.sales14")) + "</section>" +
+        '<section class="card"><h3>' + t("k.top") + "</h3>" + (s.topProducts.length ? s.topProducts.map(function (p, i) { return '<div class="topi"><span class="num rank">' + (i + 1) + '</span><span class="cim">' + SF.art(p.kind, 40) + '</span><div class="grow"><b>' + esc(tx(p.name)) + '</b><small class="muted num">' + t("k.sold", { n: p.qty }) + '</small></div><b class="num">' + money(p.sum) + "</b></div>"; }).join("") : '<p class="muted">' + t("k.noData") + "</p>") +
+        '<div class="line"><span>' + t("k.payout") + '</span><b class="num">' + money(s.payout) + '</b></div><div class="line muted"><span>' + t("k.commission", { p: r.commissionPct }) + '</span><span class="num">' + money(s.commission) + "</span></div></section></div>";
+    });
+  } });
+  /* subscription: the owner sees how long the place stays visible, and is warned before the end */
+  function subBanner(r) { var sb = r.sub; if (!sb || sb.state === "none" || sb.state === "ok") return "";
+    var exp = sb.state === "expired", ph = SF.state.pub && SF.state.pub.supportPhone;
+    return '<section class="subwarn' + (exp ? " bad" : "") + '">' + I(exp ? "shield" : "clock", 22) + '<div class="grow"><b>' + t(exp ? "sub.restExpired" : "sub.restSoon", { n: sb.daysLeft, d: SF.fullDate(sb.until) }) + "</b><span>" + t(exp ? "sub.restExpiredSub" : "sub.restSoonSub") + "</span></div>" +
+      (ph ? '<a class="btn sm ' + (exp ? "danger" : "primary") + '" href="tel:' + esc(String(ph).replace(/\s/g, "")) + '">' + I("phone", 14) + t("sub.call") + "</a>" : "") + "</section>"; }
+  SF.restSubBanner = subBanner;
+  function subCard(r) { var sb = r.sub, h = r.subHistory || [];
+    return '<section class="card stack"><h3>' + I("wallet", 18) + t("sub.title") + '</h3><div class="line"><span>' + t("sub.status") + "</span>" + SF.subPill(sb) + "</div>" +
+      (h.length ? '<div class="subhist">' + h.map(function (x) { return '<div class="line"><span class="num">' + SF.fullDate(x.at) + "</span><span>" + (x.kind === "trial" ? t("sub.trialRow", { n: x.days }) : t(x.months === 12 ? "sub.year" : "sub.months", { n: x.months })) + '</span><b class="num">' + (x.amount ? money(x.amount) : "—") + "</b></div>"; }).join("") + "</div>" : "") +
+      '<p class="fine">' + t("sub.restNote") + "</p></section>"; }
+  /* first days: what the owner still has to do before customers can order */
+  function startList(r) {
+    var steps = [[r.productCount > 0, "start.menu", "/rest/menu"], [!!r.payCard, "start.card", "/rest/settings"], [!!(r.cover || r.hasAd), "start.promo", "/rest/promo"], [r.open, "start.open", null]];
+    if (steps.every(function (x) { return x[0]; })) return "";
+    var done = steps.filter(function (x) { return x[0]; }).length;
+    return '<section class="card startlist"><div class="rowhead"><h3>' + I("bolt", 18) + t("start.title") + '</h3><span class="muted num">' + done + "/" + steps.length + '</span></div><span class="bar"><i style="width:' + Math.round(done / steps.length * 100) + '%"></i></span><ol>' +
+      steps.map(function (x) { return '<li class="' + (x[0] ? "ok" : "") + '">' + I(x[0] ? "check" : "info", 16) + (x[2] && !x[0] ? '<a href="#' + x[2] + '">' + t(x[1]) + "</a>" : "<span>" + t(x[1]) + "</span>") + "</li>"; }).join("") + "</ol></section>";
+  }
+  SF.actions.ropen = function (el) { return api().patch("/restaurant/me", { open: el.getAttribute("aria-checked") !== "true" }).then(function () { SF.render({ quiet: true }); }); };
+
+  /* ---------- Orders board ---------- */
+  function ago(ms) { var m = Math.max(0, Math.round((Date.now() - ms) / 60000)); return m < 1 ? t("u.now") : t("u.ago", { n: m }); }
+  /* own delivery: who is told about the order, and the "we take it ourselves" button */
+  function dlNote(o) { var d = o.delivery || "platform"; if (d === "platform" || o.courier || o.selfDelivery || (o.status !== "cooking" && o.status !== "ready")) return "";
+    var k = d === "own" ? "dl.noteOwn" : o.handedOff ? "dl.noteHanded" : "dl.noteMixed"; return '<p class="dlnote">' + I(d === "own" || !o.handedOff ? "store" : "scooter", 14) + t(k, { n: ((SF.state.pub && SF.state.pub.handoffMin) || 7) }) + "</p>"; }
+  /* two big choices for an incoming order of a restaurant that may deliver itself */
+  SF.dlChoice = function (cur, act, id) { return [["own", "store", "dl.chOwn", "dl.chOwnSub"], ["platform", "scooter", "dl.chTez", "dl.chTezSub"]].map(function (c) {
+    var on = cur === c[0]; return '<button type="button" class="dlch' + (on ? " on" : "") + '" aria-pressed="' + on + '" data-act="' + act + '" data-v="' + c[0] + '"' + (id ? ' data-id="' + id + '"' : "") + ">" + I(c[1], 20) + "<b>" + t(c[2]) + "</b><small>" + t(c[3]) + "</small></button>"; }).join(""); };
+  SF.actions.tdeliv = function (el) { SF.state.tDeliv = SF.state.tDeliv || {}; SF.state.tDeliv[el.dataset.id] = el.dataset.v; SF.render({ quiet: true }); };
+  SF.actions.handoff = function (el) { return api().post("/restaurant/orders/" + el.dataset.id + "/handoff").then(function () { SF.toast(t("dl.handedToast")); SF.render({ quiet: true }); }); };
+  function selfBtn(o) { return (o.delivery || "platform") !== "platform" && !o.courier && (o.status === "cooking" || o.status === "ready") ? '<div class="row2 selfrow"><button class="btn ghost" data-act="selfout" data-id="' + o.id + '">' + I("store", 16) + t("dl.selfBtn") + '</button><button class="btn ghost" data-act="handoff" data-id="' + o.id + '">' + I("scooter", 16) + t("dl.toTez") + "</button></div>" : ""; }
+  SF.actions.selfout = function (el) { return api().get("/restaurant/couriers").then(function (cs) {
+    SF.modal('<button class="mx" data-act="closemodal" aria-label="' + t("btn.close") + '">' + I("x", 20) + '</button><form class="stack" data-form="selfout" data-id="' + el.dataset.id + '"><h2 class="h2">' + t("dl.selfBtn") + '</h2><p class="muted">' + t("dl.selfSub") + "</p>" +
+      (cs.length ? '<div class="tags">' + cs.filter(function (c) { return c.active; }).map(function (c) { return '<button type="button" class="chip" data-act="selfpick" data-n="' + esc(c.name) + '" data-p="' + esc(c.phone.replace(/^\+992/, "")) + '">' + esc(c.name) + "</button>"; }).join("") + "</div>" : "") +
+      '<label class="f">' + t("dl.who2") + '<input name="name" id="so-n" maxlength="60" placeholder="' + t("dl.who2Ph") + '"></label><label class="f">' + t("auth.phone") + '<span class="phonein"><i>+992</i><input name="phone" id="so-p" inputmode="tel"></span></label>' +
+      '<button class="btn primary block lg">' + I("scooter", 18) + t("dl.selfGo") + "</button></form>"); }); };
+  SF.actions.selfpick = function (el) { document.getElementById("so-n").value = el.dataset.n; document.getElementById("so-p").value = el.dataset.p; };
+  SF.forms.selfout = function (fd, f) { return api().post("/restaurant/orders/" + f.dataset.id + "/out", { name: fd.name, phone: fd.phone }).then(function () { SF.closeModal(); SF.toast(t("dl.selfToast")); SF.render({ quiet: true }); }); };
+  SF.actions.selfdone = function (el) { return api().post("/restaurant/orders/" + el.dataset.id + "/delivered").then(function () { SF.toast(t("dl.doneToast")); SF.render({ quiet: true }); }); };
+
+  /* ---------- Our couriers ---------- */
+  R("/rest/couriers", { title: "dl.couriers", live: true, render: function () {
+    return Promise.all([api().get("/restaurant/me"), api().get("/restaurant/couriers")]).then(function (a) {
+      var r = a[0], list = a[1], d = r.delivery || "platform";
+      return '<section class="card dlmode d-' + d + '"><span class="kic">' + I(d === "platform" ? "scooter" : "store", 20) + '</span><div class="grow"><small class="muted">' + t("dl.who") + "</small><b>" + t("dl.m." + d) + "</b><p>" + t("dl.desc." + d, { n: (SF.state.pub && SF.state.pub.handoffMin) || 7 }) + '</p><p class="fine">' + t("dl.adminSets") + "</p></div></section>" +
+        '<div class="toolbar"><p class="muted">' + t("dl.count", { n: list.length, on: list.filter(function (c) { return c.courier.online; }).length }) + '</p><button class="btn primary" data-act="ocnew">' + I("plus", 18) + t("dl.add") + "</button></div>" +
+        (list.length ? '<div class="stack">' + list.map(function (c) {
+          var st = !c.active ? '<span class="pill p-bad">' + t("dl.blocked") + "</span>" : c.busy ? '<span class="pill p-warn">' + t("dl.busy") + "</span>" : c.courier.online ? '<span class="pill p-ok">' + t("cour.onlineL") + "</span>" : '<span class="pill p-mut">' + t("cour.offlineL") + "</span>";
+          return '<div class="card ocrow' + (c.active ? "" : " off") + '"><span class="avatar">' + esc(c.name.charAt(0)) + '</span><div class="grow"><b>' + esc(c.name) + '</b><small class="muted num">' + esc(SF.phone(c.phone)) + " · " + t("veh." + c.courier.vehicle) + " · " + t("dl.deliveredN", { n: c.delivered }) + "</small>" + st + "</div>" +
+            '<button class="iconbtn" data-act="ocpass" data-id="' + c.id + '" data-name="' + esc(c.name) + '" aria-label="' + t("dl.newPass") + '" title="' + t("dl.newPass") + '">' + I("shield", 18) + "</button>" +
+            '<button class="switch' + (c.active ? " on" : "") + '" role="switch" aria-checked="' + c.active + '" data-act="ocact" data-id="' + c.id + '" aria-label="' + t("adm.activeL") + '"></button></div>'; }).join("") + "</div>"
+          : SF.empty("scooter", t("dl.none"), t("dl.noneSub")));
+    });
+  } });
+  function ocCreds(name, login) {
+    SF.modal('<button class="mx" data-act="closemodal" aria-label="' + t("btn.close") + '">' + I("x", 20) + '</button><div class="stack"><h2 class="h2">' + t("adm.credsTitle") + '</h2><p class="muted">' + t("dl.credsSub", { name: name }) + "</p>" +
+      '<div class="creds"><span>' + t("auth.phone") + '</span><code class="num">' + esc(SF.phone(login.phone)) + "</code><span>" + t("auth.password") + '</span><code class="num">' + esc(login.password) + "</code></div>" +
+      '<button type="button" class="btn ghost block" data-act="copynum" data-v="' + esc(SF.phone(login.phone) + " / " + login.password) + '">' + I("copy", 16) + t("adm.credsCopy") + '</button><p class="fine">' + t("adm.credsNote") + "</p></div>"); }
+  SF.actions.ocnew = function () {
+    SF.modal('<button class="mx" data-act="closemodal" aria-label="' + t("btn.close") + '">' + I("x", 20) + '</button><form class="stack" data-form="ocnew"><h2 class="h2">' + t("dl.add") + '</h2><label class="f">' + t("profile.name") + '<input name="name" required maxlength="60"></label>' +
+      '<label class="f">' + t("auth.phone") + '<span class="phonein"><i>+992</i><input name="phone" inputmode="tel" required></span></label><label class="f">' + t("cour.vehicle") + '<select name="vehicle">' + ["scooter", "bike", "car", "foot"].map(function (v) { return '<option value="' + v + '">' + t("veh." + v) + "</option>"; }).join("") + "</select></label>" +
+      '<p class="fine">' + t("dl.addNote") + '</p><button class="btn primary block">' + t("btn.create") + "</button></form>"); };
+  SF.forms.ocnew = function (fd) { return api().post("/restaurant/couriers", fd).then(function (c) { SF.render({ quiet: true }); ocCreds(c.name, c.login); }); };
+  SF.actions.ocact = function (el) { return api().patch("/restaurant/couriers/" + el.dataset.id, { active: el.getAttribute("aria-checked") !== "true" }).then(function () { SF.render({ quiet: true }); }); };
+  SF.actions.ocpass = function (el) { return api().post("/restaurant/couriers/" + el.dataset.id + "/password").then(function (l) { ocCreds(el.dataset.name, l); }); };
+
+  function ticket(o) {
+    var acts = "";
+    if (o.status === "pending") acts = ((o.delivery || "platform") !== "platform" ? '<p class="lbl">' + t("dl.who") + '</p><div class="ic-dl">' + SF.dlChoice((SF.state.tDeliv || {})[o.id] || "own", "tdeliv", o.id) + "</div>" : "") + '<div class="seg" role="group" aria-label="' + t("rest.prep") + '">' + [10, 15, 20, 30, 45].map(function (m) { var on = (SF.state.prep[o.id] || 20) === m; return '<button class="' + (on ? "on" : "") + '" aria-pressed="' + on + '" data-act="prep" data-id="' + o.id + '" data-v="' + m + '">' + m + "</button>"; }).join("") + "</div>" +
+      '<div class="row2"><button class="btn ghost" data-act="reject" data-id="' + o.id + '">' + t("rest.reject") + '</button><button class="btn primary" data-act="accept" data-id="' + o.id + '">' + I("check", 16) + t(o.payment.method === "transfer" ? "tr.acceptPaid" : "rest.accept") + "</button></div>";
+    else if (o.status === "cooking") acts = '<button class="btn ok block" data-act="ready" data-id="' + o.id + '">' + I("bag", 16) + t("rest.markReady") + "</button>" + selfBtn(o);
+    else if (o.selfDelivery) acts = '<div class="msg ok">' + I("store", 16) + t("dl.selfIs", { name: o.selfDelivery.name || t("dl.selfTitle") }) + "</div>" + (o.status === "picked_up" ? '<button class="btn ok block" data-act="selfdone" data-id="' + o.id + '">' + I("check", 16) + t("dl.delivered") + "</button>" : "");
+    else acts = '<div class="msg ' + (o.status === "ready" ? "info" : "ok") + '">' + I("scooter", 16) + (o.courier ? t("rest.courierIs", { name: o.courier.name }) : t("rest.waitCourier")) + "</div>" + selfBtn(o);
+    if (o.status !== "pending") acts = dlNote(o) + acts;
+    return '<article class="ticket t-' + o.status + '"><header><b class="num">№' + o.number + "</b>" + SF.statusPill(o.status) + '<small class="muted">' + ago(o.history[o.history.length - 1].at) + "</small></header>" +
+      '<ul class="items">' + o.items.map(function (it) { return '<li><b class="num">' + it.qty + "×</b><span>" + esc(tx(it.name)) + "</span></li>"; }).join("") + "</ul>" +
+      (o.comment ? '<div class="note">' + I("info", 14) + esc(o.comment) + "</div>" : "") +
+      '<div class="tmeta"><span>' + I(o.payment.method === "cash" ? "cash" : "card", 14) + t("pay." + o.payment.method) + '</span><b class="num">' + money(o.subtotal) + "</b></div>" +
+      (o.payment.method === "transfer" ? '<div class="paycheck' + (o.payment.status === "review" ? " review" : "") + '"><span>' + (o.payment.status === "review" ? t("tr.restCheck", { sum: money(o.total), card: o.payment.toCard }) : t("ps." + o.payment.status)) + '</span><button type="button" class="btn sm ghost" data-act="rcpt" data-id="' + o.id + '">' + I("receipt", 14) + t("tr.receipt") + "</button></div>" : "") +
+      (o.prepMin && o.status === "cooking" ? '<div class="timer"><i style="--p:' + Math.min(100, Math.round((Date.now() - o.history[o.history.length - 1].at) / (o.prepMin * 600))) + '%"></i><span class="num">' + t("rest.prepLeft", { n: Math.max(0, o.prepMin - Math.round((Date.now() - o.history[o.history.length - 1].at) / 60000)) }) + "</span></div>" : "") + acts + "</article>";
+  }
+  R("/rest/orders", { title: "rest.orders", live: true, render: function () {
+    SF.state.prep = SF.state.prep || {};
+    return Promise.all([api().get("/restaurant/orders?scope=new"), api().get("/restaurant/orders?scope=active"), api().get("/restaurant/me")]).then(function (a) {
+      var fresh = a[0], act = a[1], cook = act.filter(function (o) { return o.status === "cooking"; }), out = act.filter(function (o) { return o.status !== "cooking"; }); SF.state.newCount = fresh.length;
+      function col(key, list, icon) { return '<section class="col"><h3>' + I(icon, 18) + t(key) + '<span class="cnt num">' + list.length + "</span></h3>" + (list.length ? list.map(ticket).join("") : '<div class="colempty">' + t("rest.none") + "</div>") + "</section>"; }
+      return subBanner(a[2]) + SF.soundBar() + '<div class="board">' + col("rest.colNew", fresh, "bell") + col("rest.colCooking", cook, "fire") + col("rest.colOut", out, "scooter") + "</div>";
+    });
+  } });
+  SF.actions.prep = function (el) { SF.state.prep[el.dataset.id] = +el.dataset.v; SF.render({ quiet: true }); };
+  SF.actions.accept = function (el) { return api().post("/restaurant/orders/" + el.dataset.id + "/accept", { prepMin: SF.state.prep[el.dataset.id] || 20, delivery: el.closest(".ticket").querySelector(".ic-dl") ? ((SF.state.tDeliv || {})[el.dataset.id] || "own") : undefined }).then(function () { SF.toast(t("rest.accepted")); SF.render({ quiet: true }); }); };
+  SF.actions.ready = function (el) { return api().post("/restaurant/orders/" + el.dataset.id + "/ready").then(function () { SF.toast(t("rest.readyToast")); SF.render({ quiet: true }); }); };
+  SF.actions.reject = function (el) {
+    SF.modal('<div class="confirm"><span class="cic bad">' + I("x", 28) + '</span><h2 class="h2">' + t("rest.rejectTitle") + '</h2><form class="stack" data-form="reject" data-id="' + el.dataset.id + '"><div class="tags">' + ["tr.notReceived", "rest.r1", "rest.r2", "rest.r3"].map(function (k) { return '<button type="button" class="chip" data-act="rreason" data-v="' + esc(t(k)) + '">' + t(k) + "</button>"; }).join("") +
+      '</div><label class="f">' + t("rest.reason") + '<input name="reason" id="rreason" required></label><div class="row2"><button type="button" class="btn ghost" data-act="closemodal">' + t("btn.cancel") + '</button><button class="btn danger">' + t("rest.reject") + "</button></div></form></div>");
+  };
+  SF.actions.rreason = function (el) { document.getElementById("rreason").value = el.dataset.v; };
+  SF.forms.reject = function (fd, f) { return api().post("/restaurant/orders/" + f.dataset.id + "/reject", fd).then(function () { SF.closeModal(); SF.toast(t("rest.rejected"), "info"); SF.render({ quiet: true }); }); };
+
+  /* ---------- Menu ---------- */
+  R("/rest/menu", { title: "rest.menu", render: function () {
+    return Promise.all([api().get("/restaurant/products"), api().get("/restaurant/me")]).then(function (a) {
+      var list = a[0], r = a[1]; SF.state.myProducts = list; SF.state.tone = r.tone;
+      var cats = SF.state.categories.filter(function (c) { return list.some(function (p) { return p.categoryId === c.id; }); });
+      return '<div class="toolbar"><p class="muted">' + t("menu.count", { n: list.length, off: list.filter(function (p) { return !p.available; }).length }) + '</p><button class="btn primary" data-act="prodnew">' + I("plus", 18) + t("menu.add") + "</button></div>" +
+        (list.length ? cats.map(function (c) { return '<section class="msec"><h2>' + esc(tx(c.name)) + '</h2><div class="mtable">' + list.filter(function (p) { return p.categoryId === c.id; }).map(function (p) {
+          return '<div class="mrowp' + (p.available ? "" : " off") + '"><span class="cim" style="--tone:' + esc(r.tone) + '">' + SF.pic(p, 48) + '</span><div class="grow"><b>' + esc(tx(p.name)) + (SF.sale(p) ? ' <span class="chip sale">−' + SF.sale(p) + "%</span>" : "") + (p.popular ? ' <span class="chip hot">' + I("fire", 12) + t("prod.hit") + "</span>" : "") + '</b><small class="muted">' + esc(tx(p.desc)) + (p.weight ? " · " + esc(p.weight) : "") + '</small></div><b class="num price">' + money(p.price) + (SF.sale(p) ? "<s>" + money(p.oldPrice) + "</s>" : "") + "</b>" +
+            '<button class="switch' + (p.available ? " on" : "") + '" role="switch" aria-checked="' + p.available + '" aria-label="' + t("menu.inStock") + '" data-act="pavail" data-id="' + p.id + '"></button>' +
+            '<button class="iconbtn" data-act="prodedit" data-id="' + p.id + '" aria-label="' + t("btn.edit") + '">' + I("edit", 18) + '</button><button class="iconbtn" data-act="proddel" data-id="' + p.id + '" aria-label="' + t("btn.delete") + '">' + I("trash", 18) + "</button></div>"; }).join("") + "</div></section>"; }).join("")
+          : SF.empty("grid", t("menu.empty"), t("menu.emptySub")));
+    });
+  } });
+  function prodForm(p) {
+    p = p || { name: { tg: "" }, desc: { tg: "" }, price: "", weight: "", categoryId: SF.state.categories[0].id, kind: "plate", popular: false, photo: null, oldPrice: null };
+    SF.state.pk = p.kind; SF.state.pphoto = p.photo || null;
+    SF.modal('<button class="mx" data-act="closemodal" aria-label="' + t("btn.close") + '">' + I("x", 20) + '</button><form class="stack pform' + (p.photo ? " hasphoto" : "") + '" data-form="prod" data-id="' + (p.id || "") + '"><h2 class="h2">' + t(p.id ? "menu.edit" : "menu.add") + "</h2>" +
+      '<div class="photoup">' + photoBox() + '</div><p class="fine pkfine">' + t("menu.photoOr") + "</p>" +
+      '<div class="pkind"><span class="pkprev" id="pkprev" style="--tone:' + esc(SF.state.tone) + '">' + SF.art(p.kind, 96) + '</span><div class="pkgrid" role="radiogroup" aria-label="' + t("menu.picture") + '">' + SF.KINDS.map(function (k) { return '<button type="button" role="radio" aria-checked="' + (k === p.kind) + '" class="' + (k === p.kind ? "on" : "") + '" data-act="pkind" data-v="' + k + '" aria-label="' + k + '">' + SF.art(k, 30) + "</button>"; }).join("") + "</div></div>" +
+      '<label class="f">' + t("menu.name") + '<input name="name" required maxlength="60" value="' + esc(tx(p.name)) + '"></label><label class="f">' + t("menu.desc") + '<input name="desc" maxlength="140" value="' + esc(tx(p.desc)) + '"></label>' +
+      '<div class="grid3"><label class="f">' + t("menu.price") + '<input name="price" inputmode="numeric" required value="' + esc(p.price) + '"></label><label class="f">' + t("menu.oldPrice") + '<input name="oldPrice" inputmode="numeric" placeholder="' + t("menu.oldPriceHint") + '" value="' + esc(p.oldPrice || "") + '"></label><label class="f">' + t("menu.weight") + '<input name="weight" maxlength="20" value="' + esc(p.weight) + '" placeholder="350 г"></label>' +
+      '<label class="f">' + t("menu.category") + '<select name="categoryId">' + SF.state.categories.map(function (c) { return '<option value="' + c.id + '"' + (c.id === p.categoryId ? " selected" : "") + ">" + esc(tx(c.name)) + "</option>"; }).join("") + "</select></label></div>" +
+      '<label class="check"><input type="checkbox" name="popular"' + (p.popular ? " checked" : "") + "><span>" + t("menu.popular") + '</span></label><input type="hidden" name="kind" id="pkind" value="' + esc(p.kind) + '"><button class="btn primary block lg">' + t("btn.save") + "</button></form>", "wide");
+  }
+  function photoBox() { var ph = SF.state.pphoto;
+    return '<label class="upload ph' + (ph ? " done" : "") + '">' + (ph ? '<img src="' + esc(ph) + '" alt="">' + "<span>" + I("check", 16) + t("menu.photoSet") + "</span><small>" + t("tr.change") + "</small>" : I("plus", 22) + "<b>" + t("menu.photo") + "</b><small>" + t("menu.photoSub") + "</small>") +
+      '<input type="file" accept="image/*" data-input="pphoto"></label>' + (ph ? '<button type="button" class="btn sm ghost" data-act="pphotodel">' + I("trash", 14) + t("btn.remove") + "</button>" : ""); }
+  function pickPhoto(el, max, done) { var f = el.files && el.files[0]; if (!f) return;
+    SF.shrinkImage(f, max, 0.8).then(done, function () { SF.toast(t("tr.notImage"), "err"); }); }
+  SF.inputs.pphoto = function (v, el) { pickPhoto(el, 900, function (d) { SF.state.pphoto = d; var f = el.closest("form"); f.classList.add("hasphoto"); f.querySelector(".photoup").innerHTML = photoBox(); }); };
+  SF.actions.pphotodel = function (el) { SF.state.pphoto = null; var f = el.closest("form"); f.classList.remove("hasphoto"); f.querySelector(".photoup").innerHTML = photoBox(); };
+  SF.actions.prodnew = function () { prodForm(null); };
+  SF.actions.prodedit = function (el) { prodForm(SF.state.myProducts.filter(function (p) { return p.id === el.dataset.id; })[0]); };
+  SF.actions.pkind = function (el) { document.getElementById("pkind").value = el.dataset.v; document.getElementById("pkprev").innerHTML = SF.art(el.dataset.v, 96);
+    Array.prototype.forEach.call(el.parentNode.children, function (b) { var on = b === el; b.classList.toggle("on", on); b.setAttribute("aria-checked", on); }); };
+  SF.forms.prod = function (fd, f) { var body = { name: fd.name, desc: fd.desc, price: Number(fd.price), weight: fd.weight, categoryId: fd.categoryId, kind: fd.kind, popular: !!fd.popular,
+      oldPrice: fd.oldPrice ? Number(fd.oldPrice) : null, photo: SF.state.pphoto || null };
+    var req = f.dataset.id ? api().patch("/restaurant/products/" + f.dataset.id, body) : api().post("/restaurant/products", body);
+    return req.then(function () { SF.closeModal(); SF.toast(t("btn.saved")); SF.render({ quiet: true }); }); };
+  SF.actions.pavail = function (el) { return api().patch("/restaurant/products/" + el.dataset.id, { available: el.getAttribute("aria-checked") !== "true" }).then(function () { SF.render({ quiet: true }); }); };
+  SF.actions.proddel = function (el) { var p = SF.state.myProducts.filter(function (x) { return x.id === el.dataset.id; })[0];
+    SF.modal('<div class="confirm"><span class="cic bad">' + I("trash", 26) + '</span><h2 class="h2">' + t("menu.delTitle") + '</h2><p class="muted">' + esc(tx(p.name)) + '</p><div class="row2"><button class="btn ghost" data-act="closemodal">' + t("btn.cancel") + '</button><button class="btn danger" data-act="proddelok" data-id="' + p.id + '">' + t("btn.delete") + "</button></div></div>"); };
+  SF.actions.proddelok = function (el) { return api().del("/restaurant/products/" + el.dataset.id).then(function () { SF.closeModal(); SF.toast(t("menu.deleted"), "info"); SF.render({ quiet: true }); }); };
+
+  /* ---------- History ---------- */
+  R("/rest/history", { title: "rest.history", render: function () {
+    return api().get("/restaurant/orders?scope=history").then(function (list) {
+      return list.length ? '<div class="card tablecard"><div class="tscroll"><table class="tbl cardtbl"><thead><tr><th>№</th><th>' + t("tb.time") + "</th><th>" + t("tb.items") + "</th><th>" + t("tb.pay") + "</th><th>" + t("tb.sum") + "</th><th>" + t("tb.status") + "</th><th>" + t("tb.review") + "</th></tr></thead><tbody>" +
+        list.map(function (o) { return SF.labelCells(["№", t("tb.time"), t("tb.items"), t("tb.pay"), t("tb.sum"), t("tb.status"), t("tb.review")], '<tr><td class="num">' + o.number + '</td><td class="num">' + SF.dt(o.createdAt) + "</td><td>" + o.items.map(function (i) { return esc(tx(i.name)) + " ×" + i.qty; }).join(", ") + "</td><td>" + t("pay." + o.payment.method) + '</td><td class="num">' + money(o.subtotal) + "</td><td>" + SF.statusPill(o.status) + "</td><td>" + (o.review ? SF.stars(o.review.rating) : "—") + "</td></tr>"); }).join("") + "</tbody></table></div></div>"
+        : SF.empty("list", t("rest.noHistory"));
+    });
+  } });
+
+  /* ---------- Promotion: the owner advertises the place himself ---------- */
+  var TONES = ["#E8590C", "#0B8A5A", "#7A3E9D", "#1F6FB2", "#C2185B", "#B7791F", "#1F1A17"];
+  function adDraft() { return SF.state.adDraft; }
+  function adPreview() { var d = adDraft(); return SF.bannerHtml({ title: { tg: d.title || t("ad.titleHint") }, sub: { tg: d.sub }, tone: d.tone, art: d.art, photo: d.photo, own: true }, "div"); }
+  function coverBox(r) { var c = SF.state.coverDraft;
+    return '<label class="upload cover' + (c ? " done" : "") + '" style="--tone:' + esc(r.tone) + '">' + (c ? '<img src="' + esc(c) + '" alt="">' + "<span>" + I("check", 16) + t("menu.photoSet") + "</span><small>" + t("tr.change") + "</small>" : I("plus", 22) + "<b>" + t("promo.cover") + "</b><small>" + t("promo.coverSub") + "</small>") +
+      '<input type="file" accept="image/*" data-input="cover"></label>'; }
+  R("/rest/promo", { title: "rest.promo", render: function () {
+    return Promise.all([api().get("/restaurant/me"), api().get("/restaurant/ad"), api().get("/restaurant/products")]).then(function (a) {
+      var r = a[0], ad = a[1], prods = a[2]; SF.state.promoRest = r;
+      if (SF.state.adFor !== r.id) { SF.state.adFor = r.id; SF.state.coverDraft = r.cover || null;
+        SF.state.adDraft = ad ? { title: tx(ad.title), sub: tx(ad.sub), tone: ad.tone, art: ad.art, photo: ad.photo, active: ad.active, productId: ad.productId }
+          : { title: tx(r.name), sub: "", tone: TONES.indexOf(r.tone) >= 0 ? r.tone : TONES[0], art: (prods[0] || {}).kind || "plov", photo: null, active: true, productId: null }; }
+      var d = adDraft(), sale = prods.filter(function (p) { return SF.sale(p); });
+      var status = !ad ? '<div class="msg info">' + I("info", 16) + t("ad.none") + "</div>" : ad.blocked ? '<div class="msg err">' + I("shield", 16) + t("ad.blocked") + "</div>"
+        : ad.active ? '<div class="msg ok">' + I("check", 16) + t("ad.live") + "</div>" : '<div class="msg warn">' + I("clock", 16) + t("ad.paused") + "</div>";
+      return '<p class="muted">' + t("promo.sub") + '</p><div class="two">' +
+        '<form class="card stack" data-form="adsave"><h3>' + I("gift", 18) + t("ad.title") + "</h3>" + status +
+          '<div id="adprev" class="adprev">' + adPreview() + "</div>" +
+          '<label class="f">' + t("ad.head") + '<input name="title" maxlength="40" required data-input="adtitle" value="' + esc(d.title) + '"></label>' +
+          '<label class="f">' + t("ad.text") + '<input name="sub" maxlength="70" data-input="adsub" placeholder="' + t("ad.textHint") + '" value="' + esc(d.sub) + '"></label>' +
+          '<div class="f"><span>' + t("ad.color") + '</span><div class="tones" role="radiogroup" aria-label="' + t("ad.color") + '">' + TONES.map(function (c) { return '<button type="button" role="radio" aria-checked="' + (c === d.tone) + '" class="tone' + (c === d.tone ? " on" : "") + '" style="--c:' + c + '" data-act="adtone" data-v="' + c + '" aria-label="' + c + '"></button>'; }).join("") + "</div></div>" +
+          '<div class="f"><span>' + t("ad.pic") + '</span><div class="adpics">' +
+            '<label class="upload sm' + (d.photo ? " done" : "") + '">' + (d.photo ? '<img src="' + esc(d.photo) + '" alt="">' : I("plus", 18)) + "<b>" + t(d.photo ? "tr.change" : "ad.photo") + '</b><input type="file" accept="image/*" data-input="adphoto"></label>' +
+            (d.photo ? '<button type="button" class="btn sm ghost" data-act="adphotodel">' + I("trash", 14) + t("btn.remove") + "</button>" : '<div class="pkgrid">' + ["plov", "shashlik", "burger", "pizza", "samsa", "dessert", "lagman", "coffee"].map(function (k) { return '<button type="button" class="' + (k === d.art ? "on" : "") + '" aria-pressed="' + (k === d.art) + '" data-act="adart" data-v="' + k + '" aria-label="' + k + '">' + SF.art(k, 28) + "</button>"; }).join("") + "</div>") + "</div></div>" +
+          '<label class="switchrow"><span>' + t("ad.show") + '</span><button type="button" class="switch' + (d.active ? " on" : "") + '" role="switch" aria-checked="' + !!d.active + '" data-act="adactive" aria-label="' + t("ad.show") + '"' + (ad && ad.blocked ? " disabled" : "") + "></button></label>" +
+          '<div class="row2 adbtns">' + (ad ? '<button type="button" class="btn ghost" data-act="addel">' + I("trash", 16) + t("btn.delete") + "</button>" : "") + '<button class="btn primary">' + I("check", 16) + t(ad ? "btn.save" : "ad.publish") + "</button></div></form>" +
+        '<div class="stack">' +
+          '<form class="card stack" data-form="rprofile"><h3>' + I("store", 18) + t("promo.page") + "</h3>" + '<div class="coverup">' + coverBox(r) + "</div>" +
+            '<label class="f">' + t("promo.cuisine") + '<input name="cuisine" maxlength="60" required value="' + esc(tx(r.cuisine)) + '" placeholder="' + t("promo.cuisineHint") + '"></label>' +
+            '<label class="f">' + t("promo.about") + '<textarea name="about" maxlength="200" rows="3" placeholder="' + t("promo.aboutHint") + '">' + esc(tx(r.about || "")) + "</textarea></label>" +
+            '<button class="btn primary">' + t("btn.save") + "</button>" +
+            '<div class="f"><span>' + I("eye", 14) + t("promo.look") + '</span><div class="rcprev">' + SF.restCard(Object.assign({}, r, { cover: SF.state.coverDraft, art1: (prods[0] || {}).kind, art2: (prods[1] || {}).kind })).replace(/^<a /, '<div ').replace(/<\/a>$/, "</div>") + "</div></div></form>" +
+          '<section class="card stack"><h3>' + I("percent", 18) + t("promo.sale") + '</h3><p class="muted sm">' + t("promo.saleSub") + "</p>" +
+            (sale.length ? sale.map(function (p) { return '<div class="topi"><span class="cim" style="--tone:' + esc(r.tone) + '">' + SF.pic(p, 40) + '</span><div class="grow"><b>' + esc(tx(p.name)) + '</b><small class="muted num"><s>' + money(p.oldPrice) + "</s> → " + money(p.price) + '</small></div><span class="chip sale">−' + SF.sale(p) + "%</span></div>"; }).join("") : "") +
+            '<a class="btn ghost" href="#/rest/menu">' + I("edit", 16) + t("promo.toMenu") + "</a></section>" +
+          '<section class="card stack tips"><h3>' + I("info", 18) + t("promo.tips") + "</h3><ul><li>" + t("promo.tip1") + "</li><li>" + t("promo.tip2") + "</li><li>" + t("promo.tip3") + "</li></ul></section>" +
+        "</div></div>";
+    });
+  } });
+  function redrawAd() { var el = document.getElementById("adprev"); if (el) el.innerHTML = adPreview(); }
+  SF.inputs.adtitle = function (v) { adDraft().title = v; redrawAd(); };
+  SF.inputs.adsub = function (v) { adDraft().sub = v; redrawAd(); };
+  function keepText() { var f = document.querySelector("[data-form=adsave]"); if (f) { adDraft().title = f.title.value; adDraft().sub = f.sub.value; } }
+  SF.actions.adtone = function (el) { keepText(); adDraft().tone = el.dataset.v; SF.render({ quiet: true }); };
+  SF.actions.adart = function (el) { keepText(); adDraft().art = el.dataset.v; SF.render({ quiet: true }); };
+  SF.actions.adactive = function () { keepText(); adDraft().active = !adDraft().active; SF.render({ quiet: true }); };
+  SF.actions.adphotodel = function () { keepText(); adDraft().photo = null; SF.render({ quiet: true }); };
+  SF.inputs.adphoto = function (v, el) { keepText(); pickPhoto(el, 1200, function (d) { adDraft().photo = d; SF.render({ quiet: true }); }); };
+  SF.inputs.cover = function (v, el) { pickPhoto(el, 1400, function (d) { SF.state.coverDraft = d; el.closest(".coverup").innerHTML = coverBox(SF.state.promoRest); }); };
+  SF.forms.adsave = function (fd) { var d = adDraft();
+    return api().post("/restaurant/ad", { title: fd.title, sub: fd.sub, tone: d.tone, art: d.art, photo: d.photo || null, active: d.active, productId: d.productId }).then(function () { SF.state.adFor = null; SF.toast(t(d.active ? "ad.published" : "btn.saved")); SF.render({ quiet: true }); }); };
+  SF.actions.addel = function () { return api().del("/restaurant/ad").then(function () { SF.state.adFor = null; SF.toast(t("ad.deleted"), "info"); SF.render({ quiet: true }); }); };
+  SF.forms.rprofile = function (fd) { return api().patch("/restaurant/me", { cuisine: fd.cuisine, about: fd.about, cover: SF.state.coverDraft || null }).then(function () { SF.state.adFor = null; SF.toast(t("btn.saved")); SF.render({ quiet: true }); }); };
+  /* ---------- Settings ---------- */
+  R("/rest/settings", { title: "rest.settings", render: function () {
+    return api().get("/restaurant/me").then(function (r) {
+      return SF.installCard() + '<div class="two"><form class="card stack" data-form="rset"><h3>' + t("rest.hours") + '</h3><div class="grid2"><label class="f">' + t("rest.from") + '<input type="time" name="from" value="' + esc(r.hours.from) + '" required></label><label class="f">' + t("rest.to") + '<input type="time" name="to" value="' + esc(r.hours.to) + '" required></label></div>' +
+        '<div class="grid2"><label class="f">' + t("rest.eta") + '<input name="eta" value="' + esc(r.eta) + '" placeholder="25–35"></label><label class="f">' + t("rest.minOrderL") + '<input name="minOrder" inputmode="numeric" value="' + r.minOrder + '"></label></div>' +
+        '<label class="f">' + t("auth.phone") + '<input name="phone" inputmode="tel" value="' + esc(SF.phone(r.phone)) + '"></label><label class="f">' + t("rest.addressL") + '<input name="address" value="' + esc(tx(r.address)) + '"></label><button class="btn primary">' + t("btn.save") + "</button></form>" +
+        '<form class="card stack" data-form="rcard"><h3>' + t("tr.cardTitle") + '</h3><p class="muted sm">' + t("tr.cardSub") + '</p><label class="f">' + t("tr.cardNum") + '<input name="number" id="rc-num" inputmode="numeric" autocomplete="off" placeholder="0000 0000 0000 0000" value="' + esc(r.payCard ? r.payCard.number.replace(/(\d{4})(?=\d)/g, "$1 ") : "") + '"></label>' +
+        '<div class="grid2"><label class="f">' + t("tr.holder") + '<input name="holder" id="rc-holder" value="' + esc(r.payCard ? r.payCard.holder : "") + '"></label><label class="f">' + t("tr.bank") + '<input name="bank" id="rc-bank" placeholder="Алиф, Эсхата, Амонатбонк…" value="' + esc(r.payCard ? r.payCard.bank : "") + '"></label></div><button class="btn primary">' + t("btn.save") + "</button></form>" +
+        '<section class="card stack"><h3>' + t("rest.where") + '</h3><p class="muted sm">' + t("rest.whereSub") + "</p>" + SF.tmap({ key: "rloc", picker: true, center: { lat: r.lat, lng: r.lng }, zoom: 17, zone: SF.zone(r.cityId), label: t("rest.where"), onMove: function (p, fin) { SF.state.rloc = p; } }) +
+        '<button class="btn primary" data-act="rloc">' + I("pin", 16) + t("rest.whereSave") + "</button></section>" + SF.pwForm() +
+        subCard(r) + '<section class="card stack"><h3>' + t("rest.profile") + '</h3><div class="rprof" style="--tone:' + esc(r.tone) + '">' + SF.art("plov", 72) + "<div><b class=\"h2\">" + esc(tx(r.name)) + '</b><span class="muted">' + esc(tx(r.cuisine)) + "</span></div></div>" +
+        '<div class="line"><span>' + t("k.rating") + "</span>" + SF.stars(r.rating) + '</div><div class="line"><span>' + t("adm.commission") + '</span><b class="num">' + r.commissionPct + '%</b></div><div class="line"><span>' + t("rest.products") + '</span><b class="num">' + r.productCount + "</b></div><p class=\"fine\">" + t("rest.profileNote") + "</p></section></div>";
+    });
+  } });
+  SF.forms.rset = function (fd) { var ph = String(fd.phone || "").replace(/\D/g, "");
+    return api().patch("/restaurant/me", { hours: { from: fd.from, to: fd.to }, eta: String(fd.eta).replace("-", "–"), minOrder: Number(fd.minOrder), phone: ph, address: fd.address }).then(function () { SF.toast(t("btn.saved")); SF.render({ quiet: true }); }); };
+  SF.actions.rloc = function () { var p = SF.state.rloc || SF.state.tmv.rloc; if (!p) return; return api().patch("/restaurant/me", { lat: p.lat, lng: p.lng }).then(function () { SF.toast(t("rest.whereDone")); }); };
+  /* receipt photo: restaurant (and admin) check it against their bank app before accepting */
+  SF.actions.rcpt = function (el) { return api().get("/orders/" + el.dataset.id + "/receipt").then(function (r) {
+    SF.modal('<button class="mx" data-act="closemodal" aria-label="' + t("btn.close") + '">' + I("x", 20) + '</button><div class="stack"><h2 class="h2">' + t("tr.receipt") + '</h2><img class="rcptimg" src="' + r.image + '" alt="' + t("tr.receipt") + '"><p class="fine">' + t("tr.verify") + "</p></div>", "wide"); }); };
+  SF.forms.rcard = function (fd) { return api().patch("/restaurant/me", { payCard: { number: fd.number, holder: fd.holder, bank: fd.bank } }).then(function () { SF.toast(t("btn.saved")); SF.render({ quiet: true }); }); };
+})();

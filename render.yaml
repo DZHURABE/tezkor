@@ -1,0 +1,40 @@
+# Render blueprint: one web service + a 1 GB disk for orders, users and receipt photos.
+services:
+  - type: web
+    name: tezkor
+    runtime: node
+    plan: starter            # paid plan: the free one has no disk and would lose orders on restart
+    region: frankfurt
+    buildCommand: cd apps/web && node build.mjs
+    startCommand: node apps/api/src/index.js
+    healthCheckPath: /health
+    disk:
+      name: data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: DATA_FILE
+        value: /var/data/db.json
+      - key: ADMIN_PHONE
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: MAP_TILES
+        value: https://tile.openstreetmap.org/{z}/{x}/{y}.png
+      - key: MAP_TILES_ATTR
+        value: © OpenStreetMap
+      - key: NODE_VERSION
+        value: "20"
+      # Phone confirmation (each turns on when filled in; see ИШГА-ТУШИРИШ.md, section 6)
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: WHATSAPP_NUMBER
+        sync: false
+      - key: WHATSAPP_VERIFY_TOKEN
+        sync: false
+      - key: WHATSAPP_TOKEN
+        sync: false
+      - key: WHATSAPP_PHONE_ID
+        sync: false
+      - key: WHATSAPP_APP_SECRET
+        sync: false

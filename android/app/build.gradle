@@ -1,0 +1,41 @@
+plugins { id "com.android.application" }
+
+/* The address of the live site the app opens. Set it when building:
+   gradle assembleRelease -PappUrl=https://tezkor.tj  (GitHub Actions passes the APP_URL repository variable) */
+def appUrl = (project.findProperty("appUrl") ?: "https://tezkor.onrender.com").toString().replaceAll('/+$', "")
+def verCode = (project.findProperty("versionCode") ?: "1").toString().toInteger()
+
+android {
+    namespace "tj.tezkor.app"
+    compileSdk 34
+    defaultConfig {
+        applicationId "tj.tezkor.app"
+        minSdk 24
+        targetSdk 34
+        versionCode verCode
+        versionName "1." + verCode
+        resValue "string", "app_url", appUrl
+    }
+    signingConfigs {
+        release {
+            storeFile file(System.getenv("TEZKOR_KEYSTORE") ?: "../tezkor-release.jks")
+            storePassword System.getenv("TEZKOR_KEYSTORE_PASSWORD") ?: "tezkor-2026"
+            keyAlias System.getenv("TEZKOR_KEY_ALIAS") ?: "tezkor"
+            keyPassword System.getenv("TEZKOR_KEY_PASSWORD") ?: "tezkor-2026"
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+    }
+    lint {
+        checkReleaseBuilds false
+        abortOnError false
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="TezkorTheme" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:colorPrimary">#E8590C</item>
+        <item name="android:colorPrimaryDark">#E8590C</item>
+        <item name="android:colorAccent">#E8590C</item>
+        <item name="android:statusBarColor">#E8590C</item>
+        <item name="android:navigationBarColor">#F4F1EC</item>
+        <item name="android:windowBackground">#F4F1EC</item>
+    </style>
+</resources>

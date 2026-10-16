@@ -1,0 +1,3 @@
+{ "name": "@somon/api", "version": "0.1.0", "private": true, "main": "src/index.js",
+  "scripts": { "start": "node src/index.js", "test": "node ../web/test/api.test.js" },
+  "engines": { "node": ">=18" } }

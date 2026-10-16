@@ -1,0 +1,50 @@
+/* passwords on a phone, real server: register, eye, wrong password vs unknown number, forgot → admin → one-time → own password */
+const { chromium, devices } = require("/opt/npm-tools/node_modules/playwright");
+const { spawn } = require("child_process"), path = require("path"), fs = require("fs"), os = require("os");
+const PORT = 8500 + Math.floor(Math.random() * 400), BASE = `http://localhost:${PORT}/`;
+const S = path.resolve(__dirname, "../shots"); fs.mkdirSync(S, { recursive: true });
+const errs = [];
+(async () => {
+  const srv = spawn(process.execPath, [path.resolve(__dirname, "../../api/src/index.js")], { env: { ...process.env, PORT, DATA_FILE: path.join(fs.mkdtempSync(path.join(os.tmpdir(), "pw-")), "db.json"), ADMIN_PHONE: "931112233", ADMIN_PASSWORD: "Admin2026" }, stdio: "ignore" });
+  process.on("exit", () => srv.kill()); await new Promise(r => setTimeout(r, 900));
+  const b = await chromium.launch();
+  const phone = async () => { const c = await b.newContext({ ...devices["Pixel 7"] }); await c.route(/fonts\.|tile\./, x => x.abort()); const p = await c.newPage(); p.on("pageerror", e => errs.push(e.message));
+    await p.goto(BASE); await p.evaluate(() => localStorage.setItem("somon.lang", '"tg"')); await p.reload(); await p.waitForTimeout(900); return p; };
+  const go = async (p, h) => { await p.evaluate(x => location.hash = x, h); await p.waitForTimeout(600); };
+  const toast = (p) => p.evaluate(() => document.querySelector("#toasts").innerText.trim().split("\n").pop());
+  const clear = (p) => p.evaluate(() => { document.getElementById("toasts").innerHTML = ""; });
+  const c = await phone();
+  await go(c, "/register"); await c.fill("[data-form=register] [name=name]", "Нигина"); await c.fill("[data-form=register] [name=phone]", "93 777 88 99");
+  await c.fill("[data-form=register] [name=password]", "Gul2026!"); await c.click("[data-form=register] [data-act=pweye]");
+  console.log("eye shows password:", await c.evaluate(() => document.querySelector("[data-form=register] [name=password]").type === "text"));
+  await clear(c); await c.screenshot({ path: S + "/pw-register.png" });
+  await c.click("[data-form=register] button.primary"); await c.waitForTimeout(900); console.log("register:", await toast(c));
+  await c.evaluate(() => SF.actions.logout()); await c.waitForTimeout(400); await go(c, "/login");
+  console.log("phone remembered:", await c.inputValue("[data-form=login] [name=phone]"));
+  await c.fill("[data-form=login] [name=password]", "gul2026!"); await c.click("[data-form=login] button.primary"); await c.waitForTimeout(800); console.log("wrong case:", await toast(c));
+  await c.fill("[data-form=login] [name=phone]", "93 123 45 67"); await c.click("[data-form=login] button.primary"); await c.waitForTimeout(800); console.log("unknown number:", await toast(c));
+  await c.fill("[data-form=login] [name=phone]", "0937778899"); await c.fill("[data-form=login] [name=password]", "Gul2026!"); await c.click("[data-form=login] button.primary"); await c.waitForTimeout(900);
+  console.log("login with 0 prefix:", await toast(c), await c.evaluate(() => location.hash));
+  await c.evaluate(() => SF.actions.logout()); await c.waitForTimeout(400); await go(c, "/login"); await clear(c); await c.screenshot({ path: S + "/pw-login.png" });
+  await c.click("[data-act=forgot]"); await c.waitForTimeout(500); await c.screenshot({ path: S + "/pw-forgot.png" });
+  await c.click("[data-form=forgot] button.primary"); await c.waitForTimeout(800); console.log("forgot:", await c.evaluate(() => document.querySelector("#modal h2").innerText));
+  await c.evaluate(() => SF.closeModal());
+  // admin
+  const a = await phone(); await go(a, "/login"); await a.fill("[data-form=login] [name=phone]", "931112233"); await a.fill("[data-form=login] [name=password]", "Admin2026"); await a.click("[data-form=login] button.primary"); await a.waitForTimeout(1500);
+  await a.evaluate(() => SF.poll && SF.poll(true)); await a.waitForTimeout(1200);
+  await a.click(".bellbtn, [data-act=notes]").catch(() => {}); await a.waitForTimeout(600);
+  const note = await a.$("[data-act=noteopen][data-k='n.pwReset']"); console.log("admin bell has request:", !!note);
+  if (note) { await note.click(); await a.waitForTimeout(900); } else await go(a, "/admin/users?q=937778899");
+  console.log("admin opened:", await a.evaluate(() => location.hash), "| badge:", await a.evaluate(() => (document.querySelector(".pwreq") || {}).innerText));
+  await clear(a); await a.screenshot({ path: S + "/pw-admin.png" });
+  await a.click("[data-act=apass]"); await a.waitForTimeout(700);
+  const tmp = await a.evaluate(() => document.querySelectorAll(".creds code")[1].innerText); console.log("one-time password:", tmp);
+  // customer logs in with it and sets own
+  await go(c, "/login"); await c.fill("[data-form=login] [name=password]", tmp); await c.click("[data-form=login] button.primary"); await c.waitForTimeout(1300);
+  console.log("asked to set own:", await c.evaluate(() => !!document.querySelector("[data-form=newpw]"))); await clear(c); await c.screenshot({ path: S + "/pw-must.png" });
+  await c.fill("[data-form=newpw] [name=password]", "Nigina99"); await c.click("[data-form=newpw] button.primary"); await c.waitForTimeout(800); console.log("saved:", await toast(c));
+  await c.evaluate(() => SF.actions.logout()); await c.waitForTimeout(400); await go(c, "/login"); await c.fill("[data-form=login] [name=password]", "Nigina99"); await c.click("[data-form=login] button.primary"); await c.waitForTimeout(900);
+  console.log("login with own new password:", await toast(c), await c.evaluate(() => location.hash));
+  console.log(errs.length ? "PAGE ERRORS: " + errs.join(" | ") : "NO PAGE ERRORS");
+  await b.close(); srv.kill();
+})();
