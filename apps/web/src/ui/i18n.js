@@ -389,6 +389,9 @@ SF.I18N = {};
   K("vf.confirmRow", "Рақамро тасдиқ кунед", "Подтвердите номер", "Confirm your number");
   K("vf.notYet", "тасдиқ нашуда", "не подтверждён", "not confirmed");
   /* ordering at the table (QR) */
+  K("adm.addrL", "Суроға", "Адрес", "Address"); K("adm.restPhone", "Телефони ошхона", "Телефон заведения", "Restaurant phone");
+  K("adm.ownerT", "Соҳиб", "Владелец", "Owner"); K("adm.ownerNewPass", "Пароли нав ба соҳиб", "Новый пароль владельцу", "New password for the owner");
+  K("adm.ownerPhoneNote", "Рақами соҳиб — логини ӯ. Агар иваз кунед, ӯ бо рақами нав ворид мешавад (парол ҳамон).", "Номер владельца — его логин. После смены он входит с новым номером (пароль тот же).", "The owner's number is his login. After a change he logs in with the new number (same password).");
   K("tb.nav", "Мизҳо · QR", "Столы · QR", "Tables · QR"); K("tb.title", "Фармоиш аз миз", "Заказ со стола", "Order from the table");
   K("tb.table", "Мизи {n}", "Стол {n}", "Table {n}"); K("tb.inHall", "дар толор", "в зале", "in the hall");
   K("tb.accepted", "Қабул шуд — пухтанро сар кунед", "Принят — готовьте", "Accepted — start cooking"); K("tb.payTable", "Пардохт дар миз", "Оплата за столом", "Pay at the table");

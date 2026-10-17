@@ -682,6 +682,15 @@
     route("PATCH", "/admin/restaurants/:id", ["admin"], function (req, b, q, p) { var r = find(db.restaurants, p.id); if (!r) E(404, "NOT_FOUND");
       if (b.delivery != null) { if (["platform", "own", "mixed"].indexOf(b.delivery) < 0) E(400, "BAD_DELIVERY"); r.delivery = b.delivery; }
       if (b.logo !== undefined) r.logo = photoField(b.logo, r.logo || null, "lg"); if (b.cover !== undefined) r.cover = photoField(b.cover, r.cover || null, "cv");
+      /* the admin corrects what was typed when the restaurant was added: name, kitchen, city, address, phones, the owner's name and login number */
+      if (b.name != null) { var nm = str(b.name, 60); if (nm.length < 2) E(400, "BAD_NAME"); r.name = L(nm); }
+      if (b.cuisine != null) r.cuisine = L(str(b.cuisine, 60) || "—"); if (b.address != null) r.address = L(str(b.address, 80));
+      if (b.cityId != null) { var cc = find(db.cities, b.cityId); if (!cc) E(400, "BAD_CITY"); if (cc.id !== r.cityId) { r.cityId = cc.id; r.lat = cc.lat + 0.004; r.lng = cc.lng - 0.004; } }
+      if (b.phone != null) { var rp = Rules.normPhone(b.phone); if (!rp) E(400, "BAD_PHONE"); r.phone = rp; }
+      var ow = find(db.users, r.ownerId);
+      if (ow && b.ownerName != null) { var on = str(b.ownerName, 60); if (on.length < 2) E(400, "BAD_NAME"); ow.name = on; }
+      if (ow && b.ownerPhone != null) { var op = Rules.normPhone(b.ownerPhone); if (!op) E(400, "BAD_PHONE");
+        if (op !== ow.phone) { if (db.users.some(function (u) { return u.phone === op; })) E(409, "PHONE_TAKEN"); ow.phone = op; ow.phoneVerified = null; } }
       if (b.active != null) r.active = !!b.active; if (b.commissionPct != null) { var c = int(b.commissionPct); if (!(c >= 0 && c <= 50)) E(400, "BAD_COMMISSION"); r.commissionPct = c; } save(); return pubRest(r); });
     route("GET", "/admin/users", ["admin"], function (req, b, q) { var l = db.users; if (q.role) l = l.filter(function (u) { return u.role === q.role; });
       if (q.q) { var s = str(q.q).toLowerCase(); l = l.filter(function (u) { return u.name.toLowerCase().indexOf(s) >= 0 || u.phone.indexOf(s.replace(/\D/g, "") || "~") >= 0; }); }
