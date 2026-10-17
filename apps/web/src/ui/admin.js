@@ -134,8 +134,12 @@
       '<div class="grid2"><label class="f">' + t("adm.addrL") + '<input name="address" value="' + esc(tx(r.address) || "") + '"></label><label class="f">' + t("adm.restPhone") + '<span class="phonein"><i>+992</i><input name="phone" inputmode="tel" value="' + esc(String(r.phone || "").replace(/^\+992/, "")) + '"></span></label></div>' +
       '<h3 class="h3">' + t("adm.ownerT") + '</h3><div class="grid2"><label class="f">' + t("adm.ownerName") + '<input name="ownerName" value="' + esc(o.name || "") + '"></label><label class="f">' + t("adm.ownerPhone") + '<span class="phonein"><i>+992</i><input name="ownerPhone" inputmode="tel" value="' + esc(String(o.phone || "").replace(/^\+992/, "")) + '"></span></label></div>' +
       '<p class="fine">' + t("adm.ownerPhoneNote") + '</p><button class="btn primary block">' + t("btn.save") + "</button>" +
+      '<a class="btn ghost block" href="#/admin/rzone/' + r.id + '" data-act="closemodal" data-go="/admin/rzone/' + r.id + '">' + I("pin", 16) + t(r.zone && r.zone.length > 2 ? "zn.redit" : "zn.rdraw") + "</a>" +
+      '<button type="button" class="btn ghost block" data-act="atpl" data-id="' + r.id + '">' + I("grid", 16) + t("tpl.btn") + "</button>" +
       (o.id ? '<button type="button" class="btn ghost block" data-act="aownerpass" data-id="' + o.id + '" data-name="' + esc(tx(r.name)) + '">' + I("shield", 16) + t("adm.ownerNewPass") + "</button>" : "") + "</form>", "wide"); };
   SF.forms.arestedit = function (fd, f) { return api().patch("/admin/restaurants/" + f.dataset.id, fd).then(function () { SF.closeModal(); SF.toast(t("btn.saved")); SF.render({ quiet: true }); }); };
+  SF.actions.atpl = function (el) { SF.modal('<div class="confirm"><span class="cic">' + I("grid", 26) + '</span><h2 class="h2">' + t("tpl.q") + '</h2><p class="muted">' + t("tpl.sub") + '</p><div class="row2"><button class="btn ghost" data-act="closemodal">' + t("btn.cancel") + '</button><button class="btn primary" data-act="atplok" data-id="' + el.dataset.id + '">' + t("tpl.go") + "</button></div></div>"); };
+  SF.actions.atplok = function (el) { var id = el.dataset.id; return api().post("/admin/restaurants/" + id + "/template", { key: "tj-uz" }).then(function (r) { SF.closeModal(); SF.toast(t("tpl.done", { n: r.added })); SF.go("/admin/products?r=" + id); }); };
   SF.actions.aownerpass = function (el) { return api().post("/admin/users/" + el.dataset.id + "/password").then(function (l) { creds(el.dataset.name, l); }); };
   SF.forms.arestnew = function (fd) { fd.trialDays = Number(fd.trialDays); return api().post("/admin/restaurants", fd).then(function (r) { SF.render({ quiet: true }); creds(tx(r.name), r.login); }); };
   /* one-time login shown once: the admin passes it to the partner, who changes it in settings */
@@ -265,9 +269,42 @@
   R("/admin/cities", { title: "adm.cities", render: function () {
     return api().get("/admin/cities").then(function (list) { SF.state.allCities = list;
       return '<form class="card inlineform" data-form="acity"><label class="f grow">' + t("adm.cityName") + '<input name="name" required></label><label class="f">' + t("adm.lat") + '<input name="lat" inputmode="decimal" required placeholder="38.56"></label><label class="f">' + t("adm.lng") + '<input name="lng" inputmode="decimal" required placeholder="68.79"></label><button class="btn primary">' + I("plus", 18) + t("btn.create") + "</button></form>" +
-        table([t("profile.city"), t("adm.restaurants"), t("adm.couriers"), t("adm.coords"), t("adm.activeL")], list.map(function (c) { return "<tr><td><b>" + esc(tx(c.name)) + '</b></td><td class="num">' + c.restaurants + '</td><td class="num">' + c.couriers + '</td><td class="num">' + c.lat.toFixed(3) + ", " + c.lng.toFixed(3) + "</td><td>" + sw(c.active, "acityt", c.id, t("adm.activeL")) + "</td></tr>"; }));
+        table([t("profile.city"), t("adm.restaurants"), t("adm.couriers"), t("adm.coords"), t("adm.activeL")], list.map(function (c) { return "<tr><td><b>" + esc(tx(c.name)) + '</b><br><a class="link sm" href="#/admin/zone/' + c.id + '">' + I("pin", 14) + " " + t(c.zone && c.zone.length > 2 ? "zn.edit" : "zn.draw") + '</a></td><td class="num">' + c.restaurants + '</td><td class="num">' + c.couriers + '</td><td class="num">' + c.lat.toFixed(3) + ", " + c.lng.toFixed(3) + "</td><td>" + sw(c.active, "acityt", c.id, t("adm.activeL")) + "</td></tr>"; }));
     });
   } });
+  /* ---------- delivery area: the admin taps the corners of the area on the map ---------- */
+  /* one editor for both: a town's area and a restaurant's own area */
+  function zoneEditor(o) {
+    var Z = SF.state.zoneEdit; if (!Z || Z.key !== o.key) Z = SF.state.zoneEdit = { key: o.key, url: o.url, back: o.back, pts: (o.zone || []).map(function (x) { return { lat: x.lat, lng: x.lng }; }) };
+    var has = o.zone && o.zone.length > 2;
+    return '<a class="backlink" href="#' + o.back + '">' + I("chevL", 18) + esc(o.backLabel) + '</a><section class="card stack"><h3>' + t("zn.title") + " · " + esc(o.name) + '</h3><p class="fine">' + t(o.how) + "</p>" +
+      '<div class="zmap">' + SF.tmap({ key: o.key, center: o.center, zoom: 14, free: true, label: t("zn.title"), markers: [{ lat: o.center.lat, lng: o.center.lng, type: "rest", label: o.mark }], edit: function () { return SF.state.zoneEdit ? SF.state.zoneEdit.pts : []; },
+        onTap: function (pt) { var z = SF.state.zoneEdit; if (!z || z.pts.length >= 200) return; z.pts.push(pt); zcount(); } }) + "</div>" +
+      '<p class="zcount" id="zcount"></p>' +
+      '<div class="zbtns"><button type="button" class="btn ghost" data-act="zundo">' + I("chevL", 16) + t("zn.undo") + '</button><button type="button" class="btn ghost" data-act="zclear">' + I("trash", 16) + t("zn.clear") + "</button></div>" +
+      '<button type="button" class="btn primary block lg" data-act="zsave">' + I("check", 18) + t("zn.save") + "</button>" +
+      (has ? '<button type="button" class="link center" data-act="zcircle">' + t(o.offKey, { km: (SF.state.pub || {}).zoneKm || 5 }) + "</button>" : '<p class="fine center">' + t(o.nowKey, { km: (SF.state.pub || {}).zoneKm || 5 }) + "</p>") + "</section>";
+  }
+  R("/admin/zone/:id", { title: "zn.title", render: function (p) {
+    return api().get("/admin/cities").then(function (list) { var c = list.filter(function (x) { return x.id === p.id; })[0]; if (!c) { SF.go("/admin/cities"); return ""; }
+      return zoneEditor({ key: "zed-" + c.id, url: "/admin/cities/" + c.id + "/zone", back: "/admin/cities", backLabel: t("adm.cities"), name: tx(c.name), center: { lat: c.lat, lng: c.lng }, zone: c.zone, mark: "★", how: "zn.how", offKey: "zn.circle", nowKey: "zn.nowCircle" });
+    });
+  } });
+  R("/admin/rzone/:id", { title: "zn.title", render: function (p) {
+    return Promise.all([api().get("/admin/restaurants"), api().get("/admin/cities")]).then(function (a) { var r = a[0].filter(function (x) { return x.id === p.id; })[0]; if (!r) { SF.go("/admin/restaurants"); return ""; }
+      var c = a[1].filter(function (x) { return x.id === r.cityId; })[0], cz = c && c.zone && c.zone.length > 2;
+      return zoneEditor({ key: "rzed-" + r.id, url: "/admin/restaurants/" + r.id + "/zone", back: "/admin/restaurants", backLabel: t("adm.restaurants"), name: tx(r.name), center: { lat: r.lat, lng: r.lng }, zone: r.zone, mark: "R", how: "zn.rhow", offKey: "zn.roff", nowKey: cz ? "zn.rnowCity" : "zn.nowCircle" });
+    });
+  } });
+  function zcount() { var el = document.getElementById("zcount"), n = SF.state.zoneEdit ? SF.state.zoneEdit.pts.length : 0; if (el) el.innerHTML = n < 3 ? t("zn.need", { n: n }) : I("check", 14) + " " + t("zn.ok", { n: n }); }
+  SF.after.push(function () { if (document.getElementById("zcount")) zcount(); });
+  function zredraw() { var z = SF.state.zoneEdit; if (z) SF.redrawMap(z.key); zcount(); }
+  SF.actions.zundo = function () { var z = SF.state.zoneEdit; if (z && z.pts.length) z.pts.pop(); zredraw(); };
+  SF.actions.zclear = function () { var z = SF.state.zoneEdit; if (z) z.pts = []; zredraw(); };
+  function zdone(z) { return api().get("/cities").then(function (cs) { SF.state.cities = cs; SF.state.zoneEdit = null; SF.toast(t("zn.saved")); SF.go(z.back); }); }
+  SF.actions.zsave = function () { var z = SF.state.zoneEdit; if (!z || z.pts.length < 3) { SF.toast(t("zn.need", { n: z ? z.pts.length : 0 }), "err"); return; }
+    return api().post(z.url, { zone: z.pts }).then(function () { return zdone(z); }); };
+  SF.actions.zcircle = function () { var z = SF.state.zoneEdit; if (!z) return; return api().post(z.url, { zone: [] }).then(function () { return zdone(z); }); };
   SF.forms.acity = function (fd) { return api().post("/admin/cities", fd).then(function () { SF.toast(t("btn.saved")); SF.render({ quiet: true }); }); };
   SF.actions.acityt = function (el) { return api().patch("/admin/cities/" + el.dataset.id, { active: el.getAttribute("aria-checked") !== "true" }).then(function () { return api().get("/cities"); }).then(function (c) { SF.state.cities = c; SF.render({ quiet: true }); }); };
 
@@ -286,16 +323,29 @@
 
   /* ---------- Settings ---------- */
   R("/admin/settings", { title: "adm.settings", render: function () {
-    return Promise.all([api().get("/admin/settings"), api().get("/admin/storage")]).then(function (a) { var s = a[0]; SF.state.storage = a[1];
+    return Promise.all([api().get("/admin/settings"), api().get("/admin/storage"), api().get("/admin/admins")]).then(function (a) { var s = a[0]; SF.state.storage = a[1];
       return '<div class="two"><form class="card stack" data-form="aset"><h3>' + t("adm.pricing") + '</h3><p class="fine">' + t("adm.pricingNote") + '</p><div class="grid2"><label class="f">' + t("adm.base") + '<input name="deliveryBase" inputmode="numeric" value="' + s.deliveryBase + '"></label><label class="f">' + t("adm.perKm") + '<input name="deliveryPerKm" inputmode="numeric" value="' + s.deliveryPerKm + '"></label>' +
         '<label class="f">' + t("adm.minFee") + '<input name="deliveryMin" inputmode="numeric" value="' + s.deliveryMin + '"></label><label class="f">' + t("adm.courierPct") + '<input name="courierPct" inputmode="numeric" value="' + s.courierPct + '"></label><label class="f">' + t("adm.zoneKm") + '<input name="zoneKm" inputmode="numeric" value="' + (s.zoneKm || 5) + '"></label><label class="f">' + t("dl.handoff") + '<input name="handoffMin" inputmode="numeric" value="' + s.handoffMin + '"></label></div><label class="f">' + t("adm.payWays") + '</label><label class="checkrow"><input type="checkbox" name="payTransfer"' + (s.payTransfer !== false ? " checked" : "") + '><span>' + t("pay.transfer") + '</span></label><label class="checkrow"><input type="checkbox" name="payCash"' + (s.payCash !== false ? " checked" : "") + '><span>' + t("pay.cash") + '</span></label><label class="f">' + t("foot.support") + '<input name="supportPhone" value="' + esc(s.supportPhone) + '"></label><button class="btn primary">' + t("btn.save") + "</button></form>" +
         '<section class="card"><h3>' + t("adm.example") + '</h3><div class="ptable"><span class="pth">' + t("u.km") + '</span><span class="pth">' + t("role.customer") + '</span><span class="pth">' + t("role.courier") + '</span><span class="pth">' + esc(SF.brand()) + '</span>' +
         [1, 2, 3, 4, 5].map(function (k) { var f = SomonRules.deliveryFee(s, k), c = Math.round(f * s.courierPct / 100); return '<span class="num">' + k + '</span><b class="num">' + money(f) + '</b><span class="num">' + money(c) + '</span><span class="num">' + money(f - c) + "</span>"; }).join("") + "</div>" +
         (SF.state.pub.demo ? '<h3 style="margin-top:20px">' + t("adm.demo") + '</h3><p class="fine">' + t("adm.demoNote") + '</p><button class="btn ghost" data-act="areset">' + I("route", 16) + t("adm.resetDemo") + "</button>" : "") + "</section>" +
-        verifyCard(s) + storageCard(a[1]) +
+        adminsCard(a[2]) + verifyCard(s) + storageCard(a[1]) +
         '<form class="card stack" data-form="asubset"><h3>' + t("sub.title") + '</h3><p class="fine">' + t("sub.setNote") + '</p><div class="grid2"><label class="f">' + t("sub.fee") + '<input name="subFee" inputmode="numeric" value="' + s.subFee + '"></label><label class="f">' + t("sub.trialDays") + '<input name="trialDays" inputmode="numeric" value="' + s.trialDays + '"></label></div><button class="btn primary">' + t("btn.save") + "</button></form>" + SF.pwForm() + "</div>";
     });
   } });
   SF.forms.aset = function (fd) { return api().patch("/admin/settings", fd).then(function () { return api().get("/settings/public"); }).then(function (p) { SF.state.pub = p; SF.toast(t("btn.saved")); SF.render({ quiet: true }); }); };
+  /* admins: the main admin adds a helper admin (own login), or removes him */
+  function adminsCard(d) {
+    return '<section class="card stack"><h3>' + I("shield", 18) + " " + t("aa.title") + '</h3><p class="fine">' + t("aa.sub", { n: d.max }) + "</p>" +
+      d.list.map(function (u) { return '<div class="line"><span><b>' + esc(u.name) + "</b> " + (u.main ? '<span class="pill p-brand">' + t("aa.main") + "</span>" : '<span class="pill p-mut">' + t("aa.helper") + "</span>") + (u.mustChange ? ' <span class="pill p-warn">' + t("sf.notYet") + "</span>" : "") + '<br><small class="muted num">' + esc(SF.phone(u.phone)) + "</small></span>" +
+        (d.me && !u.main ? '<span class="row"><button type="button" class="iconbtn" data-act="aapass" data-id="' + u.id + '" data-name="' + esc(u.name) + '" aria-label="' + t("dl.newPass") + '">' + I("shield", 16) + '</button><button type="button" class="iconbtn" data-act="aadel" data-id="' + u.id + '" data-name="' + esc(u.name) + '" aria-label="' + t("sf.del") + '">' + I("trash", 16) + "</button></span>" : "") + "</div>"; }).join("") +
+      (d.me && d.list.length < d.max ? '<button type="button" class="btn ghost" data-act="aanew">' + I("plus", 16) + t("aa.add") + "</button>" : "") + "</section>";
+  }
+  SF.actions.aanew = function () { SF.modal('<button class="mx" data-act="closemodal" aria-label="' + t("btn.close") + '">' + I("x", 20) + '</button><form class="stack" data-form="aanew"><h2 class="h2">' + t("aa.add") + '</h2><label class="f">' + t("profile.name") + '<input name="name" required maxlength="60"></label>' +
+    '<label class="f">' + t("auth.phone") + '<span class="phonein"><i>+992</i><input name="phone" inputmode="tel" required></span></label><p class="fine">' + t("aa.addNote") + '</p><button class="btn primary block">' + t("btn.create") + "</button></form>"); };
+  SF.forms.aanew = function (fd) { return api().post("/admin/admins", fd).then(function (u) { SF.render({ quiet: true }); creds(u.name, u.login); }); };
+  SF.actions.aapass = function (el) { return api().post("/admin/users/" + el.dataset.id + "/password").then(function (l) { creds(el.dataset.name, l); }); };
+  SF.actions.aadel = function (el) { SF.modal('<div class="confirm"><span class="cic">' + I("trash", 26) + '</span><h2 class="h2">' + t("aa.delQ", { name: esc(el.dataset.name) }) + '</h2><div class="row2"><button class="btn ghost" data-act="closemodal">' + t("btn.cancel") + '</button><button class="btn primary" data-act="aadelok" data-id="' + el.dataset.id + '">' + t("sf.del") + "</button></div></div>"); };
+  SF.actions.aadelok = function (el) { return api().del("/admin/admins/" + el.dataset.id).then(function () { SF.closeModal(); SF.render({ quiet: true }); }); };
   SF.actions.areset = function () { return api().post("/admin/reset-demo").then(function () { SF.toast(t("adm.resetDone"), "info"); SF.render(); }); };
 })();

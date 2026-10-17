@@ -78,7 +78,13 @@
   }
   function fmtPhone(p) { var d = String(p || "").replace(/\D/g, "").slice(-9); return d.length === 9 ? "+992 " + d.slice(0, 2) + " " + d.slice(2, 5) + " " + d.slice(5, 7) + " " + d.slice(7) : p; }
 
-  return { ROLES: ROLES, ORDER_FLOW: ORDER_FLOW, ACTIVE: ACTIVE, FINAL: FINAL, canTransition: canTransition,
+  /* is the point inside the delivery area drawn by the admin? poly: [{lat,lng},…] (ray casting) */
+  function inPolygon(p, poly) { if (!poly || poly.length < 3) return true; var inside = false;
+    for (var i = 0, j = poly.length - 1; i < poly.length; j = i++) { var a = poly[i], b = poly[j];
+      if ((a.lat > p.lat) !== (b.lat > p.lat) && p.lng < (b.lng - a.lng) * (p.lat - a.lat) / (b.lat - a.lat) + a.lng) inside = !inside; }
+    return inside; }
+
+  return { inPolygon: inPolygon, ROLES: ROLES, ORDER_FLOW: ORDER_FLOW, ACTIVE: ACTIVE, FINAL: FINAL, canTransition: canTransition,
     distanceKm: distanceKm, deliveryFee: deliveryFee, promoDiscount: promoDiscount, split: split,
     isOpenAt: isOpenAt, normPhone: normPhone, fmtPhone: fmtPhone };
 });

@@ -20,7 +20,10 @@
   R("/rest", { title: "rest.dash", live: true, render: function () {
     return Promise.all([api().get("/restaurant/me"), api().get("/restaurant/stats"), api().get("/restaurant/orders?scope=new")]).then(function (a) {
       var r = a[0], s = a[1], fresh = a[2]; SF.state.newCount = fresh.length;
-      return '<section class="banner-rest" style="--tone:' + esc(r.tone) + '"><div><span class="eyebrow">' + t("rest.yourPlace") + "</span><h2 class=\"h1\">" + esc(tx(r.name)) + '</h2><span class="muted">' + esc(r.hours.from) + "–" + esc(r.hours.to) + " · " + (r.isOpenNow ? t("rest.openNow") : t("rest.closedShort")) + "</span></div>" +
+      /* big buttons for the things the owner does every day */
+      var quick = worker() ? "" : '<nav class="quick">' + [["/rest/orders", "receipt", "rest.orders", SF.state.newCount], ["/rest/sales", "wallet", "sl.nav"], ["/rest/menu", "grid", "rest.menu"], ["/rest/tables", "grid", "tb.nav"], ["/rest/staff", "users", "sf.nav"]].map(function (x) {
+        return '<a href="#' + x[0] + '">' + I(x[1], 22) + "<span>" + t(x[2]) + "</span>" + (x[3] ? '<i class="badge">' + x[3] + "</i>" : "") + "</a>"; }).join("") + "</nav>";
+      return quick + '<section class="banner-rest" style="--tone:' + esc(r.tone) + '"><div><span class="eyebrow">' + t("rest.yourPlace") + "</span><h2 class=\"h1\">" + esc(tx(r.name)) + '</h2><span class="muted">' + esc(r.hours.from) + "–" + esc(r.hours.to) + " · " + (r.isOpenNow ? t("rest.openNow") : t("rest.closedShort")) + "</span></div>" +
         '<label class="switchrow"><span>' + t("rest.accepting") + '</span><button class="switch' + (r.open ? " on" : "") + '" role="switch" aria-checked="' + r.open + '" data-act="ropen" aria-label="' + t("rest.accepting") + '"></button></label></section>' +
         subBanner(r) + startList(r) +
         (fresh.length ? '<a class="alert" href="#/rest/orders">' + I("bell", 18) + "<b>" + t("rest.newWaiting", { n: fresh.length }) + "</b>" + I("chevR", 18) + "</a>" : "") +
@@ -100,13 +103,15 @@
   /* ---------- Staff: workers with their own login ---------- */
   R("/rest/staff", { title: "sf.nav", render: function () {
     var me = SF.state.user; if (me.staff && me.staffRole !== "manager") { SF.go("/rest/orders"); return ""; }
-    return api().get("/restaurant/staff").then(function (list) {
+    return api().get("/restaurant/staff").then(function (list) { SF.state.staffList = list;
       return '<section class="card sfhero"><span class="kic">' + I("users", 22) + '</span><div class="grow"><b>' + t("sf.title") + "</b><p>" + t("sf.sub") + "</p></div></section>" +
         '<div class="toolbar"><p class="muted">' + t("sf.count", { n: list.length, on: list.filter(function (x) { return x.active; }).length }) + '</p><button class="btn primary" data-act="sfnew">' + I("plus", 18) + t("sf.add") + "</button></div>" +
         (list.length ? '<div class="stack">' + list.map(function (u) {
           var st = !u.active ? '<span class="pill p-bad">' + t("dl.blocked") + "</span>" : u.mustChange ? '<span class="pill p-warn">' + t("sf.notYet") + "</span>" : '<span class="pill p-ok">' + t("sf.activeP") + "</span>";
-          return '<div class="card ocrow' + (u.active ? "" : " off") + '"><span class="avatar">' + esc(u.name.charAt(0)) + '</span><div class="grow"><b>' + esc(u.name) + (u.staffRole === "manager" ? ' <span class="pill p-brand">' + t("sf.manager") + "</span>" : ' <span class="pill p-mut">' + t("sf.worker") + "</span>") + '</b><small class="muted num">' + esc(SF.phone(u.phone)) + (u.lastSeenAt ? " · " + t("sf.seen", { t: SF.dt(u.lastSeenAt) }) : "") + "</small>" + st + "</div>" +
-            (me.staff && u.staffRole === "manager" ? "</div>" : (!me.staff ? '<button class="iconbtn" data-act="sfrole" data-id="' + u.id + '" data-r="' + (u.staffRole === "manager" ? "worker" : "manager") + '" aria-label="' + t("sf.changeRole") + '" title="' + t(u.staffRole === "manager" ? "sf.makeWorker" : "sf.makeManager") + '">' + I("users", 18) + "</button>" : "") +
+          return '<div class="card ocrow' + (u.active ? "" : " off") + '"><span class="avatar">' + esc(u.name.charAt(0)) + '</span><div class="grow"><b>' + esc(u.name) + ' <span class="pill ' + (u.staffRole === "manager" ? "p-brand" : u.staffRole === "waiter" ? "p-info" : "p-mut") + '">' + t("sf." + u.staffRole) + "</span>" + '</b><small class="muted num">' + esc(SF.phone(u.phone)) + (u.lastSeenAt ? " · " + t("sf.seen", { t: SF.dt(u.lastSeenAt) }) : "") + "</small>" +
+            (u.stats && (u.stats.orders || u.stats.rating) ? '<small class="sfstat num">' + t("sf.stat", { n: u.stats.orders, sum: SF.money(u.stats.sum) }) + (u.stats.rating ? " · ★ " + u.stats.rating + " (" + u.stats.ratingCount + ")" : "") + "</small>" : "") +
+            (u.tipCard ? '<small class="muted num">' + I("card", 12) + " " + t("sf.tipShort") + " ··" + esc(u.tipCard.slice(-4)) + "</small>" : "") + st + "</div>" +
+            (me.staff && u.staffRole === "manager" ? "</div>" : '<button class="iconbtn" data-act="sfedit" data-id="' + u.id + '" aria-label="' + t("sf.changeRole") + '" title="' + t("sf.changeRole") + '">' + I("edit", 18) + "</button>" +
             '<button class="iconbtn" data-act="sfpass" data-id="' + u.id + '" data-name="' + esc(u.name) + '" aria-label="' + t("dl.newPass") + '" title="' + t("dl.newPass") + '">' + I("shield", 18) + "</button>" +
             '<button class="iconbtn" data-act="sfdel" data-id="' + u.id + '" data-name="' + esc(u.name) + '" aria-label="' + t("sf.del") + '" title="' + t("sf.del") + '">' + I("trash", 18) + "</button>" +
             '<button class="switch' + (u.active ? " on" : "") + '" role="switch" aria-checked="' + u.active + '" data-act="sfact" data-id="' + u.id + '" aria-label="' + t("adm.activeL") + '"></button></div>'); }).join("") + "</div>"
@@ -120,16 +125,52 @@
   SF.actions.sfnew = function () {
     SF.modal('<button class="mx" data-act="closemodal" aria-label="' + t("btn.close") + '">' + I("x", 20) + '</button><form class="stack" data-form="sfnew"><h2 class="h2">' + t("sf.add") + '</h2><label class="f">' + t("profile.name") + '<input name="name" required maxlength="60" placeholder="' + t("sf.namePh") + '"></label>' +
       '<label class="f">' + t("auth.phone") + '<span class="phonein"><i>+992</i><input name="phone" inputmode="tel" required></span></label>' +
-      (SF.state.user.staff ? '<input type="hidden" name="staffRole" value="worker">' : '<p class="lbl">' + t("sf.roleL") + '</p><div class="rolepick"><label><input type="radio" name="staffRole" value="worker" checked><span><b>' + t("sf.worker") + "</b><small>" + t("sf.workerSub") + '</small></span></label><label><input type="radio" name="staffRole" value="manager"><span><b>' + t("sf.manager") + "</b><small>" + t("sf.managerSub") + "</small></span></label></div>") +
+      rolePick("worker") + '<label class="f">' + t("sf.tipL") + '<input name="tipCard" inputmode="numeric" placeholder="0000 0000 0000 0000"><small class="hint">' + t("sf.tipHint") + "</small></label>" +
       '<p class="fine">' + t("sf.addNote") + '</p><button class="btn primary block">' + t("btn.create") + "</button></form>"); };
   SF.forms.sfnew = function (fd) { return api().post("/restaurant/staff", fd).then(function (u) { SF.render({ quiet: true }); sfCreds(u.name, u.login); }); };
   SF.actions.sfact = function (el) { return api().patch("/restaurant/staff/" + el.dataset.id, { active: el.getAttribute("aria-checked") !== "true" }).then(function () { SF.render({ quiet: true }); }); };
+  /* three kinds of staff: waiter (only orders), worker (orders + dishes in stock), branch manager (everything; only the owner appoints) */
+  function rolePick(cur) { var roles = SF.state.user.staff ? ["waiter", "worker"] : ["waiter", "worker", "manager"];
+    return '<p class="lbl">' + t("sf.roleL") + '</p><div class="rolepick">' + roles.map(function (r) { return '<label><input type="radio" name="staffRole" value="' + r + '"' + (r === cur ? " checked" : "") + "><span><b>" + t("sf." + r) + "</b><small>" + t("sf." + r + "Sub") + "</small></span></label>"; }).join("") + "</div>"; }
+  SF.actions.sfedit = function (el) { var u = (SF.state.staffList || []).filter(function (x) { return x.id === el.dataset.id; })[0]; if (!u) return;
+    SF.modal('<button class="mx" data-act="closemodal" aria-label="' + t("btn.close") + '">' + I("x", 20) + '</button><form class="stack" data-form="sfedit" data-id="' + u.id + '"><h2 class="h2">' + esc(u.name) + "</h2>" + rolePick(u.staffRole) +
+      '<label class="f">' + t("sf.tipL") + '<input name="tipCard" inputmode="numeric" value="' + esc((u.tipCard || "").replace(/(\d{4})(?=\d)/g, "$1 ")) + '" placeholder="0000 0000 0000 0000"><small class="hint">' + t("sf.tipHint") + "</small></label>" +
+      '<button class="btn primary block">' + t("btn.save") + "</button></form>"); };
+  SF.forms.sfedit = function (fd, f) { return api().patch("/restaurant/staff/" + f.dataset.id, { staffRole: fd.staffRole, tipCard: fd.tipCard || "" }).then(function () { SF.closeModal(); SF.toast(t("btn.saved")); SF.render({ quiet: true }); }); };
   SF.actions.sfrole = function (el) { return api().patch("/restaurant/staff/" + el.dataset.id, { staffRole: el.dataset.r }).then(function () { SF.toast(t("btn.saved")); SF.render({ quiet: true }); }); };
   SF.actions.sfpass = function (el) { return api().post("/restaurant/staff/" + el.dataset.id + "/password").then(function (l) { sfCreds(el.dataset.name, l); }); };
   SF.actions.sfdel = function (el) {
     SF.modal('<div class="confirm"><span class="cic">' + I("trash", 26) + '</span><h2 class="h2">' + t("sf.delQ", { name: esc(el.dataset.name) }) + '</h2><p class="muted">' + t("sf.delSub") + '</p><div class="row2"><button class="btn ghost" data-act="closemodal">' + t("btn.cancel") + '</button><button class="btn primary" data-act="sfdelok" data-id="' + el.dataset.id + '">' + t("sf.del") + "</button></div></div>"); };
   SF.actions.sfdelok = function (el) { return api().del("/restaurant/staff/" + el.dataset.id).then(function () { SF.closeModal(); SF.toast(t("sf.deleted")); SF.render({ quiet: true }); }); };
 
+  /* ---------- «Sales»: the owner's money page ---------- */
+  function bar(v, max) { return '<i class="slbar"><b style="width:' + (max ? Math.max(3, Math.round(v / max * 100)) : 0) + '%"></b></i>'; }
+  R("/rest/sales", { title: "sl.nav", render: function (p, q) {
+    if (worker()) { SF.go("/rest/orders"); return ""; }
+    var per = (q && q.p) || SF.state.slp || "today";
+    return api().get("/restaurant/sales?period=" + per).then(function (s) { var mx = Math.max.apply(null, [1].concat(s.days.map(function (d) { return d.sum; })));
+      return '<div class="seg slseg" role="group">' + ["today", "week", "month"].map(function (k) { return '<button class="' + (k === per ? "on" : "") + '" aria-pressed="' + (k === per) + '" data-act="slper" data-v="' + k + '">' + t("sl." + k) + "</button>"; }).join("") + "</div>" +
+        '<section class="slbig"><div><small>' + t("sl.revenue") + '</small><b class="num">' + money(s.revenue) + '</b></div><div><small>' + t("sl.orders") + '</small><b class="num">' + s.orders + '</b></div><div><small>' + t("sl.avg") + '</small><b class="num">' + money(s.avg) + "</b></div>" +
+          '<div><small>' + t("sl.hall") + '</small><b class="num">' + money(s.hall.sum) + "</b><em>" + t("sl.n", { n: s.hall.orders }) + '</em></div><div><small>' + t("sl.delivery") + '</small><b class="num">' + money(s.delivery.sum) + "</b><em>" + t("sl.n", { n: s.delivery.orders }) + "</em></div>" +
+          (s.cancelled ? '<div class="bad"><small>' + t("sl.cancelled") + '</small><b class="num">' + s.cancelled + "</b></div>" : "") + "</section>" +
+        (s.days.length > 1 ? '<section class="card"><h3>' + t("sl.byDay") + '</h3><div class="sldays">' + s.days.map(function (d) { return '<div title="' + SF.date(d.day) + " · " + money(d.sum) + '"><i style="height:' + Math.max(2, Math.round(d.sum / mx * 100)) + '%"></i><small>' + new Date(d.day + 5 * 3600000).getUTCDate() + "</small></div>"; }).join("") + "</div></section>" : "") +
+        '<div class="two">' +
+        '<section class="card"><h3>' + I("user", 18) + " " + t("sl.waiters") + "</h3>" + (s.waiters.length ? s.waiters.map(function (w, i) { return '<div class="slrow"><span class="slnum">' + (i + 1) + '</span><div class="grow"><b>' + esc(w.name) + (w.rating ? ' <span class="likec">★ ' + w.rating + "</span>" : "") + "</b>" + bar(w.sum, s.waiters[0].sum) + '<small class="muted">' + t("sl.n", { n: w.orders }) + '</small></div><b class="num">' + money(w.sum) + "</b></div>"; }).join("") : '<p class="muted">' + t("sl.none") + "</p>") + "</section>" +
+        '<section class="card"><h3>' + I("grid", 18) + " " + t("sl.tables") + "</h3>" + (s.tables.length ? s.tables.map(function (x) { return '<div class="slrow"><span class="slnum">' + esc(x.name) + '</span><div class="grow"><b>' + t("tb.table", { n: esc(x.name) }) + "</b>" + bar(x.sum, s.tables[0].sum) + '<small class="muted">' + t("sl.n", { n: x.orders }) + '</small></div><b class="num">' + money(x.sum) + "</b></div>"; }).join("") : '<p class="muted">' + t("sl.none") + "</p>") + "</section>" +
+        "</div>" +
+        '<section class="card"><h3>' + I("fire", 18) + " " + t("sl.dishes") + "</h3>" + (s.dishes.length ? s.dishes.map(function (d, i) { return '<div class="slrow"><span class="slnum">' + (i + 1) + '</span><div class="grow"><b>' + esc(tx(d.name)) + "</b>" + bar(d.sum, s.dishes[0].sum) + '<small class="muted">' + t("sl.qty", { n: d.qty }) + '</small></div><b class="num">' + money(d.sum) + "</b></div>"; }).join("") : '<p class="muted">' + t("sl.none") + "</p>") + "</section>" +
+        (s.pay.length ? '<section class="card"><h3>' + I("wallet", 18) + " " + t("sl.pay") + "</h3>" + s.pay.map(function (x) { return '<div class="line"><span>' + t("pay." + x.method) + " · " + t("sl.n", { n: x.orders }) + '</span><b class="num">' + money(x.sum) + "</b></div>"; }).join("") + "</section>" : "");
+    });
+  } });
+  SF.actions.slper = function (el) { SF.state.slp = el.dataset.v; SF.render({ quiet: true }); };
+  /* ---------- a staff member's own page: today, 30 days, rating, tip card ---------- */
+  R("/rest/me", { title: "my.nav", render: function () {
+    return api().get("/restaurant/my").then(function (m) {
+      return '<section class="slbig"><div><small>' + t("my.today") + '</small><b class="num">' + m.todayOrders + "</b><em>" + money(m.todaySum) + '</em></div><div><small>' + t("my.month") + '</small><b class="num">' + m.orders + "</b><em>" + money(m.sum) + '</em></div><div><small>' + t("my.rating") + '</small><b class="num">' + (m.rating ? "★ " + m.rating : "—") + "</b><em>" + t("my.votes", { n: m.ratingCount }) + "</em></div></section>" +
+        '<form class="card stack" data-form="mytip"><h3>' + I("card", 18) + " " + t("sf.tipL") + '</h3><p class="fine">' + t("my.tipSub") + '</p><input name="tipCard" inputmode="numeric" value="' + esc((m.tipCard || "").replace(/(\d{4})(?=\d)/g, "$1 ")) + '" placeholder="0000 0000 0000 0000"><button class="btn primary">' + t("btn.save") + "</button></form>" + SF.pwForm();
+    });
+  } });
+  SF.forms.mytip = function (fd) { return api().patch("/restaurant/my", { tipCard: fd.tipCard || "" }).then(function () { SF.toast(t("btn.saved")); SF.render({ quiet: true }); }); };
   SF.actions.served = function (el) { return api().post("/restaurant/orders/" + el.dataset.id + "/served").then(function () { SF.toast(t("tb.servedOk")); SF.render({ quiet: true }); }); };
 
   /* ---------- tables in the hall: QR stickers, the guest orders without signing up ---------- */
@@ -170,6 +211,8 @@
       document.body.classList.add("printing"); setTimeout(function () { window.print(); setTimeout(function () { document.body.classList.remove("printing"); }, 500); }, 150);
     }); };
 
+  SF.actions.rtpl = function () { SF.modal('<div class="confirm"><span class="cic">' + I("grid", 26) + '</span><h2 class="h2">' + t("tpl.q") + '</h2><p class="muted">' + t("tpl.sub") + '</p><div class="row2"><button class="btn ghost" data-act="closemodal">' + t("btn.cancel") + '</button><button class="btn primary" data-act="rtplok">' + t("tpl.go") + "</button></div></div>"); };
+  SF.actions.rtplok = function () { return api().post("/restaurant/menu/template", { key: "tj-uz" }).then(function (r) { SF.closeModal(); SF.toast(t("tpl.done", { n: r.added })); SF.render({ quiet: true }); }); };
   function worker() { var u = SF.state.user; return !!(u && u.staff && u.staffRole !== "manager"); }
   function ticket(o) {
     var acts = "";
@@ -183,6 +226,7 @@
     return '<article class="ticket t-' + o.status + '"><header><b class="num">№' + o.number + "</b>" + SF.statusPill(o.status) + '<small class="muted">' + ago(o.history[o.history.length - 1].at) + "</small></header>" +
       '<ul class="items">' + o.items.map(function (it) { return '<li><b class="num">' + it.qty + "×</b><span>" + esc(tx(it.name)) + "</span></li>"; }).join("") + "</ul>" +
       (o.comment ? '<div class="note">' + I("info", 14) + esc(o.comment) + "</div>" : "") +
+      (o.acceptedBy && o.status !== "pending" ? '<div class="tacc">' + I("check", 12) + t("sl.acceptedBy", { name: esc(o.acceptedBy.name) }) + "</div>" : "") +
       (o.dineIn ? '<div class="tcust tdine">' + I("grid", 14) + "<b>" + t("tb.table", { n: esc(o.tableName) }) + "</b>" + (o.guestName ? '<span class="grow muted">' + esc(o.guestName) + "</span>" : '<span class="grow"></span>') + '<span class="cmark new">' + t("tb.inHall") + "</span></div>" : "") +
       (o.customer ? '<div class="tcust">' + I("user", 14) + '<b class="grow">' + esc(o.customer.name) + "</b>" + SF.custMark(o.customer) + "</div>" : "") +
       '<div class="tmeta"><span>' + I(o.payment.method === "cash" ? "cash" : "card", 14) + (o.dineIn ? t("tb.payTable") : t("pay." + o.payment.method)) + '</span><b class="num">' + money(o.subtotal) + "</b></div>" +
@@ -217,7 +261,8 @@
           return '<div class="mrowp' + (p.available ? "" : " off") + '"><span class="cim" style="--tone:' + esc(r.tone) + '">' + SF.pic(p, 48) + '</span><div class="grow"><b>' + esc(tx(p.name)) + (SF.sale(p) ? ' <span class="chip sale">−' + SF.sale(p) + "%</span>" : "") + (p.popular ? ' <span class="chip hot">' + I("fire", 12) + t("prod.hit") + "</span>" : "") + '</b><small class="muted">' + esc(tx(p.desc)) + (p.weight ? " · " + esc(p.weight) : "") + '</small></div><b class="num price">' + money(p.price) + (SF.sale(p) ? "<s>" + money(p.oldPrice) + "</s>" : "") + "</b>" +
             '<button class="switch' + (p.available ? " on" : "") + '" role="switch" aria-checked="' + p.available + '" aria-label="' + t("menu.inStock") + '" data-act="pavail" data-id="' + p.id + '"></button>' +
             (worker() ? "</div>" : '<button class="iconbtn" data-act="prodedit" data-id="' + p.id + '" aria-label="' + t("btn.edit") + '">' + I("edit", 18) + '</button><button class="iconbtn" data-act="proddel" data-id="' + p.id + '" aria-label="' + t("btn.delete") + '">' + I("trash", 18) + "</button></div>"); }).join("") + "</div></section>"; }).join("")
-          : SF.empty("grid", t("menu.empty"), t("menu.emptySub")));
+          : SF.empty("grid", t("menu.empty"), t("menu.emptySub"))) +
+        (worker() ? "" : '<section class="card tplcard"><span class="kic">' + I("grid", 22) + '</span><div class="grow"><b>' + t("tpl.btn") + "</b><p>" + t("tpl.sub") + '</p></div><button class="btn ghost" data-act="rtpl">' + t("tpl.go") + "</button></section>");
     });
   } });
   function prodForm(p) {
@@ -229,6 +274,7 @@
       '<label class="f">' + t("menu.name") + '<input name="name" required maxlength="60" value="' + esc(tx(p.name)) + '"></label><label class="f">' + t("menu.desc") + '<input name="desc" maxlength="140" value="' + esc(tx(p.desc)) + '"></label>' +
       '<div class="grid3"><label class="f">' + t("menu.price") + '<input name="price" inputmode="numeric" required value="' + esc(p.price) + '"></label><label class="f">' + t("menu.oldPrice") + '<input name="oldPrice" inputmode="numeric" placeholder="' + t("menu.oldPriceHint") + '" value="' + esc(p.oldPrice || "") + '"></label><label class="f">' + t("menu.weight") + '<input name="weight" maxlength="20" value="' + esc(p.weight) + '" placeholder="350 г"></label>' +
       '<label class="f">' + t("menu.category") + '<select name="categoryId">' + SF.state.categories.map(function (c) { return '<option value="' + c.id + '"' + (c.id === p.categoryId ? " selected" : "") + ">" + esc(tx(c.name)) + "</option>"; }).join("") + "</select></label></div>" +
+      '<p class="lbl">' + t("ml.label") + '</p><div class="mealpick">' + ["b", "l", "d", "n"].map(function (m) { return '<label><input type="checkbox" name="meal_' + m + '"' + ((p.meals || []).indexOf(m) >= 0 ? " checked" : "") + "><span>" + t("ml." + m) + "</span></label>"; }).join("") + '</div><p class="fine">' + t("ml.hint") + "</p>" +
       '<label class="check"><input type="checkbox" name="popular"' + (p.popular ? " checked" : "") + "><span>" + t("menu.popular") + '</span></label><input type="hidden" name="kind" id="pkind" value="' + esc(p.kind) + '"><button class="btn primary block lg">' + t("btn.save") + "</button></form>", "wide");
   }
   function photoBox() { var ph = SF.state.pphoto;
@@ -243,7 +289,7 @@
   SF.actions.pkind = function (el) { document.getElementById("pkind").value = el.dataset.v; document.getElementById("pkprev").innerHTML = SF.art(el.dataset.v, 96);
     Array.prototype.forEach.call(el.parentNode.children, function (b) { var on = b === el; b.classList.toggle("on", on); b.setAttribute("aria-checked", on); }); };
   SF.forms.prod = function (fd, f) { var body = { name: fd.name, desc: fd.desc, price: Number(fd.price), weight: fd.weight, categoryId: fd.categoryId, kind: fd.kind, popular: !!fd.popular,
-      oldPrice: fd.oldPrice ? Number(fd.oldPrice) : null, photo: SF.state.pphoto || null };
+      oldPrice: fd.oldPrice ? Number(fd.oldPrice) : null, photo: SF.state.pphoto || null, meals: ["b", "l", "d", "n"].filter(function (m) { return fd["meal_" + m]; }) };
     var req = f.dataset.id ? api().patch("/restaurant/products/" + f.dataset.id, body) : api().post("/restaurant/products", body);
     return req.then(function () { SF.closeModal(); SF.toast(t("btn.saved")); SF.render({ quiet: true }); }); };
   SF.actions.pavail = function (el) { return api().patch("/restaurant/products/" + el.dataset.id, { available: el.getAttribute("aria-checked") !== "true" }).then(function () { SF.render({ quiet: true }); }); };

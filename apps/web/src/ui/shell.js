@@ -31,14 +31,16 @@
 
   /* partner dashboards (restaurant, admin) */
   SF.panelNav = {
-    restaurant: [["/rest", "chart", "rest.dash"], ["/rest/orders", "receipt", "rest.orders"], ["/rest/menu", "grid", "rest.menu"], ["/rest/promo", "gift", "rest.promo"], ["/rest/tables", "grid", "tb.nav"], ["/rest/couriers", "scooter", "dl.couriers"], ["/rest/history", "list", "rest.history"], ["/rest/staff", "users", "sf.nav"], ["/rest/settings", "store", "rest.settings"]],
+    restaurant: [["/rest", "chart", "rest.dash"], ["/rest/orders", "receipt", "rest.orders"], ["/rest/sales", "wallet", "sl.nav"], ["/rest/me", "user", "my.nav"], ["/rest/menu", "grid", "rest.menu"], ["/rest/promo", "gift", "rest.promo"], ["/rest/tables", "grid", "tb.nav"], ["/rest/couriers", "scooter", "dl.couriers"], ["/rest/history", "list", "rest.history"], ["/rest/staff", "users", "sf.nav"], ["/rest/settings", "store", "rest.settings"]],
     admin: [["/admin", "chart", "adm.dash"], ["/admin/orders", "receipt", "adm.orders"], ["/admin/restaurants", "store", "adm.restaurants"], ["/admin/couriers", "scooter", "adm.couriers"], ["/admin/users", "users", "adm.users"],
       ["/admin/products", "grid", "adm.products"], ["/admin/categories", "tag", "adm.categories"], ["/admin/payments", "card", "adm.payments"], ["/admin/promos", "percent", "adm.promos"], ["/admin/banners", "gift", "adm.banners"], ["/admin/cities", "city", "adm.cities"], ["/admin/stats", "bolt", "adm.stats"], ["/admin/settings", "cog", "adm.settings"]]
   };
   SF.shells.panel = function (html, r) {
     /* a worker of the restaurant: orders, menu (in stock / out of stock), history. A branch manager sees everything. */
-    var WORK = ["/rest", "/rest/orders", "/rest/menu", "/rest/history"];
-    var u = SF.state.user, path = SF.path().split("?")[0], worker = u.staff && u.staffRole !== "manager", nav = (SF.panelNav[u.role] || []).filter(function (n) { return !worker || WORK.indexOf(n[0]) >= 0; });
+    var u = SF.state.user, path = SF.path().split("?")[0], worker = u.staff && u.staffRole !== "manager";
+    /* waiter: orders + his own page; worker: + menu (in stock) and history; owner / manager: everything (his own page only for staff) */
+    var WORK = u.staffRole === "waiter" ? ["/rest/orders", "/rest/me"] : ["/rest", "/rest/orders", "/rest/menu", "/rest/history", "/rest/me"];
+    var nav = (SF.panelNav[u.role] || []).filter(function (n) { if (n[0] === "/rest/me") return !!u.staff; return !worker || WORK.indexOf(n[0]) >= 0; });
     if (worker && u.role === "restaurant" && WORK.indexOf(path) < 0) setTimeout(function () { SF.go("/rest/orders"); }, 0);
     var cur = nav.filter(function (n) { return n[0] === path; })[0] || nav.filter(function (n) { return path.indexOf(n[0]) === 0 && n[0] !== "/rest" && n[0] !== "/admin"; })[0] || nav[0];
     return '<div class="panel' + (SF.state.drawer ? " open" : "") + '"><aside class="side"><div class="sidehead">' + SF.logo() + '<span class="rolebadge">' + t("role." + u.role) + "</span></div>" +

@@ -84,8 +84,10 @@
     }
     function P(p) { return { x: wx(p.lng, z) - ox, y: wy(p.lat, z) - oy }; }
     var g = "";
+    var pd = function (pts, close) { return pts.map(function (p, i) { var q = P(p); return (i ? "L" : "M") + q.x.toFixed(1) + " " + q.y.toFixed(1); }).join("") + (close ? "Z" : ""); };
+    if (o.edit) { var ep = o.edit(); if (ep.length) g += '<path class="tm-zone tm-edit" d="' + pd(ep, ep.length > 2) + '"/>' + ep.map(function (p, i) { var q = P(p); return '<circle class="tm-vx' + (i === ep.length - 1 ? " last" : "") + '" cx="' + q.x.toFixed(1) + '" cy="' + q.y.toFixed(1) + '" r="7"/>'; }).join(""); }
     if (o.zone) { var zc = P(o.zone), r = o.zone.km * 1000 / mpp(o.zone.lat, z);
-      g += '<circle class="tm-zone" cx="' + zc.x.toFixed(1) + '" cy="' + zc.y.toFixed(1) + '" r="' + r.toFixed(1) + '"/>' +
+      g += (o.zone.poly ? '<path class="tm-zone" d="' + pd(o.zone.poly, true) + '"/>' : '<circle class="tm-zone" cx="' + zc.x.toFixed(1) + '" cy="' + zc.y.toFixed(1) + '" r="' + r.toFixed(1) + '"/>') +
         '<g class="tm-center" transform="translate(' + zc.x.toFixed(1) + "," + zc.y.toFixed(1) + ')"><circle r="5"/><text y="20">' + esc(o.zone.name || "") + "</text></g>"; }
     if (o.route && o.route[0] && o.route[1] && o.route[1].lat != null) { var a = P(o.route[0]), b = P(o.route[1]), mx = (a.x + b.x) / 2, my = Math.min(a.y, b.y) - Math.min(60, Math.abs(a.x - b.x) / 4 + 12);
       g += '<path class="m-route" d="M' + a.x.toFixed(1) + " " + a.y.toFixed(1) + " Q " + mx.toFixed(1) + " " + my.toFixed(1) + " " + b.x.toFixed(1) + " " + b.y.toFixed(1) + '"/>'; }
@@ -98,7 +100,7 @@
   }
 
   function clampView(o, v) {
-    var lim = o.zone || o.center; if (!lim) return;
+    if (o.free) return; var lim = o.zone || o.center; if (!lim) return;
     var maxKm = (o.zone ? o.zone.km : 5) * 1.6, d = SF.geo.km(lim, v);
     if (d > maxKm) { var f = maxKm / d; v.lat = lim.lat + (v.lat - lim.lat) * f; v.lng = lim.lng + (v.lng - lim.lng) * f; }
   }
@@ -138,6 +140,7 @@
         if (moved > 4) settle(el);
         else if (start && e.type === "pointerup") { var now = Date.now(), rc = el.getBoundingClientRect();
           if (now - lastTap < 320) zoomBy(el, 1, e.clientX - rc.left, e.clientY - rc.top);
+          else if (o.onTap) { var v0 = SF.state.tmv[o.key]; o.onTap({ lng: lngOf(wx(v0.lng, v0.z) - rc.width / 2 + e.clientX - rc.left, v0.z), lat: latOf(wy(v0.lat, v0.z) - rc.height / 2 + e.clientY - rc.top, v0.z) }); draw(el); }
           else if (o.picker) { // single tap: move the pin to the tapped spot
             var v = SF.state.tmv[o.key]; v.lng = lngOf(wx(v.lng, v.z) + (e.clientX - rc.left - rc.width / 2), v.z); v.lat = latOf(wy(v.lat, v.z) + (e.clientY - rc.top - rc.height / 2), v.z); clampView(o, v); draw(el); settle(el); }
           lastTap = now; }
@@ -154,8 +157,17 @@
   }
   SF.zone = function (cityId) {
     var cs = SF.state.cities || [], c = cs.filter(function (x) { return x.id === cityId; })[0] || cs.filter(function (x) { return x.id === (SF.state.pub || {}).defaultCityId; })[0] || cs[0];
-    return c ? { lat: c.lat, lng: c.lng, km: (SF.state.pub || {}).zoneKm || 5, name: SF.tx(c.name) } : null;
+    if (!c) return null; var km = (SF.state.pub || {}).zoneKm || 5, poly = c.zone && c.zone.length > 2 ? c.zone : null;
+    /* a drawn area: km = how far its farthest corner is (used to keep the map near the town) */
+    if (poly) km = Math.max.apply(null, poly.map(function (p) { return SF.geo.km(c, p); }));
+    return { lat: c.lat, lng: c.lng, km: Math.round(km * 10) / 10, name: SF.tx(c.name), poly: poly };
   };
+  /* a restaurant with its own drawn area delivers only there; otherwise the town's area */
+  SF.restZone = function (r) { if (!r || !r.zone || r.zone.length < 3) return SF.zone(r && r.cityId);
+    return { lat: r.lat, lng: r.lng, km: Math.round(Math.max.apply(null, r.zone.map(function (p) { return SF.geo.km(r, p); })) * 10) / 10, name: SF.tx(r.name), poly: r.zone }; };
+  SF.inZoneOf = function (p, z) { if (!z) return true; return z.poly ? SomonRules.inPolygon(p, z.poly) : SF.geo.km(z, p) <= z.km + 1e-9; };
+  SF.inZone = function (p, cityId) { return SF.inZoneOf(p, SF.zone(cityId)); };
+  SF.redrawMap = function (key) { var el = document.querySelector('[data-tmap="' + key + '"]'); if (el && el._m) draw(el); };
   SF.mountMaps = function () { document.querySelectorAll("[data-tmap]").forEach(mount); };
   SF.after.push(SF.mountMaps);
   window.addEventListener("resize", function () { document.querySelectorAll("[data-tmap]").forEach(function (el) { if (el._m) draw(el); }); });

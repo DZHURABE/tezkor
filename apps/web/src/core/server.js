@@ -61,7 +61,7 @@
 
     /* ---------- shaping ---------- */
     function pubUser(u) { if (!u) return null; var o = { id: u.id, role: u.role, name: u.name, phone: u.phone, cityId: u.cityId, active: u.active, lang: u.lang, createdAt: u.createdAt };
-      if (u.mustChange) o.mustChange = true; if (u.staff) { o.staff = true; o.staffRole = u.staffRole === "manager" ? "manager" : "worker"; } if (u.avatar) o.avatar = u.avatar; if (u.favs) o.favs = u.favs; if (u.pwResetAt) o.pwResetAt = u.pwResetAt; if (u.phoneVerified) o.phoneVerified = u.phoneVerified;
+      if (u.mustChange) o.mustChange = true; if (u.staff) { o.staff = true; o.staffRole = ["manager", "waiter"].indexOf(u.staffRole) >= 0 ? u.staffRole : "worker"; if (u.tipCard) o.tipCard = u.tipCard; } if (u.avatar) o.avatar = u.avatar; if (u.favs) o.favs = u.favs; if (u.pwResetAt) o.pwResetAt = u.pwResetAt; if (u.phoneVerified) o.phoneVerified = u.phoneVerified;
       if (u.restaurantId) o.restaurantId = u.restaurantId; if (u.courier) { o.courier = Object.assign({}, u.courier, courierRating(u)); if (u.courier.restaurantId) { var rr = find(db.restaurants, u.courier.restaurantId); o.courier.restaurantName = rr ? rr.name : null; } } if (u.addresses) o.addresses = u.addresses; return o; }
     function courierRating(u) { var rs = db.orders.filter(function (o) { return o.courierId === u.id && o.review && o.review.courierRating; });
       if (!rs.length) return { rating: u.courier ? u.courier.rating : null, ratingCount: u.courier ? u.courier.ratingCount : 0 };
@@ -82,7 +82,7 @@
     function addMonths(t, n) { var d = new Date(t); var day = d.getDate(); d.setMonth(d.getMonth() + n); if (d.getDate() < day) d.setDate(0); return d.getTime(); }
     function openNow(r) { return live(r) && r.open && Rules.isOpenAt(r.hours, new Date(clock())); }
     function pubRest(r) { var c = cityOf(r.cityId);
-      return Object.assign({}, r, { isOpenNow: openNow(r), deliveryFrom: Rules.deliveryFee(db.settings, Math.max(1, Rules.distanceKm(r, c) )), productCount: by(db.products, "restaurantId", r.id).length, sub: subOf(r), hasSale: db.products.some(function (p) { return p.restaurantId === r.id && p.available && p.oldPrice > p.price; }), orderCount: db.orders.filter(function (o) { return o.restaurantId === r.id && o.status === "delivered"; }).length, isNew: clock() - (r.createdAt || 0) < 30 * 864e5 }); }
+      return Object.assign({}, r, { tables: undefined, isOpenNow: openNow(r), deliveryFrom: Rules.deliveryFee(db.settings, Math.max(1, Rules.distanceKm(r, c) )), productCount: by(db.products, "restaurantId", r.id).length, sub: subOf(r), hasSale: db.products.some(function (p) { return p.restaurantId === r.id && p.available && p.oldPrice > p.price; }), orderCount: db.orders.filter(function (o) { return o.restaurantId === r.id && o.status === "delivered"; }).length, isNew: clock() - (r.createdAt || 0) < 30 * 864e5 }); }
     /* where the courier is: real GPS from the courier app when it is fresh, otherwise an estimate along the route */
     var SPEED = { scooter: 25, bike: 15, car: 30, foot: 5 };   // km/h inside the town
     function courierPos(o) {
@@ -101,13 +101,14 @@
       return { lat: pos.lat, lng: pos.lng, progress: p == null ? null : p, leg: leg, km: Math.round(left * 10) / 10, etaMin: eta, live: !!live, at: live ? c.courier.locAt : t };
     }
 
+    function wOf(o) { var w = o.waiterId && find(db.users, o.waiterId); return w ? { id: w.id, name: w.name, tipCard: w.tipCard || null, rating: w.wRating || null } : null; }
     function pubOrder(o, viewer) {
       var r = find(db.restaurants, o.restaurantId), cu = find(db.users, o.customerId), co = o.courierId ? find(db.users, o.courierId) : null;
       var x = Object.assign({}, o, { restaurant: r ? { id: r.id, name: r.name, phone: r.phone, lat: r.lat, lng: r.lng, tone: r.tone, address: r.address } : null,
         /* a known number: how many orders this customer has already received — new or regular */
         customer: cu ? { id: cu.id, name: cu.name, phone: cu.phone, verified: !!cu.phoneVerified, orders: db.orders.filter(function (x) { return x.customerId === cu.id && x.status === "delivered" && x.id !== o.id; }).length } : null,
         courier: co ? Object.assign({ id: co.id, name: co.name, phone: co.phone, vehicle: co.courier.vehicle }, courierRating(co)) : null,
-        courierPos: courierPos(o) });
+        courierPos: courierPos(o), waiter: wOf(o) });
       /* phone numbers are shared only while they are needed: during an active order, between the people working on it */
       var live = Rules.ACTIVE.indexOf(o.status) >= 0, role = viewer && viewer.role;
       if (role !== "admin") {
@@ -180,6 +181,7 @@
       if (to === "ready") { if (!o.selfDelivery && !o.dineIn) notify(o.courierId ? "u:" + o.courierId : offerTarget(o), "n.ready", { n: num, rest: r.name }, o.id); notify("u:" + o.customerId, "n.readyCustomer", { n: num }, o.id); }
       if (to === "picked_up") { o.pickedAt = t; notify("u:" + o.customerId, "n.onTheWay", { n: num, total: o.total, cash: o.payment.method === "cash" }, o.id); }
       if (to === "delivered") { o.deliveredAt = t; if (o.payment.method === "cash") o.payment.status = "paid";
+        o.items.forEach(function (it) { var pr = find(db.products, it.productId); if (pr) pr.sold = (pr.sold || 0) + it.qty; });
         var dc = o.courierId && find(db.users, o.courierId); o.ownDelivery = !dc || !!(dc.courier && dc.courier.restaurantId === o.restaurantId); Object.assign(o, Rules.split(o, r, db.settings)); hideFor(o.id); notify("u:" + o.customerId, "n.delivered", { n: num }, o.id); }
       if (to === "rejected" || to === "cancelled") { hideFor(o.id); if (o.payment.status === "paid") { o.payment.status = "refunded"; db.payments.forEach(function (p) { if (p.orderId === o.id) p.status = "refunded"; }); }
         if (to === "rejected") notify("u:" + o.customerId, "n.rejected", { n: num }, o.id); else if (role !== "customer") notify("u:" + o.customerId, "n.cancelled", { n: num }, o.id);
@@ -198,7 +200,11 @@
       var subtotal = items.reduce(function (s, x) { return s + x.price * x.qty; }, 0);
       if (!b.dineIn && subtotal < r.minOrder) E(409, "MIN_ORDER", { min: r.minOrder });
       var a = b.address || {}, km = null, fee = null;
-      if (typeof a.lat === "number" && typeof a.lng === "number") { var city = cityOf(r.cityId); var zk = Rules.distanceKm(city, a), zmax = db.settings.zoneKm || 5; if (zk > zmax) E(422, "OUT_OF_ZONE", { km: Math.round(zk * 10) / 10, max: zmax }); km = Math.round(Rules.distanceKm(r, a) * 10) / 10; fee = Rules.deliveryFee(db.settings, km); }
+      if (typeof a.lat === "number" && typeof a.lng === "number") { var city = cityOf(r.cityId); var zk = Rules.distanceKm(city, a), zmax = db.settings.zoneKm || 5;
+        /* the area the admin drew on the map; without one — a circle of zoneKm around the town centre */
+        if (r.zone && r.zone.length >= 3) { if (!Rules.inPolygon(a, r.zone)) E(422, "OUT_OF_AREA"); }   // the restaurant's own area, drawn by the admin
+        else if (city.zone && city.zone.length >= 3) { if (!Rules.inPolygon(a, city.zone)) E(422, "OUT_OF_AREA"); }
+        else if (zk > zmax) E(422, "OUT_OF_ZONE", { km: Math.round(zk * 10) / 10, max: zmax }); km = Math.round(Rules.distanceKm(r, a) * 10) / 10; fee = Rules.deliveryFee(db.settings, km); }
       var discount = 0, promo = null;
       if (b.promoCode) { promo = db.promos.filter(function (p) { return p.code === str(b.promoCode).toUpperCase(); })[0]; var pd = Rules.promoDiscount(promo, subtotal, clock()); if (!pd.ok) E(409, pd.code, { min: pd.min }); discount = pd.discount; }
       return { restaurant: r, items: items, subtotal: subtotal, km: km, deliveryFee: fee, discount: discount, promo: promo, total: subtotal - discount + (fee || 0) };
@@ -338,7 +344,10 @@
     route("GET", "/restaurants/:id", null, function (req, b, q, p) { var r = find(db.restaurants, p.id); if (!r || !live(r)) E(404, "NOT_FOUND");
       return Object.assign(pubRest(r), { products: by(db.products, "restaurantId", r.id) }); });
     route("GET", "/products/popular", null, function (req, b, q) { var ids = db.restaurants.filter(function (r) { return orderable(r) && (!q.cityId || r.cityId === q.cityId); }).map(function (r) { return r.id; });
-      return db.products.filter(function (p) { return p.popular && p.available && ids.indexOf(p.restaurantId) >= 0; }).slice(0, 12).map(function (p) { return Object.assign({}, p, { restaurant: pubRest(find(db.restaurants, p.restaurantId)) }); }); });
+      /* «Popular»: what people like (👍) and buy most, plus the dishes a restaurant marks as hits */
+      var score = function (p) { return (p.likes || 0) * 3 - (p.dislikes || 0) * 2 + Math.min(p.sold || 0, 200) * 0.5 + (p.popular ? 4 : 0); };
+      return db.products.filter(function (p) { return p.available && ids.indexOf(p.restaurantId) >= 0 && (p.popular || score(p) > 2); })
+        .sort(function (a, c) { return score(c) - score(a); }).slice(0, 12).map(function (p) { return Object.assign({}, p, { restaurant: pubRest(find(db.restaurants, p.restaurantId)) }); }); });
     route("GET", "/products/:id", null, function (req, b, q, p) { var x = find(db.products, p.id); if (!x) E(404, "NOT_FOUND"); return Object.assign({}, x, { restaurant: pubRest(find(db.restaurants, x.restaurantId)) }); });
     route("GET", "/search", null, function (req, b, q) {
       /* forgiving match: Tajik letters = Russian ones, ё = е, and о = а (палав / палов / плов) */
@@ -404,14 +413,21 @@
     route("GET", "/orders/:id", "*", function (req, b, q, p) { return pubOrder(orderFor(req, p.id), req.user); });
     route("POST", "/orders/:id/cancel", ["customer"], function (req, b, q, p) { var o = orderFor(req, p.id); setStatus(o, "cancelled", req.user); save(); return pubOrder(o, req.user); });
     route("POST", "/orders/:id/review", ["customer"], function (req, b, q, p) {
-      var o = orderFor(req, p.id); if (o.status !== "delivered") E(409, "NOT_DELIVERED"); if (o.review) E(409, "ALREADY_REVIEWED");
-      var r = int(b.rating), cr = b.courierRating == null ? null : int(b.courierRating);
-      if (!(r >= 1 && r <= 5) || (cr !== null && !(cr >= 1 && cr <= 5))) E(400, "BAD_RATING");
-      o.review = { rating: r, courierRating: cr, comment: str(b.comment, 300), at: clock() };
-      var rest = find(db.restaurants, o.restaurantId); rest.rating = Math.round((rest.rating * rest.ratingCount + r) / (rest.ratingCount + 1) * 10) / 10; rest.ratingCount++;
+      var o = orderFor(req, p.id); applyReview(o, b); save(); return pubOrder(o, req.user); });
+    /* one review: the restaurant (stars), the courier or the waiter (stars), and each dish (👍 / 👎) — liked dishes rise in «Popular» */
+    function applyReview(o, b) {
+      if (o.status !== "delivered") E(409, "NOT_DELIVERED"); if (o.review) E(409, "ALREADY_REVIEWED");
+      var r = int(b.rating), cr = b.courierRating == null ? null : int(b.courierRating), wr = b.waiterRating == null ? null : int(b.waiterRating);
+      if (!(r >= 1 && r <= 5) || (cr !== null && !(cr >= 1 && cr <= 5)) || (wr !== null && !(wr >= 1 && wr <= 5))) E(400, "BAD_RATING");
+      var likes = {}, ids = o.items.map(function (i) { return i.productId; });
+      Object.keys(b.likes || {}).forEach(function (k) { var v = int(b.likes[k]); if (ids.indexOf(k) >= 0 && (v === 1 || v === -1)) likes[k] = v; });
+      o.review = { rating: r, courierRating: cr, waiterRating: wr, likes: likes, comment: str(b.comment, 300), at: clock() };
+      var rest = find(db.restaurants, o.restaurantId); rest.rating = Math.round(((rest.rating || 0) * (rest.ratingCount || 0) + r) / ((rest.ratingCount || 0) + 1) * 10) / 10; rest.ratingCount = (rest.ratingCount || 0) + 1;
+      Object.keys(likes).forEach(function (k) { var pr = find(db.products, k); if (!pr) return; if (likes[k] > 0) pr.likes = (pr.likes || 0) + 1; else pr.dislikes = (pr.dislikes || 0) + 1; });
       if (o.courierId && cr) notify("u:" + o.courierId, "n.rated", { n: o.number, r: cr }, o.id);
-      save(); return pubOrder(o, req.user);
-    });
+      var w = o.waiterId && find(db.users, o.waiterId);
+      if (w && wr) { w.wRating = Math.round(((w.wRating || 0) * (w.wRatingCount || 0) + wr) / ((w.wRatingCount || 0) + 1) * 10) / 10; w.wRatingCount = (w.wRatingCount || 0) + 1; notify("u:" + w.id, "n.rated", { n: o.number, r: wr }, o.id); }
+    }
 
     /* ---------- notifications ---------- */
     route("GET", "/notifications", "*", function (req) { var ts = targetsOf(req.user), uid = req.user.id;
@@ -454,7 +470,10 @@
       if (!o.dineIn && (b.delivery === "own" || b.delivery === "platform")) { var rm = (find(db.restaurants, o.restaurantId) || {}).delivery || "platform";
         if (rm === "platform" && b.delivery === "own") E(409, "PLATFORM_DELIVERY");
         o.delivery = b.delivery === "platform" ? "platform" : (rm === "mixed" ? "mixed" : "own"); o.deliveryChosen = b.delivery; }
-      setStatus(o, "cooking", req.user); if (o.payment.method === "transfer") { o.payment.status = "paid"; o.payment.confirmedAt = clock(); } save(); return pubOrder(o, req.user); });
+      setStatus(o, "cooking", req.user); if (o.payment.method === "transfer") { o.payment.status = "paid"; o.payment.confirmedAt = clock(); }
+      /* who took it: shown on the ticket; at a table the one who accepted is the table's waiter */
+      o.acceptedBy = { id: req.user.id, name: req.user.name }; if (o.dineIn) o.waiterId = req.user.id;
+      save(); return pubOrder(o, req.user); });
     route("POST", "/restaurant/orders/:id/reject", ["restaurant"], function (req, b, q, p) { var o = orderFor(req, p.id); o.rejectReason = str(b.reason, 120); setStatus(o, "rejected", req.user); if (o.payment.method === "transfer" && o.payment.status === "review") o.payment.status = "not_received"; save(); return pubOrder(o, req.user); });
     route("POST", "/restaurant/orders/:id/ready", ["restaurant"], function (req, b, q, p) { var o = orderFor(req, p.id); setStatus(o, "ready", req.user); save(); return pubOrder(o, req.user); });
     /* the restaurant changes its mind: give an own-delivery order to Тезкор couriers right now */
@@ -473,7 +492,8 @@
       setStatus(o, "delivered", req.user); save(); return pubOrder(o, req.user); });
     /* ---------- tables in the hall: a QR sticker on each table → the guest orders from the menu without signing up ---------- */
     route("POST", "/restaurant/orders/:id/served", ["restaurant"], function (req, b, q, p) { var o = orderFor(req, p.id); if (!o.dineIn) E(409, "NOT_TABLE_ORDER");
-      if (o.status === "cooking") setStatus(o, "ready", req.user); if (o.status === "ready") setStatus(o, "picked_up", req.user); setStatus(o, "delivered", req.user); save(); return pubOrder(o, req.user); });
+      if (o.status === "cooking") setStatus(o, "ready", req.user); if (o.status === "ready") setStatus(o, "picked_up", req.user); setStatus(o, "delivered", req.user);
+      if (!o.waiterId || req.user.staffRole === "waiter") o.waiterId = req.user.id; o.servedBy = { id: req.user.id, name: req.user.name }; save(); return pubOrder(o, req.user); });
     var TABLE_MAX = 100;
     function tablesOf(r) { return r.tables || (r.tables = []); }
     function tableCode() { var c; do { c = String(newToken()).replace(/[^A-Za-z0-9]/g, "").slice(1, 11); } while (c.length < 8 || db.restaurants.some(function (r) { return tablesOf(r).some(function (x) { return x.code === c; }); })); return c; }
@@ -495,6 +515,8 @@
     /* the guest's side (no account): the menu of this table, orders, "call the waiter" */
     function guestOrder(o) { var x = pubOrder(o, null); delete x.guestKey; delete x.sig; return x; }
     route("GET", "/dine/:key", null, function (req, b, q, p) { var k = str(p.key, 60), o = k.length >= 16 && db.orders.filter(function (x) { return x.dineIn && x.guestKey === k; })[0]; if (!o) E(404, "NOT_FOUND"); return guestOrder(o); });
+    route("POST", "/dine/:key/review", null, function (req, b, q, p) { var k = str(p.key, 60), o = k.length >= 16 && db.orders.filter(function (x) { return x.dineIn && x.guestKey === k; })[0]; if (!o) E(404, "NOT_FOUND");
+      applyReview(o, b); save(); return guestOrder(o); });
     route("POST", "/dine/:key/cancel", null, function (req, b, q, p) { var k = str(p.key, 60), o = k.length >= 16 && db.orders.filter(function (x) { return x.dineIn && x.guestKey === k; })[0]; if (!o) E(404, "NOT_FOUND");
       setStatus(o, "cancelled", { role: "customer", id: "guest" }); save(); return guestOrder(o); });
     route("GET", "/table/:code", null, function (req, b, q, p) { var m = byCode(p.code);
@@ -523,19 +545,44 @@
     function ownerOnly(req) { var r = myRest(req); if (r.ownerId !== req.user.id) E(403, "OWNER_ONLY"); return r; }
     function myStaff(req, id) { var r = boss(req), u = find(db.users, id); if (!u || u.role !== "restaurant" || u.restaurantId !== r.id || u.id === r.ownerId) E(404, "NOT_FOUND");
       if (u.id === req.user.id) E(409, "USE_PROFILE"); if (u.staffRole === "manager" && r.ownerId !== req.user.id) E(403, "OWNER_ONLY"); return u; }
-    function pubStaff(u) { return { id: u.id, staffRole: u.staffRole === "manager" ? "manager" : "worker", name: u.name, phone: u.phone, active: u.active, createdAt: u.createdAt, lastSeenAt: u.lastSeenAt || null, mustChange: !!u.mustChange }; }
+    function cardNum(v) { var d = String(v || "").replace(/\D/g, ""); if (!d) return null; if (d.length < 12 || d.length > 19) E(400, "CARD_NUMBER"); return d; }
+    /* what a staff member did in the last 30 days: orders taken, money, rating from guests */
+    function staffStats(u) { var m0 = clock() - 30 * DAY, l = db.orders.filter(function (o) { return o.status === "delivered" && o.createdAt >= m0 && (o.waiterId === u.id || (o.acceptedBy && o.acceptedBy.id === u.id)); });
+      return { orders: l.length, sum: l.reduce(function (s, o) { return s + o.subtotal; }, 0), rating: u.wRating || null, ratingCount: u.wRatingCount || 0 }; }
+    function pubStaff(u) { return { id: u.id, staffRole: ["manager", "waiter"].indexOf(u.staffRole) >= 0 ? u.staffRole : "worker", tipCard: u.tipCard || null, stats: staffStats(u), name: u.name, phone: u.phone, active: u.active, createdAt: u.createdAt, lastSeenAt: u.lastSeenAt || null, mustChange: !!u.mustChange }; }
     function dropSessions(id) { Object.keys(db.sessions).forEach(function (k) { if (db.sessions[k].userId === id) delete db.sessions[k]; }); }
+    /* «Sales»: one page with the money — by day, by dish, by table, by waiter, by payment */
+    route("GET", "/restaurant/sales", ["restaurant"], function (req, b, q) { var r = boss(req), t = clock(), d0 = startOfDay(t);
+      var from = q.period === "week" ? d0 - 6 * DAY : q.period === "month" ? d0 - 29 * DAY : d0;
+      var all = by(db.orders, "restaurantId", r.id).filter(function (o) { return o.createdAt >= from; }), del = all.filter(function (o) { return o.status === "delivered"; });
+      var sum = function (l) { return l.reduce(function (s, o) { return s + o.subtotal; }, 0); }, group = function (key, name) { var m = {}; del.forEach(function (o) { var k = key(o); if (k == null) return; m[k] = m[k] || { key: k, name: name(o), orders: 0, sum: 0 }; m[k].orders++; m[k].sum += o.subtotal; }); return Object.keys(m).map(function (k) { return m[k]; }).sort(function (a, c) { return c.sum - a.sum; }); };
+      var dishes = {}; del.forEach(function (o) { o.items.forEach(function (it) { var d = dishes[it.productId] = dishes[it.productId] || { name: it.name, kind: it.kind, qty: 0, sum: 0 }; d.qty += it.qty; d.sum += it.qty * it.price; }); });
+      var days = []; for (var i = (q.period === "month" ? 29 : q.period === "week" ? 6 : 0); i >= 0; i--) { var a = d0 - i * DAY, l = del.filter(function (o) { return o.createdAt >= a && o.createdAt < a + DAY; }); days.push({ day: a, sum: sum(l), count: l.length }); }
+      var waiters = group(function (o) { return o.waiterId || (o.acceptedBy && o.acceptedBy.id) || null; }, function (o) { var w = find(db.users, o.waiterId || o.acceptedBy.id); return w ? w.name : (o.acceptedBy ? o.acceptedBy.name : "—"); })
+        .map(function (x) { var w = find(db.users, x.key); x.rating = w ? w.wRating || null : null; x.staffRole = w ? (w.id === r.ownerId ? "owner" : w.staffRole || "worker") : null; return x; });
+      return { period: q.period || "today", from: from, revenue: sum(del), orders: del.length, avg: del.length ? Math.round(sum(del) / del.length) : 0,
+        cancelled: all.filter(function (o) { return o.status === "cancelled" || o.status === "rejected"; }).length,
+        hall: { orders: del.filter(function (o) { return o.dineIn; }).length, sum: sum(del.filter(function (o) { return o.dineIn; })) }, delivery: { orders: del.filter(function (o) { return !o.dineIn; }).length, sum: sum(del.filter(function (o) { return !o.dineIn; })) },
+        pay: ["cash", "card", "transfer"].map(function (m) { var l = del.filter(function (o) { return o.payment.method === m && !o.dineIn; }); return { method: m, orders: l.length, sum: sum(l) }; }).filter(function (x) { return x.orders; }),
+        days: days, dishes: Object.keys(dishes).map(function (k) { return dishes[k]; }).sort(function (a, c) { return c.sum - a.sum; }).slice(0, 15),
+        tables: group(function (o) { return o.dineIn ? o.tableId : null; }, function (o) { return o.tableName; }), waiters: waiters }; });
+    /* a waiter's own page: what I did, my rating, my tip card */
+    route("GET", "/restaurant/my", ["restaurant"], function (req) { var u = req.user, d0 = startOfDay(clock()), mine = function (o) { return o.status === "delivered" && (o.waiterId === u.id || (o.acceptedBy && o.acceptedBy.id === u.id)); };
+      var today = db.orders.filter(function (o) { return mine(o) && o.createdAt >= d0; });
+      return Object.assign(staffStats(u), { todayOrders: today.length, todaySum: today.reduce(function (s, o) { return s + o.subtotal; }, 0), tipCard: u.tipCard || null, name: u.name }); });
+    route("PATCH", "/restaurant/my", ["restaurant"], function (req, b) { if (b.tipCard !== undefined) req.user.tipCard = cardNum(b.tipCard); save(); return { tipCard: req.user.tipCard || null }; });
     route("GET", "/restaurant/staff", ["restaurant"], function (req) { var r = boss(req);
       return db.users.filter(function (u) { return u.role === "restaurant" && u.restaurantId === r.id && u.id !== r.ownerId; }).map(pubStaff); });
-    route("POST", "/restaurant/staff", ["restaurant"], function (req, b) { var r = boss(req), sr = b.staffRole === "manager" ? "manager" : "worker", name = str(b.name, 60), phone = Rules.normPhone(b.phone);
+    route("POST", "/restaurant/staff", ["restaurant"], function (req, b) { var r = boss(req), sr = ["manager", "waiter"].indexOf(b.staffRole) >= 0 ? b.staffRole : "worker", name = str(b.name, 60), phone = Rules.normPhone(b.phone);
       if (name.length < 2) E(400, "BAD_NAME"); if (!phone) E(400, "BAD_PHONE"); if (db.users.some(function (u) { return u.phone === phone; })) E(409, "PHONE_TAKEN");
       if (db.users.filter(function (u) { return u.role === "restaurant" && u.restaurantId === r.id; }).length > 15) E(409, "STAFF_LIMIT");
       if (sr === "manager" && r.ownerId !== req.user.id) E(403, "OWNER_ONLY");
-      var tmp = newPassword(), u = { id: id("u"), role: "restaurant", restaurantId: r.id, staff: true, staffRole: sr, name: name, phone: phone, pass: hashPw(tmp), mustChange: true, active: true, cityId: r.cityId, createdAt: clock(), lang: "tg" };
+      var tmp = newPassword(), u = { id: id("u"), role: "restaurant", restaurantId: r.id, staff: true, staffRole: sr, tipCard: cardNum(b.tipCard), name: name, phone: phone, pass: hashPw(tmp), mustChange: true, active: true, cityId: r.cityId, createdAt: clock(), lang: "tg" };
       db.users.push(u); save(); return Object.assign(pubStaff(u), { login: { phone: phone, password: tmp } }); });
     route("PATCH", "/restaurant/staff/:id", ["restaurant"], function (req, b, q, p) { var u = myStaff(req, p.id);
       if (b.active != null) { u.active = !!b.active; if (!u.active) dropSessions(u.id); }
-      if (b.staffRole != null) { if (myRest(req).ownerId !== req.user.id) E(403, "OWNER_ONLY"); u.staffRole = b.staffRole === "manager" ? "manager" : "worker"; }
+      if (b.staffRole != null) { if (myRest(req).ownerId !== req.user.id && (b.staffRole === "manager" || u.staffRole === "manager")) E(403, "OWNER_ONLY"); u.staffRole = ["manager", "waiter"].indexOf(b.staffRole) >= 0 ? b.staffRole : "worker"; }
+      if (b.tipCard !== undefined) u.tipCard = cardNum(b.tipCard);
       save(); return pubStaff(u); });
     route("POST", "/restaurant/staff/:id/password", ["restaurant"], function (req, b, q, p) { var u = myStaff(req, p.id), tmp = newPassword(); u.pass = hashPw(tmp); u.mustChange = true; dropSessions(u.id); save(); return { phone: u.phone, password: tmp }; });
     route("DELETE", "/restaurant/staff/:id", ["restaurant"], function (req, b, q, p) { var u = myStaff(req, p.id); dropSessions(u.id); db.users.splice(db.users.indexOf(u), 1); save(); return true; });
@@ -554,6 +601,8 @@
       if (b.desc != null) x.desc = L(str(b.desc, 140)); if (b.weight != null) x.weight = str(b.weight, 20);
       if (b.kind != null) x.kind = KINDS.indexOf(b.kind) >= 0 ? b.kind : "plate";
       if (b.available != null) x.available = !!b.available; if (b.popular != null) x.popular = !!b.popular;
+      /* when the dish is shown first on the home screen: breakfast / lunch / dinner / night (empty = guessed from the dish) */
+      if (b.meals != null) x.meals = (Array.isArray(b.meals) ? b.meals : []).filter(function (m, i, a) { return ["b", "l", "d", "n"].indexOf(m) >= 0 && a.indexOf(m) === i; });
       if (b.oldPrice !== undefined) { var op = b.oldPrice ? int(b.oldPrice) : null; if (op !== null && !(op >= 1 && op <= 10000)) E(400, "BAD_PRICE"); x.oldPrice = op; }
       return x;
     }
@@ -561,11 +610,19 @@
       Object.assign(prod, x); if (prod.oldPrice && prod.oldPrice <= prod.price) E(400, "OLD_PRICE_LOW");
       if (ph !== undefined) prod.photo = photoField(ph, prod.photo || null, "ph"); return prod;
     }
+    /* fill a menu from a ready template (Tajik + Uzbek dishes); dishes with the same name are skipped, hidden categories come back */
+    function fillMenu(r, key) { var tpl = (Seed.MENU_TPL || {})[key]; if (!tpl) E(400, "BAD_TEMPLATE"); var t = clock(), added = 0;
+      var have = by(db.products, "restaurantId", r.id).map(function (p) { return String(p.name && p.name.tg || "").toLowerCase(); });
+      tpl.forEach(function (d) { if (have.indexOf(d[1].tg.toLowerCase()) >= 0) return;
+        db.products.push({ id: id(r.id + "p"), restaurantId: r.id, categoryId: d[0], name: JSON.parse(JSON.stringify(d[1])), desc: JSON.parse(JSON.stringify(d[2])), price: d[3], weight: d[4], kind: d[5], popular: !!d[6], available: true, photo: null, oldPrice: null, createdAt: t });
+        var c = find(db.categories, d[0]); if (c && c.active === false) c.active = true; added++; });
+      save(); return { added: added, total: by(db.products, "restaurantId", r.id).length }; }
+    route("POST", "/restaurant/menu/template", ["restaurant"], function (req, b) { return fillMenu(boss(req), str(b.key) || "tj-uz"); });
     route("GET", "/restaurant/products", ["restaurant"], function (req) { return by(db.products, "restaurantId", myRest(req).id); });
     route("POST", "/restaurant/products", ["restaurant"], function (req, b) { var r = boss(req);
       var prod = saveProduct({ id: id(r.id + "p"), restaurantId: r.id, desc: L(""), weight: "", kind: "plate", available: true, popular: false, photo: null, oldPrice: null, createdAt: clock() }, b, false);
       db.products.push(prod); save(); return prod; });
-    route("PATCH", "/restaurant/products/:id", ["restaurant"], function (req, b, q, p) { var r = onlyKeys(b, ["available"]) ? myRest(req) : boss(req), prod = find(db.products, p.id);
+    route("PATCH", "/restaurant/products/:id", ["restaurant"], function (req, b, q, p) { var r = onlyKeys(b, ["available"]) && req.user.staffRole !== "waiter" ? myRest(req) : boss(req), prod = find(db.products, p.id);
       if (!prod || prod.restaurantId !== r.id) E(404, "NOT_FOUND"); var keep = JSON.parse(JSON.stringify(prod));
       try { saveProduct(prod, b, true); } catch (e) { Object.assign(prod, keep); throw e; } save(); return prod; });
     route("DELETE", "/restaurant/products/:id", ["restaurant"], function (req, b, q, p) { var r = boss(req), prod = find(db.products, p.id);
@@ -619,7 +676,8 @@
     route("GET", "/courier/history", ["courier"], function (req) { return db.orders.filter(function (o) { return o.courierId === req.user.id && Rules.FINAL.indexOf(o.status) >= 0; }).slice(0, 50).map(function (o) { return pubOrder(o, req.user); }); });
 
     /* ---------- admin ---------- */
-    function startOfDay(t) { var d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); }
+    /* midnight in Tajikistan (UTC+5), whatever the server clock zone is */
+    function startOfDay(t) { var off = 5 * 3600000; return Math.floor((t + off) / DAY) * DAY - off; }
     function statsFor(orders, forRestaurant) {
       var t = clock(), d0 = startOfDay(t), m0 = d0 - 29 * 86400000;
       var del = orders.filter(function (o) { return o.status === "delivered"; });
@@ -679,6 +737,7 @@
       r.paidUntil = clock() + td * DAY; r.trial = td > 0;
       db.subs = db.subs || []; db.subs.unshift({ id: id("s"), restaurantId: rid, kind: "trial", months: 0, days: td, amount: 0, note: "", from: clock(), until: r.paidUntil, at: clock(), by: req.user.id });
       db.users.push(owner); db.restaurants.push(r); save(); return Object.assign(pubRest(r), { login: { phone: phone, password: tmp } }); });
+    route("POST", "/admin/restaurants/:id/template", ["admin"], function (req, b, q, p) { var r = find(db.restaurants, p.id); if (!r) E(404, "NOT_FOUND"); return fillMenu(r, str(b.key) || "tj-uz"); });
     route("PATCH", "/admin/restaurants/:id", ["admin"], function (req, b, q, p) { var r = find(db.restaurants, p.id); if (!r) E(404, "NOT_FOUND");
       if (b.delivery != null) { if (["platform", "own", "mixed"].indexOf(b.delivery) < 0) E(400, "BAD_DELIVERY"); r.delivery = b.delivery; }
       if (b.logo !== undefined) r.logo = photoField(b.logo, r.logo || null, "lg"); if (b.cover !== undefined) r.cover = photoField(b.cover, r.cover || null, "cv");
@@ -692,10 +751,29 @@
       if (ow && b.ownerPhone != null) { var op = Rules.normPhone(b.ownerPhone); if (!op) E(400, "BAD_PHONE");
         if (op !== ow.phone) { if (db.users.some(function (u) { return u.phone === op; })) E(409, "PHONE_TAKEN"); ow.phone = op; ow.phoneVerified = null; } }
       if (b.active != null) r.active = !!b.active; if (b.commissionPct != null) { var c = int(b.commissionPct); if (!(c >= 0 && c <= 50)) E(400, "BAD_COMMISSION"); r.commissionPct = c; } save(); return pubRest(r); });
+    /* ---------- admins: one main admin (the one set on the server) and up to two helpers he adds himself ----------
+       helpers run everything day to day; only the main admin adds or removes admins, and nobody else can block him or reset his password */
+    var ADMIN_MAX = 3;
+    function mainAdmin() { var a = db.meta.mainAdminId && find(db.users, db.meta.mainAdminId);
+      if (a && a.role === "admin") return a;
+      var envPh = opts.admin && Rules.normPhone(opts.admin.phone), all = db.users.filter(function (u) { return u.role === "admin"; });
+      a = (envPh && all.filter(function (u) { return u.phone === envPh; })[0]) || all.slice().sort(function (x, y) { return (x.createdAt || 0) - (y.createdAt || 0); })[0];
+      if (a) db.meta.mainAdminId = a.id; return a || null; }
+    function isMain(u) { var m = mainAdmin(); return !!(m && u && m.id === u.id); }
+    function mainOnly(req) { if (!isMain(req.user)) E(403, "MAIN_ADMIN_ONLY"); }
+    function pubAdmin(u) { return { id: u.id, name: u.name, phone: u.phone, active: u.active, main: isMain(u), mustChange: !!u.mustChange, createdAt: u.createdAt, lastSeenAt: u.lastSeenAt || null }; }
+    route("GET", "/admin/admins", ["admin"], function (req) { return { me: isMain(req.user), max: ADMIN_MAX, list: db.users.filter(function (u) { return u.role === "admin"; }).map(pubAdmin) }; });
+    route("POST", "/admin/admins", ["admin"], function (req, b) { mainOnly(req); var name = str(b.name, 60), phone = Rules.normPhone(b.phone);
+      if (name.length < 2) E(400, "BAD_NAME"); if (!phone) E(400, "BAD_PHONE"); if (db.users.some(function (u) { return u.phone === phone; })) E(409, "PHONE_TAKEN");
+      if (db.users.filter(function (u) { return u.role === "admin"; }).length >= ADMIN_MAX) E(409, "ADMIN_LIMIT", { max: ADMIN_MAX });
+      var tmp = newPassword(), u = { id: id("u"), role: "admin", name: name, phone: phone, pass: hashPw(tmp), mustChange: true, active: true, cityId: db.settings.defaultCityId, createdAt: clock(), lang: "tg" };
+      db.users.push(u); save(); return Object.assign(pubAdmin(u), { login: { phone: phone, password: tmp } }); });
+    route("DELETE", "/admin/admins/:id", ["admin"], function (req, b, q, p) { mainOnly(req); var u = find(db.users, p.id); if (!u || u.role !== "admin") E(404, "NOT_FOUND"); if (isMain(u)) E(409, "CANNOT_BLOCK_SELF");
+      Object.keys(db.sessions).forEach(function (k) { if (db.sessions[k].userId === u.id) delete db.sessions[k]; }); db.users.splice(db.users.indexOf(u), 1); save(); return true; });
     route("GET", "/admin/users", ["admin"], function (req, b, q) { var l = db.users; if (q.role) l = l.filter(function (u) { return u.role === q.role; });
       if (q.q) { var s = str(q.q).toLowerCase(); l = l.filter(function (u) { return u.name.toLowerCase().indexOf(s) >= 0 || u.phone.indexOf(s.replace(/\D/g, "") || "~") >= 0; }); }
       return l.map(function (u) { var x = pubUser(u); x.orderCount = db.orders.filter(function (o) { return o.customerId === u.id || o.courierId === u.id; }).length; return x; }); });
-    route("PATCH", "/admin/users/:id", ["admin"], function (req, b, q, p) { var u = find(db.users, p.id); if (!u) E(404, "NOT_FOUND");
+    route("PATCH", "/admin/users/:id", ["admin"], function (req, b, q, p) { var u = find(db.users, p.id); if (!u) E(404, "NOT_FOUND"); if (u.role === "admin" && u.id !== req.user.id) mainOnly(req);
       if (b.active != null) { if (u.id === req.user.id) E(409, "CANNOT_BLOCK_SELF"); if (!b.active && u.role === "courier" && activeOf(u.id)) E(409, "HAS_ACTIVE_ORDER");
         u.active = !!b.active; if (!u.active) { if (u.courier) u.courier.online = false; Object.keys(db.sessions).forEach(function (k) { if (db.sessions[k].userId === u.id) delete db.sessions[k]; }); } }
       /* there is one main admin (set on the server); nobody can be made an admin from the app */
@@ -707,7 +785,7 @@
       db.users.push(u); return { user: u, login: { phone: phone, password: tmp } }; }
     route("POST", "/admin/couriers", ["admin"], function (req, b) { var rr = b.restaurantId ? find(db.restaurants, b.restaurantId) : null; if (b.restaurantId && !rr) E(400, "BAD_RESTAURANT");
       var nc = newCourier(b, rr ? cityOf(rr.cityId) : (find(db.cities, b.cityId) || db.cities[0]), rr ? rr.id : null); save(); return Object.assign(pubUser(nc.user), { login: nc.login }); });
-    route("POST", "/admin/users/:id/password", ["admin"], function (req, b, q, p) { var u = find(db.users, p.id); if (!u) E(404, "NOT_FOUND"); if (u.id === req.user.id) E(409, "USE_PROFILE");
+    route("POST", "/admin/users/:id/password", ["admin"], function (req, b, q, p) { var u = find(db.users, p.id); if (!u) E(404, "NOT_FOUND"); if (u.id === req.user.id) E(409, "USE_PROFILE"); if (u.role === "admin") mainOnly(req);
       var tmp = newPassword(); u.pass = hashPw(tmp); u.mustChange = true; u.pwResetAt = null; Object.keys(db.sessions).forEach(function (k) { if (db.sessions[k].userId === u.id) delete db.sessions[k]; });
       db.notifications.forEach(function (n) { if (n.key === "n.pwReset" && n.params && Rules.normPhone(n.params.phone) === u.phone) n.gone = true; }); save();
       return { phone: u.phone, password: tmp }; });
@@ -747,6 +825,15 @@
     route("GET", "/admin/cities", ["admin"], function () { return db.cities.map(function (c) { return Object.assign({}, c, { restaurants: by(db.restaurants, "cityId", c.id).length, couriers: db.users.filter(function (u) { return u.role === "courier" && u.cityId === c.id; }).length }); }); });
     route("POST", "/admin/cities", ["admin"], function (req, b) { var n = str(b.name, 40), la = Number(b.lat), ln = Number(b.lng); if (n.length < 2) E(400, "BAD_NAME");
       if (!(la > 36 && la < 41.5 && ln > 67 && ln < 75.5)) E(400, "BAD_COORDS"); var c = { id: id("c"), name: L(n), lat: la, lng: ln, active: true }; db.cities.push(c); save(); return c; });
+    /* the delivery area of a town: points the admin taps on the map (3–200); an empty list goes back to the circle */
+    function setZone(o, b) { var pts = Array.isArray(b.zone) ? b.zone : [];
+      if (!pts.length) { delete o.zone; save(); return; }
+      if (pts.length < 3 || pts.length > 200) E(400, "BAD_ZONE");
+      o.zone = pts.map(function (x) { var la = Number(x.lat), ln = Number(x.lng); if (!(isFinite(la) && isFinite(ln) && Math.abs(la) < 90 && Math.abs(ln) < 180) || Rules.distanceKm(o, { lat: la, lng: ln }) > 60) E(400, "BAD_ZONE"); return { lat: Math.round(la * 1e6) / 1e6, lng: Math.round(ln * 1e6) / 1e6 }; });
+      save(); }
+    route("POST", "/admin/cities/:id/zone", ["admin"], function (req, b, q, p) { var c = find(db.cities, p.id); if (!c) E(404, "NOT_FOUND"); setZone(c, b); return c; });
+    /* each restaurant can have its own delivery area: "this kitchen delivers up to here" */
+    route("POST", "/admin/restaurants/:id/zone", ["admin"], function (req, b, q, p) { var r = find(db.restaurants, p.id); if (!r) E(404, "NOT_FOUND"); setZone(r, b); return pubRest(r); });
     route("PATCH", "/admin/cities/:id", ["admin"], function (req, b, q, p) { var c = find(db.cities, p.id); if (!c) E(404, "NOT_FOUND"); if (b.active != null) c.active = !!b.active; save(); return c; });
     route("GET", "/admin/payments", ["admin"], function () { return db.payments.slice(0, 120).map(function (x) { var o = find(db.orders, x.orderId); return Object.assign({}, x, { number: o ? o.number : null }); }); });
     /* storage: how much the data takes, the last cleanup, run it now */

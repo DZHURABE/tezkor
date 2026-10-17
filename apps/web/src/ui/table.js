@@ -27,7 +27,10 @@
     var left = o.status === "cooking" && o.prepMin ? Math.max(1, o.prepMin - Math.round((Date.now() - o.history[o.history.length - 1].at) / 60000)) : null;
     return '<div class="tord s-' + o.status + '"><span class="tdot"></span><div class="grow"><b>№' + o.number + " · " + t(k) + "</b><small>" +
       o.items.map(function (i) { return i.qty + "× " + esc(tx(i.name)); }).join(", ") + (left ? " · " + t("tb.left", { n: left }) : "") + "</small></div>" +
-      (o.status === "pending" ? '<button type="button" class="link sm" data-act="tcancel" data-k="' + esc(o._key) + '">' + t("btn.cancel") + "</button>" : '<b class="num">' + money(o.total) + "</b>") + "</div>";
+      (o.status === "pending" ? '<button type="button" class="link sm" data-act="tcancel" data-k="' + esc(o._key) + '">' + t("btn.cancel") + "</button>" : '<b class="num">' + money(o.total) + "</b>") + "</div>" +
+      /* the waiter of this table, and his tip card if he added one (not required) */
+      (o.waiter && o.status !== "cancelled" && o.status !== "rejected" ? '<div class="twaiterline">' + I("user", 14) + "<span class=\"grow\">" + t("tb.yourWaiter", { name: esc(o.waiter.name) }) + (o.waiter.rating ? " · ★ " + o.waiter.rating : "") + "</span>" +
+        (o.waiter.tipCard ? '<button type="button" class="btn sm ghost" data-act="ttip" data-v="' + esc(o.waiter.tipCard) + '" data-name="' + esc(o.waiter.name) + '">' + I("card", 14) + t("tb.tip") + "</button>" : "") + "</div>" : "");
   }
 
   SF.route("/t/:code", { shell: SF.shells.table, title: "tb.title", render: function (p) {
@@ -49,6 +52,7 @@
             '<div class="thname">' + (r.logo ? '<img class="tlogo" src="' + esc(r.logo) + '" alt="">' : "") + "<div><h1>" + esc(tx(r.name)) + '</h1><span class="tbadge">' + I("grid", 14) + t("tb.table", { n: esc(m.table.name) }) + "</span></div></div></header>" +
           (m.open ? "" : '<div class="msg warn">' + I("clock", 16) + t("tb.closed") + "</div>") +
           (os.length ? '<section class="card tords"><h2>' + t("tb.yours") + "</h2>" + os.map(statusLine).join("") + "</section>" : '<p class="thint">' + I("info", 16) + t("tb.hint") + "</p>") +
+          (function () { var d = os.filter(function (o) { return o.status === "delivered" && !o.review; })[0]; if (!d) return ""; SF.state.tRev = d._key; return SF.reviewForm(d, "trev"); })() +
           '<nav class="ctabs tcats">' + groups.map(function (g, i) { return '<button class="' + (i ? "" : "on") + '" data-act="jump" data-v="' + g.id + '">' + esc(g.name) + "</button>"; }).join("") + "</nav>" +
           groups.map(function (g) { return '<section class="msec" id="sec-' + g.id + '" data-sec="' + g.id + '"><h2>' + esc(g.name) + '</h2><div class="tlist">' + g.list.map(function (x) { return card(x, s.cart[x.id] || 0); }).join("") + "</div></section>"; }).join("") +
           '<div class="twaiter"><button type="button" class="btn ghost" data-act="tcall" data-why="help">' + I("bell", 16) + t("tb.callWaiter") + '</button><button type="button" class="btn ghost" data-act="tcall" data-why="bill">' + I("receipt", 16) + t("tb.bill") + "</button></div>" +
@@ -83,6 +87,12 @@
       SF.render({ quiet: true });
     }).then(function () { SF.state.tSending = false; }, function (e) { SF.state.tSending = false; throw e; }); };
 
+  SF.actions.trev = function () { var body; try { body = SF.rvBody(); } catch (e) { SF.toast(SF.err(e), "err"); return; }
+    return SF.api.post("/dine/" + SF.state.tRev + "/review", body).then(function () { SF.state.rv = null; SF.toast(t("rv.thanks")); SF.render({ quiet: true }); }); };
+  /* tip: show the waiter's card number big, with copy */
+  SF.actions.ttip = function (el) { var v = el.dataset.v, nice = v.replace(/(\d{4})(?=\d)/g, "$1 ");
+    SF.modal('<button class="mx" data-act="closemodal" aria-label="' + t("btn.close") + '">' + I("x", 20) + '</button><div class="callsheet"><span class="avatar xl">' + esc(el.dataset.name.charAt(0)) + "</span><b>" + t("tb.tipT", { name: esc(el.dataset.name) }) + '</b><span class="muted">' + t("tb.tipS") + '</span><code class="callnum num" id="callnum">' + esc(nice) + "</code>" +
+      '<button type="button" class="btn primary block" data-act="copynum" data-v="' + esc(v) + '">' + I("copy", 16) + t("tb.tipCopy") + "</button></div>"); };
   SF.actions.tcancel = function (el) { return SF.api.post("/dine/" + el.dataset.k + "/cancel").then(function () { SF.toast(t("tb.cancelled")); SF.render({ quiet: true }); }); };
   SF.actions.tcall = function (el) { if (!M) return; return SF.api.post("/table/" + M.code + "/call", { why: el.dataset.why }).then(function (r) {
     SF.toast(r.again ? t("tb.calledAgain", { s: r.again }) : t(el.dataset.why === "bill" ? "tb.billSent" : "tb.called")); }); };

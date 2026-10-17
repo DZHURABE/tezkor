@@ -47,6 +47,11 @@ var SF = (function () {
     shield: '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/>', wallet: '<path d="M3 7a2 2 0 012-2h13v4M3 7v11a2 2 0 002 2h15V9H5a2 2 0 01-2-2zM16 14h.01"/>',
     route: '<circle cx="6" cy="19" r="2.5"/><circle cx="18" cy="5" r="2.5"/><path d="M8.5 19H16a3.5 3.5 0 000-7H8a3.5 3.5 0 010-7h7.5"/>', grid: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
     info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5h.01"/>', percent: '<path d="M19 5L5 19"/><circle cx="7" cy="7" r="2.5"/><circle cx="17" cy="17" r="2.5"/>', box: '<path d="M3 7l9-4 9 4v10l-9 4-9-4z"/><path d="M3 7l9 4 9-4M12 11v10"/>',
+    heart: '<path d="M12 20s-7.5-4.6-9.3-9.2C1.5 7.6 3.6 4.5 7 4.5c2 0 3.6 1.1 5 2.9 1.4-1.8 3-2.9 5-2.9 3.4 0 5.5 3.1 4.3 6.3C19.5 15.4 12 20 12 20z"/>',
+    sliders: '<path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.2"/><circle cx="10" cy="17" r="2.2"/>', camera: '<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>',
+    ticket: '<path d="M3 8a2 2 0 002-2h14a2 2 0 002 2v2a2 2 0 000 4v2a2 2 0 00-2 2H5a2 2 0 00-2-2v-2a2 2 0 000-4z"/><path d="M10 6v12" stroke-dasharray="2 2"/>',
+    briefcase: '<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2M3 13h18"/>', help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 114 2c-1 .6-1.5 1.2-1.5 2.3M12 17h.01"/>',
+    lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/>', sort: '<path d="M7 4v16M3 16l4 4 4-4M17 20V4M13 8l4-4 4 4"/>',
     sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>', send: '<path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/>'
   };
   SF.icon = function (n, s) { return '<svg class="ic" width="' + (s || 20) + '" height="' + (s || 20) + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (P[n] || "") + "</svg>"; };
@@ -56,8 +61,9 @@ var SF = (function () {
   var BC = (root.SOMON_CONFIG || {}).brand || {};
   SF.BRAND = { tg: BC.tg || "Тезкор", ru: BC.ru || "Тезкор", en: BC.en || "Tezkor" };
   SF.brand = function () { return SF.BRAND[SF.state.lang] || SF.BRAND.tg; };
-  SF.mark = function (s) { s = s || 36; return '<svg width="' + s + '" height="' + s + '" viewBox="0 0 120 120" aria-hidden="true"><rect width="120" height="120" rx="28" fill="#E8590C"/>' +
-    '<path d="M38 36H92L86 50H70L58 88H42L54 50H32Z" fill="#fff"/><rect x="16" y="60" width="22" height="7" rx="3.5" fill="#1B1F24"/><rect x="22" y="73" width="16" height="7" rx="3.5" fill="#1B1F24"/><circle cx="80" cy="82" r="7" fill="#1B1F24"/></svg>'; };
+  /* mark: a map pin with a T cut out of it and a dot for the door, on a deep-green tile (logo «Манзил-Т») */
+  SF.markInner = '<path d="M60 12C37 12 22 29 22 50C22 75 60 104 60 104C60 104 98 75 98 50C98 29 83 12 60 12Z" fill="#E8590C"/><rect x="40" y="35" width="40" height="11" rx="3" fill="#fff"/><rect x="54.5" y="35" width="11" height="34" rx="3" fill="#fff"/><circle cx="60" cy="110" r="4.5" fill="#E8590C"/>';
+  SF.mark = function (s) { s = s || 36; return '<svg width="' + s + '" height="' + s + '" viewBox="0 0 120 120" aria-hidden="true"><rect width="120" height="120" rx="28" fill="#0B5D3B"/><g transform="translate(60 60) scale(.78) translate(-60 -60)">' + SF.markInner + "</g></svg>"; };
   SF.logo = function () { return '<span class="logo">' + SF.mark(34) + '<span class="wm"><b>' + SF.esc(SF.brand()) + "</b><i>" + SF.esc(SF.t("brand.sub")) + "</i></span></span>"; };
 
   /* ---------- food art (original illustrations) ---------- */
@@ -84,6 +90,9 @@ var SF = (function () {
     coffee: '<path d="M22 40h48v14a22 22 0 01-44 0" fill="#fff" stroke="#C9D2DE" stroke-width="1.5"/><path d="M70 44h6a8 8 0 010 16h-8" stroke="#C9D2DE" stroke-width="4" fill="none"/><ellipse cx="46" cy="40" rx="24" ry="5" fill="#8A5A3B"/><path d="M40 40q6-4 12 0" stroke="#F3E1C9" stroke-width="2.5" fill="none"/><ellipse cx="46" cy="80" rx="30" ry="5" fill="#E7EAF0"/>',
     shawarma: '<g transform="rotate(-30 50 50)"><path d="M34 14h32l-4 70H38z" fill="#EBD3A6"/><path d="M34 14q16-10 32 0l-2 10H36z" fill="#8A4B2A"/><path d="M36 20q6 4 10 0t10 0 8 0" stroke="#74B816" stroke-width="4" fill="none" stroke-linecap="round"/><circle cx="44" cy="22" r="3" fill="#E03131"/><path d="M38 40h24M37 54h26M38 68h24" stroke="#D2B37C" stroke-width="1.5"/><path d="M36 84h28l-1 6H37z" fill="#D62839"/></g>',
     ayran: '<path d="M32 22h36l-4 60H36z" fill="#F7F8FA" stroke="#C9D2DE" stroke-width="1.5"/><path d="M34 34h32l-3 46H37z" fill="#fff"/><path d="M34 34q8 4 16 0t16 0" stroke="#DCE3EC" stroke-width="2" fill="none"/><path d="M44 46l4 6M54 58l-3 5" stroke="#2F9E44" stroke-width="2.5" stroke-linecap="round"/>',
+    sushi: '<ellipse cx="50" cy="80" rx="40" ry="6" fill="#000" opacity=".08"/><rect x="10" y="62" width="80" height="14" rx="4" fill="#3B3F45"/><g><ellipse cx="30" cy="52" rx="16" ry="12" fill="#1F2A24"/><ellipse cx="30" cy="50" rx="12" ry="8" fill="#F7F4EE"/><ellipse cx="30" cy="49" rx="6" ry="4" fill="#F28B5B"/></g><g><ellipse cx="70" cy="52" rx="16" ry="12" fill="#1F2A24"/><ellipse cx="70" cy="50" rx="12" ry="8" fill="#F7F4EE"/><ellipse cx="70" cy="49" rx="6" ry="4" fill="#7CC58C"/></g><path d="M38 40q12-12 26-4l-2 6q-12-6-22 2z" fill="#F28B5B"/><path d="M40 38q10-6 20-2" stroke="#fff" stroke-width="1.5" fill="none" opacity=".7"/>',
+    grocery: '<ellipse cx="50" cy="84" rx="34" ry="5" fill="#000" opacity=".08"/><path d="M18 42h64l-6 38H24z" fill="#E9B97A"/><path d="M18 42h64l-2 8H20z" fill="#D49A55"/><circle cx="34" cy="34" r="12" fill="#E8463A"/><path d="M34 22q4-6 9-5" stroke="#3A7D44" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M52 20l4 22h-12z" fill="#F2A33A"/><path d="M50 20q2-6 8-4" stroke="#3A7D44" stroke-width="3" fill="none"/><rect x="62" y="22" width="12" height="22" rx="3" fill="#E7F5EE" stroke="#9CC9B2" stroke-width="1.5"/><rect x="62" y="28" width="12" height="6" fill="#2E8B57"/>',
+    box: '<ellipse cx="50" cy="84" rx="34" ry="5" fill="#000" opacity=".08"/><path d="M16 34l34-14 34 14v40L50 88 16 74z" fill="#D9A15E"/><path d="M16 34l34 14 34-14" stroke="#B57C3C" stroke-width="2.5" fill="none"/><path d="M50 48v40" stroke="#B57C3C" stroke-width="2.5"/><path d="M33 27l34 14v12l-8-3V44L25 30z" fill="#F2D9B4"/>',
     plate: '<ellipse cx="50" cy="60" rx="42" ry="20" fill="#fff"/><ellipse cx="50" cy="58" rx="28" ry="12" fill="#EDE6DA"/><path d="M84 30v34M80 30v12q4 4 8 0V30" stroke="#9AA3AE" stroke-width="2.4" fill="none" stroke-linecap="round"/>',
     scooter: '<rect x="18" y="30" width="26" height="22" rx="4" fill="#fff"/><path d="M24 36h14M24 42h10" stroke="#E8590C" stroke-width="3" stroke-linecap="round"/><path d="M20 60h40l10-18h6l-8 22q-2 5-7 5H20z" fill="#F7C948"/><path d="M68 42l4-10" stroke="#fff" stroke-width="3.5" stroke-linecap="round"/><circle cx="28" cy="72" r="9" fill="#15171C"/><circle cx="70" cy="72" r="9" fill="#15171C"/><circle cx="28" cy="72" r="3.5" fill="#fff"/><circle cx="70" cy="72" r="3.5" fill="#fff"/>'
   };
@@ -135,7 +144,9 @@ var SF = (function () {
     var box = document.getElementById("toasts"); if (!box) return; box.appendChild(el); setTimeout(function () { el.classList.add("out"); setTimeout(function () { el.remove(); }, 400); }, 3600);
   };
   SF.modal = function (html, cls) { var m = document.getElementById("modal"); m.innerHTML = '<div class="mbg" data-act="closemodal"></div><div class="sheet ' + (cls || "") + '" role="dialog" aria-modal="true">' + html + "</div>"; m.hidden = false;
-    var f = m.querySelector("input,button:not(.mx)"); if (f) setTimeout(function () { f.focus(); }, 60); };
+    /* on phones do not jump to the first field: the keyboard would cover the form and scroll its top away */
+    var touch = root.matchMedia && root.matchMedia("(pointer: coarse)").matches;
+    var f = !touch && m.querySelector("input,button:not(.mx)"); if (f) setTimeout(function () { f.focus({ preventScroll: true }); }, 60); };
   SF.closeModal = function () { var m = document.getElementById("modal"); if (m) { m.hidden = true; m.innerHTML = ""; } };
   SF.actions.closemodal = SF.closeModal;
 
@@ -164,7 +175,9 @@ var SF = (function () {
       if (seq !== SF.renderSeq) return;
       var shell = (r.shell || SF.shells.customer)(html, r, m);
       var scroller = document.scrollingElement, y = scroller ? scroller.scrollTop : 0;
-      app.innerHTML = shell; app.setAttribute("data-role", u ? u.role : "guest"); app.classList.toggle("noanim", !!opts.quiet);
+      app.innerHTML = shell; app.setAttribute("data-role", u ? u.role : "guest");
+      /* the restaurant panel is always light (easier to read in the kitchen), whatever the phone's dark mode */
+      if (u && u.role === "restaurant") document.documentElement.setAttribute("data-theme", "light"); else document.documentElement.removeAttribute("data-theme"); app.classList.toggle("noanim", !!opts.quiet);
       if (opts.quiet && scroller) scroller.scrollTop = y; else if (scroller && SF._lastPath !== path) scroller.scrollTop = 0;
       SF._lastPath = path; SF.live = !!r.live;
       document.title = (r.title ? SF.t(r.title) + " · " : "") + SF.brand();
@@ -182,6 +195,7 @@ var SF = (function () {
     add: function (p, n) { var c = SF.cart.get(); if (c.restaurantId && c.restaurantId !== p.restaurantId && SF.cart.count()) return false;
       c.restaurantId = p.restaurantId; c.items[p.id] = Math.min(50, (c.items[p.id] || 0) + (n || 1)); SF.state.cart = c; SF.cart.save(); return true; },
     dec: function (pid) { var c = SF.cart.get(); if (!c.items[pid]) return; c.items[pid]--; if (!c.items[pid]) delete c.items[pid]; if (!SF.cart.count()) c.restaurantId = null; SF.state.cart = c; SF.cart.save(); },
+    remove: function (pid) { var c = SF.cart.get(); delete c.items[pid]; if (!SF.cart.count()) c.restaurantId = null; SF.state.cart = c; SF.cart.save(); },
     clear: function () { SF.state.cart = { restaurantId: null, items: {} }; SF.cart.save(); }
   };
 

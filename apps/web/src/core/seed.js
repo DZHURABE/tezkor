@@ -16,16 +16,21 @@
   ];
 
   var categories = [
-    { id: "k1", name: L("Миллӣ", "Национальная", "National"), icon: "plov", sort: 1, active: true },
-    { id: "k2", name: L("Кабоб ва шашлик", "Шашлык и кебаб", "Grill"), icon: "shashlik", sort: 2, active: true },
-    { id: "k3", name: L("Бургер", "Бургеры", "Burgers"), icon: "burger", sort: 3, active: true },
-    { id: "k4", name: L("Питса", "Пицца", "Pizza"), icon: "pizza", sort: 4, active: true },
-    { id: "k5", name: L("Шаурма", "Шаурма", "Shawarma"), icon: "shawarma", sort: 5, active: true },
-    { id: "k6", name: L("Самбӯса ва нон", "Самса и выпечка", "Bakery"), icon: "samsa", sort: 6, active: true },
-    { id: "k7", name: L("Шӯрбо ва салат", "Супы и салаты", "Soups & salads"), icon: "salad", sort: 7, active: true },
+    { id: "k3", name: L("Бургер", "Бургеры", "Burgers"), icon: "burger", sort: 1, active: true },
+    { id: "k4", name: L("Питса", "Пицца", "Pizza"), icon: "pizza", sort: 2, active: true },
+    { id: "k5", name: L("Шаурма", "Шаурма", "Shawarma"), icon: "shawarma", sort: 3, active: true },
+    { id: "k1", name: L("Таомҳои миллӣ", "Национальная кухня", "National"), icon: "plov", sort: 4, active: true },
+    { id: "k10", name: L("Суши", "Суши", "Sushi"), icon: "sushi", sort: 5, active: true },
+    { id: "k2", name: L("Гриль", "Гриль", "Grill"), icon: "shashlik", sort: 6, active: true },
+    { id: "k9", name: L("Нӯшокӣ", "Напитки", "Drinks"), icon: "drink", sort: 7, active: true },
     { id: "k8", name: L("Ширинӣ", "Десерты", "Desserts"), icon: "dessert", sort: 8, active: true },
-    { id: "k9", name: L("Нӯшокӣ", "Напитки", "Drinks"), icon: "drink", sort: 9, active: true }
+    { id: "k11", name: L("Озуқаворӣ", "Продукты", "Groceries"), icon: "grocery", sort: 9, active: true },
+    { id: "k12", name: L("Дигар молҳо", "Другие товары", "Other goods"), icon: "box", sort: 10, active: true },
+    { id: "k6", name: L("Самбӯса ва нон", "Самса и выпечка", "Bakery"), icon: "samsa", sort: 11, active: true },
+    { id: "k7", name: L("Шӯрбо ва салат", "Супы и салаты", "Soups & salads"), icon: "salad", sort: 12, active: true }
   ];
+  var CAT_ORDER = ["k3", "k4", "k5", "k1", "k10", "k2", "k9", "k8", "k11", "k12", "k6", "k7"];
+  var EXTRA_CATS = categories.filter(function (c) { return ["k10", "k11", "k12"].indexOf(c.id) >= 0; });
 
   // [id, name, cityId, cuisine, tone, eta, rating, hours, commission, dLat, dLng, products[[cat, name, desc, price, weight, kind, popular]]]
   var R = [
@@ -82,7 +87,7 @@
       ["k9", L("Чойи кабуд", "Зелёный чай", "Green tea"), L("Чойник", "Чайник", "Teapot"), 5, "500 мл", "tea", false]]]
   ];
 
-  var SCHEMA = 5;     // bump when demo data changes shape; old saved data is then replaced
+  var SCHEMA = 6;     // bump when demo data changes shape; old saved data is then replaced
   var HOME = "c5";   // launch city: Shahrituz. Other cities are kept for later expansion (inactive).
   var STREETS = ["кӯчаи Ленин", "кӯчаи Рӯдакӣ", "кӯчаи Сомонӣ", "кӯчаи Айнӣ", "кӯчаи Фирдавсӣ", "кӯчаи Истиқлол", "маҳаллаи Навобод", "маҳаллаи Гулистон"];
   function build(nowMs, opts) {
@@ -155,5 +160,44 @@
     db.meta.seq = 6000;
     return db;
   }
-  return { build: build, hash: hash, L: L, SCHEMA: SCHEMA };
+  /* ready-made menu to start from: Tajik and Uzbek dishes. Prices are a starting point — the restaurant corrects them.
+     [category, name, description, price, weight, picture, popular] */
+  var MENU_TPL = { "tj-uz": [
+    ["k1", L("Оши палови тоҷикӣ", "Плов таджикский", "Tajik plov"), L("Биринҷ, гӯшти гӯсфанд, сабзӣ, нахӯд", "Рис, баранина, морковь, нут", "Rice, lamb, carrot, chickpeas"), 30, "400 г", "plov", true],
+    ["k1", L("Оши палови самарқандӣ", "Плов самаркандский", "Samarkand plov"), L("Сабзии зард, гӯшти гов, тухми бедона", "Жёлтая морковь, говядина, перепелиное яйцо", "Yellow carrot, beef, quail egg"), 34, "400 г", "plov", false],
+    ["k1", L("Қурутоб", "Курутоб", "Qurutob"), L("Фатир, қурут, пиёз, помидор, кабудӣ", "Фатир, курут, лук, помидоры, зелень", "Fatir bread, qurut, onion, tomato, herbs"), 30, "450 г", "qurutob", true],
+    ["k1", L("Шакароб", "Шакароб", "Shakarob"), L("Чакка, помидор, пиёз, нони фатир", "Чакка, помидоры, лук, фатир", "Yogurt, tomato, onion, fatir bread"), 18, "400 г", "qurutob", false],
+    ["k1", L("Лағмон", "Лагман", "Lagman"), L("Угроаи дастӣ, гӯшт, сабзавот", "Ручная лапша, мясо, овощи", "Hand-pulled noodles, beef, vegetables"), 28, "400 г", "lagman", true],
+    ["k1", L("Манту", "Манты", "Manti"), L("5 дона, гӯшти гов ва пиёз", "5 шт., говядина и лук", "5 pcs, beef and onion"), 26, "5 дона", "mantu", true],
+    ["k1", L("Хонум", "Ханум", "Khanum"), L("Хамир, гӯшт, картошка, буғӣ", "Тесто, мясо, картофель, на пару", "Steamed dough roll, meat, potato"), 24, "350 г", "mantu", false],
+    ["k1", L("Норин", "Нарын", "Norin"), L("Угроаи борик, гӯшти асп ё гов, хунук", "Тонкая лапша, конина или говядина, холодный", "Thin noodles, horse or beef, cold"), 30, "300 г", "lagman", false],
+    ["k1", L("Димлама", "Димлама", "Dimlama"), L("Гӯшт ва сабзавот дар буғи худ", "Мясо и овощи, тушёные в собственном соку", "Meat and vegetables stewed in their own juice"), 32, "450 г", "plate", false],
+    ["k1", L("Кабоби қозонӣ", "Казан-кабоб", "Kazan kebab"), L("Гӯшти гӯсфанд, картошкаи бирён, пиёз", "Баранина, жареный картофель, лук", "Lamb, fried potato, onion"), 42, "400 г", "plate", false],
+    ["k1", L("Шавла", "Шавля", "Shavla"), L("Биринҷи ширадор бо гӯшт ва сабзӣ", "Вязкий рис с мясом и морковью", "Soft rice with meat and carrot"), 24, "400 г", "plov", false],
+    ["k7", L("Шӯрбо", "Шурпа", "Shurbo soup"), L("Гӯшти гӯсфанд, картошка, нахӯд", "Баранина, картофель, нут", "Lamb, potato, chickpeas"), 24, "400 мл", "soup", true],
+    ["k7", L("Мастоба", "Мастава", "Mastava"), L("Шӯрбои биринҷ бо гӯшт ва чакка", "Рисовый суп с мясом и катыком", "Rice soup with meat and yogurt"), 22, "400 мл", "soup", false],
+    ["k7", L("Чучвара", "Чучвара", "Chuchvara"), L("Чучвараи майда дар шӯрбо", "Мелкие пельмени в бульоне", "Small dumplings in broth"), 24, "400 мл", "soup", false],
+    ["k7", L("Нахӯдшӯрак", "Нахудшурак", "Chickpea soup"), L("Нахӯд, гӯшт, пиёз", "Нут, мясо, лук", "Chickpeas, meat, onion"), 20, "400 мл", "soup", false],
+    ["k7", L("Угро", "Угра", "Ugro noodle soup"), L("Угроаи хонагӣ, гӯшт, сабзавот", "Домашняя лапша, мясо, овощи", "Homemade noodles, meat, vegetables"), 20, "400 мл", "soup", false],
+    ["k7", L("Салати аччиқ-чучук", "Салат ачик-чучук", "Achik-chuchuk salad"), L("Помидор, пиёз, қаламфури талх", "Помидоры, лук, острый перец", "Tomato, onion, hot pepper"), 10, "200 г", "salad", false],
+    ["k7", L("Салати Тошкент", "Салат Ташкент", "Tashkent salad"), L("Гӯшти гов, турб, тухм, пиёзи бирён", "Говядина, редька, яйцо, жареный лук", "Beef, radish, egg, fried onion"), 22, "250 г", "salad", false],
+    ["k2", L("Шашлики гӯсфанд", "Шашлык из баранины", "Lamb shashlik"), L("5 сих, пиёз, нон", "5 шампуров, лук, лепёшка", "5 skewers, onion, bread"), 55, "5 сих", "shashlik", true],
+    ["k2", L("Шашлики мурғ", "Шашлык из курицы", "Chicken shashlik"), L("5 сих, соуси сирпиёз", "5 шампуров, чесночный соус", "5 skewers, garlic sauce"), 40, "5 сих", "shashlik", false],
+    ["k2", L("Люля-кабоб", "Люля-кебаб", "Lula kebab"), L("Қийма, пиёз, кабудӣ", "Фарш, лук, зелень", "Minced lamb, onion, herbs"), 36, "250 г", "kebab", true],
+    ["k2", L("Ҷиз", "Жиз", "Jiz"), L("Гӯшти гӯсфанди бирён бо пиёз", "Жареная баранина с луком", "Fried lamb with onion"), 45, "300 г", "kebab", false],
+    ["k6", L("Самбӯсаи танӯрӣ", "Самса тандырная", "Tandoor sambusa"), L("Гӯшти гӯсфанд, пиёз, зира", "Баранина, лук, зира", "Lamb, onion, cumin"), 8, "1 дона", "samsa", true],
+    ["k6", L("Самбӯсаи қаду", "Самса с тыквой", "Pumpkin sambusa"), L("Қаду, пиёз", "Тыква, лук", "Pumpkin, onion"), 6, "1 дона", "samsa", false],
+    ["k6", L("Нони танӯрӣ", "Лепёшка тандырная", "Tandoor bread"), L("Гарм аз танӯр", "Горячая из тандыра", "Hot from the tandoor"), 4, "1 дона", "bread", false],
+    ["k6", L("Нони патир", "Лепёшка патир", "Patir bread"), L("Бо кунҷид", "С кунжутом", "With sesame"), 6, "1 дона", "bread", false],
+    ["k6", L("Фатири маска", "Фатир с маслом", "Fatir with butter"), L("Қабат-қабат, бо равғани зард", "Слоёный, на топлёном масле", "Layered, with ghee"), 15, "1 дона", "bread", false],
+    ["k8", L("Пахлава", "Пахлава", "Baklava"), L("Чормағз, асал", "Грецкий орех, мёд", "Walnut, honey"), 20, "200 г", "dessert", false],
+    ["k8", L("Чак-чак", "Чак-чак", "Chak-chak"), L("Хамири бирён бо асал", "Жареное тесто с мёдом", "Fried dough with honey"), 15, "200 г", "dessert", false],
+    ["k8", L("Нишолло", "Нишалда", "Nisholo"), L("Ширинии сафеди сабук", "Воздушная белая сладость", "Airy white sweet cream"), 12, "150 г", "dessert", false],
+    ["k9", L("Чойи кабуд", "Зелёный чай", "Green tea"), L("Чойник, 2 пиёла", "Чайник, 2 пиалы", "Teapot, 2 cups"), 5, "500 мл", "tea", false],
+    ["k9", L("Чойи сиёҳ", "Чёрный чай", "Black tea"), L("Бо лимӯ", "С лимоном", "With lemon"), 5, "500 мл", "tea", false],
+    ["k9", L("Чалоб", "Чалоп", "Chalob"), L("Чакка, об, бодиринг, кабудӣ", "Катык, вода, огурец, зелень", "Yogurt, water, cucumber, herbs"), 8, "400 мл", "ayran", false],
+    ["k9", L("Компоти хонагӣ", "Домашний компот", "Homemade compote"), L("Аз меваҳои хушк", "Из сухофруктов", "Dried fruit"), 8, "500 мл", "juice", false],
+    ["k9", L("Кока-кола", "Кока-кола", "Coca-Cola"), L("Хунук", "Холодная", "Chilled"), 12, "1 л", "drink", false]
+  ] };
+  return { build: build, hash: hash, L: L, SCHEMA: SCHEMA, CAT_ORDER: CAT_ORDER, EXTRA_CATS: EXTRA_CATS, MENU_TPL: MENU_TPL };
 });
