@@ -732,10 +732,17 @@
       if (name.length < 2) E(400, "BAD_NAME"); if (!city) E(400, "BAD_CITY"); if (!phone) E(400, "BAD_PHONE"); if (!(com >= 0 && com <= 50)) E(400, "BAD_COMMISSION");
       if (db.users.some(function (u) { return u.phone === phone; })) E(409, "PHONE_TAKEN");
       var tmp, rid = id("r"), owner = { id: id("u"), role: "restaurant", name: str(b.ownerName, 60) || name, phone: phone, pass: hashPw(tmp = newPassword()), mustChange: true, active: true, cityId: city.id, restaurantId: rid, createdAt: clock(), lang: "tg" };
-      var r = { id: rid, name: L(name), cityId: city.id, ownerId: owner.id, cuisine: L(str(b.cuisine, 60) || "—"), tone: "#FFE3CC", eta: "30–45", rating: null, ratingCount: 0, hours: { from: "09:00", to: "22:00" }, open: false, active: true, commissionPct: com, minOrder: 20, lat: city.lat + 0.004, lng: city.lng - 0.004, address: L(str(b.address, 80)), phone: phone, createdAt: clock() };
-      var td = b.trialDays == null ? setting("trialDays") : int(b.trialDays); if (!(td >= 0 && td <= 365)) E(400, "BAD_TRIAL");
-      r.paidUntil = clock() + td * DAY; r.trial = td > 0;
-      db.subs = db.subs || []; db.subs.unshift({ id: id("s"), restaurantId: rid, kind: "trial", months: 0, days: td, amount: 0, note: "", from: clock(), until: r.paidUntil, at: clock(), by: req.user.id });
+      var la = Number(b.lat), ln = Number(b.lng), hasPin = isFinite(la) && isFinite(ln) && b.lat != null && Rules.distanceKm(city, { lat: la, lng: ln }) <= 60;
+      var r = { id: rid, name: L(name), cityId: city.id, ownerId: owner.id, cuisine: L(str(b.cuisine, 60) || "—"), tone: "#FFE3CC", eta: "30–45", rating: null, ratingCount: 0, hours: { from: "09:00", to: "22:00" }, open: false, active: true, commissionPct: com, minOrder: 20, lat: hasPin ? la : city.lat + 0.004, lng: hasPin ? ln : city.lng - 0.004, address: L(str(b.address, 80)), phone: phone, createdAt: clock() };
+      /* where the restaurant delivers — drawn by the admin on the map (optional) */
+      if (Array.isArray(b.zone) && b.zone.length) { if (b.zone.length < 3 || b.zone.length > 200) E(400, "BAD_ZONE"); r.zone = b.zone.map(function (x) { var a1 = Number(x.lat), a2 = Number(x.lng); if (!(isFinite(a1) && isFinite(a2)) || Rules.distanceKm(city, { lat: a1, lng: a2 }) > 60) E(400, "BAD_ZONE"); return { lat: Math.round(a1 * 1e6) / 1e6, lng: Math.round(a2 * 1e6) / 1e6 }; }); }
+      /* access: a free trial of N days, or N paid months (1–12) */
+      db.subs = db.subs || [];
+      if (b.months != null && int(b.months) > 0) { var mo = int(b.months), amt0 = int(b.amount || 0); if (!(mo >= 1 && mo <= 24)) E(400, "BAD_MONTHS"); if (!(amt0 >= 0 && amt0 <= 1000000)) E(400, "BAD_PRICE");
+        r.paidUntil = addMonths(clock(), mo); r.trial = false; db.subs.unshift({ id: id("s"), restaurantId: rid, kind: "paid", months: mo, amount: amt0, note: str(b.note, 120), from: clock(), until: r.paidUntil, at: clock(), by: req.user.id }); }
+      else { var td = b.trialDays == null ? setting("trialDays") : int(b.trialDays); if (!(td >= 0 && td <= 365)) E(400, "BAD_TRIAL");
+        r.paidUntil = clock() + td * DAY; r.trial = td > 0;
+        db.subs.unshift({ id: id("s"), restaurantId: rid, kind: "trial", months: 0, days: td, amount: 0, note: "", from: clock(), until: r.paidUntil, at: clock(), by: req.user.id }); }
       db.users.push(owner); db.restaurants.push(r); save(); return Object.assign(pubRest(r), { login: { phone: phone, password: tmp } }); });
     route("POST", "/admin/restaurants/:id/template", ["admin"], function (req, b, q, p) { var r = find(db.restaurants, p.id); if (!r) E(404, "NOT_FOUND"); return fillMenu(r, str(b.key) || "tj-uz"); });
     route("PATCH", "/admin/restaurants/:id", ["admin"], function (req, b, q, p) { var r = find(db.restaurants, p.id); if (!r) E(404, "NOT_FOUND");
@@ -781,8 +788,15 @@
     function newCourier(b, city, restaurantId) { var name = str(b.name, 60), phone = Rules.normPhone(b.phone);
       if (name.length < 2) E(400, "BAD_NAME"); if (!phone) E(400, "BAD_PHONE"); if (db.users.some(function (u) { return u.phone === phone; })) E(409, "PHONE_TAKEN");
       var tmp = newPassword(), u = { id: id("u"), role: "courier", name: name, phone: phone, pass: hashPw(tmp), mustChange: true, active: true, cityId: city.id, createdAt: clock(), lang: "tg",
-        courier: { online: false, vehicle: ["scooter", "bike", "car", "foot"].indexOf(b.vehicle) >= 0 ? b.vehicle : "scooter", rating: null, ratingCount: 0, lat: city.lat, lng: city.lng, restaurantId: restaurantId || null } };
+        courier: { online: false, vehicle: ["scooter", "bike", "car", "foot"].indexOf(b.vehicle) >= 0 ? b.vehicle : "scooter", carNumber: str(b.carNumber, 20).toUpperCase() || null, passport: str(b.passport, 30).toUpperCase() || null, rating: null, ratingCount: 0, lat: city.lat, lng: city.lng, restaurantId: restaurantId || null } };
       db.users.push(u); return { user: u, login: { phone: phone, password: tmp } }; }
+    /* the admin corrects a courier's card: vehicle, car / moto number, passport, town, name */
+    route("PATCH", "/admin/couriers/:id", ["admin"], function (req, b, q, p) { var u = find(db.users, p.id); if (!u || !u.courier) E(404, "NOT_FOUND");
+      if (b.name != null) { var nm = str(b.name, 60); if (nm.length < 2) E(400, "BAD_NAME"); u.name = nm; }
+      if (b.vehicle != null && ["scooter", "bike", "car", "foot"].indexOf(b.vehicle) >= 0) u.courier.vehicle = b.vehicle;
+      if (b.carNumber != null) u.courier.carNumber = str(b.carNumber, 20).toUpperCase() || null; if (b.passport != null) u.courier.passport = str(b.passport, 30).toUpperCase() || null;
+      if (b.cityId != null) { if (!find(db.cities, b.cityId)) E(400, "BAD_CITY"); u.cityId = b.cityId; }
+      save(); return pubUser(u); });
     route("POST", "/admin/couriers", ["admin"], function (req, b) { var rr = b.restaurantId ? find(db.restaurants, b.restaurantId) : null; if (b.restaurantId && !rr) E(400, "BAD_RESTAURANT");
       var nc = newCourier(b, rr ? cityOf(rr.cityId) : (find(db.cities, b.cityId) || db.cities[0]), rr ? rr.id : null); save(); return Object.assign(pubUser(nc.user), { login: nc.login }); });
     route("POST", "/admin/users/:id/password", ["admin"], function (req, b, q, p) { var u = find(db.users, p.id); if (!u) E(404, "NOT_FOUND"); if (u.id === req.user.id) E(409, "USE_PROFILE"); if (u.role === "admin") mainOnly(req);

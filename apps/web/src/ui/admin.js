@@ -122,7 +122,48 @@
   SF.inputs.adeliv = function (v, el) { return api().patch("/admin/restaurants/" + el.dataset.id, { delivery: v }).then(function () { SF.toast(t("dl.saved", { m: t("dl.m." + v) })); }, function (e) { SF.toast(SF.err(e), "err"); }); };
   SF.forms.acom = function (fd, f) { return api().patch("/admin/restaurants/" + f.dataset.id, { commissionPct: Number(fd.v) }).then(function () { SF.toast(t("btn.saved")); }); };
   SF.actions.arest = function (el) { return api().patch("/admin/restaurants/" + el.dataset.id, { active: el.getAttribute("aria-checked") !== "true" }).then(function () { SF.render({ quiet: true }); }); };
-  SF.actions.arestnew = function () { api().get("/admin/settings").then(function (s) { var el = document.getElementById("trialdays"); if (el) el.value = s.trialDays; });
+  /* ---------- new restaurant: one page — name, town, manager, place on the map, delivery area, access ---------- */
+  var ACCESS = [["t7", 7, 0], ["t14", 14, 0], ["m1", 0, 1], ["m2", 0, 2], ["m3", 0, 3], ["m6", 0, 6], ["m12", 0, 12]];
+  function nr() { return SF.state.nr || (SF.state.nr = { mode: "pin", pin: null, pts: [], marks: [], access: "m1", cityId: SF.state.cityId || ((SF.state.cities || [])[0] || {}).id, f: {} }); }
+  R("/admin/restaurants/new", { title: "adm.addRest", render: function () {
+    var x = nr(), c = (SF.state.cities || []).filter(function (y) { return y.id === x.cityId; })[0] || (SF.state.cities || [])[0], f = x.f, acc = ACCESS.filter(function (a) { return a[0] === x.access; })[0];
+    x.marks.length = 0; if (x.pin) x.marks.push({ lat: x.pin.lat, lng: x.pin.lng, type: "rest", label: "R" });
+    var inp = function (n, label, extra) { return '<label class="f">' + label + '<input name="' + n + '" data-input="nrf" value="' + esc(f[n] || "") + '"' + (extra || "") + "></label>"; };
+    return '<a class="backlink" href="#/admin/restaurants">' + I("chevL", 18) + t("adm.restaurants") + "</a>" +
+      '<form class="nrform stack" data-form="nrsave">' +
+      '<section class="card stack"><h3><span class="num stepn">1</span>' + t("nr.place") + "</h3>" + inp("name", t("adm.restName"), " required") +
+        '<div class="grid2"><label class="f">' + t("profile.city") + '<select name="cityId" data-input="nrcity">' + (SF.state.cities || []).map(function (y) { return '<option value="' + y.id + '"' + (y.id === x.cityId ? " selected" : "") + ">" + esc(tx(y.name)) + "</option>"; }).join("") + "</select></label>" + inp("cuisine", t("adm.cuisine"), ' placeholder="' + t("adm.cuisinePh") + '"') + "</div>" +
+        inp("address", t("adm.addrL"), ' placeholder="' + t("nr.addrPh") + '"') + "</section>" +
+      '<section class="card stack"><h3><span class="num stepn">2</span>' + t("nr.manager") + '</h3><div class="grid2">' + inp("ownerName", t("nr.mName")) +
+        '<label class="f">' + t("nr.mPhone") + '<span class="phonein"><i>+992</i><input name="ownerPhone" data-input="nrf" inputmode="tel" value="' + esc(f.ownerPhone || "") + '" required></span></label></div><p class="fine">' + t("nr.mNote") + "</p></section>" +
+      '<section class="card stack"><h3><span class="num stepn">3</span>' + t("nr.map") + "</h3>" +
+        '<div class="seg nrmode" role="group">' + [["pin", "pin", "nr.modePin"], ["zone", "edit", "nr.modeZone"]].map(function (m) { return '<button type="button" class="' + (x.mode === m[0] ? "on" : "") + '" aria-pressed="' + (x.mode === m[0]) + '" data-act="nrmode" data-v="' + m[0] + '">' + I(m[1], 16) + " " + t(m[2]) + "</button>"; }).join("") + "</div>" +
+        '<p class="fine">' + t(x.mode === "pin" ? "nr.pinHow" : "nr.zoneHow") + "</p>" +
+        '<div class="zmap">' + SF.tmap({ key: "nrmap", center: x.pin || { lat: c.lat, lng: c.lng }, zoom: 14, free: true, label: t("nr.map"), markers: x.marks, edit: function () { return nr().pts; },
+          onTap: function (pt) { var s = nr(); if (s.mode === "pin") { s.pin = pt; s.marks.length = 0; s.marks.push({ lat: pt.lat, lng: pt.lng, type: "rest", label: "R" }); } else if (s.pts.length < 200) s.pts.push(pt); nrInfo(); } }) + "</div>" +
+        '<p class="zcount" id="nrinfo"></p>' +
+        (x.mode === "zone" ? '<div class="zbtns"><button type="button" class="btn ghost" data-act="nrundo">' + I("chevL", 16) + t("zn.undo") + '</button><button type="button" class="btn ghost" data-act="nrclear">' + I("trash", 16) + t("zn.clear") + "</button></div>" : "") + "</section>" +
+      '<section class="card stack"><h3><span class="num stepn">4</span>' + t("nr.access") + '</h3><div class="accgrid">' + ACCESS.map(function (a) { return '<button type="button" class="' + (a[0] === x.access ? "on" : "") + '" aria-pressed="' + (a[0] === x.access) + '" data-act="nracc" data-v="' + a[0] + '"><b>' + (a[1] ? t("nr.days", { n: a[1] }) : t("nr.months", { n: a[2] })) + "</b><small>" + (a[1] ? t("nr.trial") : t("nr.paid")) + "</small></button>"; }).join("") + "</div>" +
+        (acc && acc[2] ? '<div class="grid2">' + inp("amount", t("nr.amount"), ' inputmode="numeric" placeholder="0"') + inp("commissionPct", t("adm.commission") + ", %", ' inputmode="numeric" placeholder="0"') + "</div>" : inp("commissionPct", t("adm.commission") + ", %", ' inputmode="numeric" placeholder="0"')) +
+        '<p class="fine">' + t("nr.accNote") + "</p></section>" +
+      '<button class="btn primary block lg">' + I("check", 18) + t("nr.create") + "</button></form>";
+  } });
+  function nrInfo() { var s = nr(), el = document.getElementById("nrinfo"); if (!el) return;
+    el.innerHTML = (s.pin ? I("check", 14) + " " + t("nr.pinOk") : I("info", 14) + " " + t("nr.pinNo")) + " · " + (s.pts.length >= 3 ? t("zn.ok", { n: s.pts.length }) : s.pts.length ? t("zn.need", { n: s.pts.length }) : t("nr.zoneNo")); }
+  SF.after.push(function () { if (document.getElementById("nrinfo")) nrInfo(); });
+  SF.inputs.nrf = function (v, el) { nr().f[el.name] = v; };
+  SF.inputs.nrcity = function (v) { var s = nr(); s.cityId = v; s.pin = null; s.pts = []; var c = (SF.state.cities || []).filter(function (y) { return y.id === v; })[0]; if (c) SF.tmapCenter("nrmap", { lat: c.lat, lng: c.lng }, 14); SF.render({ quiet: true }); };
+  SF.actions.nrmode = function (el) { nr().mode = el.dataset.v; SF.render({ quiet: true }); };
+  SF.actions.nracc = function (el) { nr().access = el.dataset.v; SF.render({ quiet: true }); };
+  SF.actions.nrundo = function () { var s = nr(); s.pts.pop(); SF.redrawMap("nrmap"); nrInfo(); };
+  SF.actions.nrclear = function () { nr().pts = []; SF.redrawMap("nrmap"); nrInfo(); };
+  SF.forms.nrsave = function (fd) { var s = nr(), a = ACCESS.filter(function (x) { return x[0] === s.access; })[0];
+    if (s.pts.length && s.pts.length < 3) { SF.toast(t("zn.need", { n: s.pts.length }), "err"); return; }
+    var body = { name: fd.name, cityId: fd.cityId, cuisine: fd.cuisine, address: fd.address, ownerName: fd.ownerName, ownerPhone: fd.ownerPhone, commissionPct: fd.commissionPct ? Number(fd.commissionPct) : 0,
+      lat: s.pin ? s.pin.lat : null, lng: s.pin ? s.pin.lng : null, zone: s.pts.length >= 3 ? s.pts : [] };
+    if (a[2]) { body.months = a[2]; body.amount = Number(fd.amount || 0); } else body.trialDays = a[1];
+    return api().post("/admin/restaurants", body).then(function (r) { SF.state.nr = null; SF.go("/admin/restaurants"); setTimeout(function () { creds(tx(r.name), r.login); }, 300); }); };
+  SF.actions.arestnew = function () { SF.state.nr = null; SF.go("/admin/restaurants/new"); return; api().get("/admin/settings").then(function (s) { var el = document.getElementById("trialdays"); if (el) el.value = s.trialDays; });
     SF.modal('<button class="mx" data-act="closemodal" aria-label="' + t("btn.close") + '">' + I("x", 20) + '</button><form class="stack" data-form="arestnew"><h2 class="h2">' + t("adm.addRest") + '</h2><label class="f">' + t("adm.restName") + '<input name="name" required></label>' +
       '<div class="grid2"><label class="f">' + t("profile.city") + '<select name="cityId">' + (SF.state.cities || []).map(function (c) { return '<option value="' + c.id + '">' + esc(tx(c.name)) + "</option>"; }).join("") + '</select></label><label class="f">' + t("adm.cuisine") + '<input name="cuisine" placeholder="' + t("adm.cuisinePh") + '"></label></div>' +
       '<div class="grid2"><label class="f">' + t("adm.ownerName") + '<input name="ownerName"></label><label class="f">' + t("adm.ownerPhone") + '<span class="phonein"><i>+992</i><input name="ownerPhone" inputmode="tel" required></span></label></div>' +
@@ -155,11 +196,24 @@
     return api().get("/admin/users?role=courier").then(function (list) {
       return '<div class="toolbar"><p class="muted">' + t("adm.courOnline", { n: list.filter(function (u) { return u.courier.online; }).length, all: list.length }) + '</p><button class="btn primary" data-act="acournew">' + I("plus", 18) + t("adm.addCourier") + "</button></div>" +
         table([t("role.courier"), t("profile.city"), t("adm.status"), t("k.rating"), t("adm.ordersN"), t("cour.vehicle"), t("adm.activeL")], list.map(function (u) {
-          return '<tr><td><div class="tcell"><span class="avatar sm">' + esc(u.name.charAt(0)) + "</span><div><b>" + esc(u.name) + '</b>' + (u.courier.restaurantName ? '<small class="ownlbl">' + I("store", 12) + esc(tx(u.courier.restaurantName)) + '</small>' : '') + '<small class="muted num">' + esc(SF.phone(u.phone)) + "</small></div></div></td><td>" + esc(cityName(u.cityId)) + "</td><td>" + (u.courier.online ? '<span class="pill p-ok">' + t("cour.onlineL") + "</span>" : '<span class="pill p-mut">' + t("cour.offlineL") + "</span>") + "</td><td>" + SF.stars(u.courier.rating) + '</td><td class="num">' + u.orderCount + "</td><td>" + t("veh." + u.courier.vehicle) + "</td><td>" + sw(u.active, "auser", u.id, t("adm.activeL")) + "</td></tr>"; }));
+          return '<tr><td><div class="tcell"><span class="avatar sm">' + esc(u.name.charAt(0)) + "</span><div><b>" + esc(u.name) + '</b>' + (u.courier.restaurantName ? '<small class="ownlbl">' + I("store", 12) + esc(tx(u.courier.restaurantName)) + '</small>' : '') + '<small class="muted num">' + esc(SF.phone(u.phone)) + "</small></div></div></td><td>" + esc(cityName(u.cityId)) + "</td><td>" + (u.courier.online ? '<span class="pill p-ok">' + t("cour.onlineL") + "</span>" : '<span class="pill p-mut">' + t("cour.offlineL") + "</span>") + "</td><td>" + SF.stars(u.courier.rating) + '</td><td class="num">' + u.orderCount + "</td><td>" + t("veh." + u.courier.vehicle) + (u.courier.carNumber ? '<br><small class="num code">' + esc(u.courier.carNumber) + "</small>" : "") + (u.courier.passport ? '<br><small class="muted num">' + I("user", 12) + " " + esc(u.courier.passport) + "</small>" : "") + '<br><button type="button" class="link sm" data-act="acouredit" data-id="' + u.id + '">' + I("edit", 12) + " " + t("btn.edit") + "</button></td><td>" + sw(u.active, "auser", u.id, t("adm.activeL")) + "</td></tr>"; }));
     });
   } });
-  SF.actions.acournew = function () { SF.modal('<button class="mx" data-act="closemodal" aria-label="' + t("btn.close") + '">' + I("x", 20) + '</button><form class="stack" data-form="acournew"><h2 class="h2">' + t("adm.addCourier") + '</h2><label class="f">' + t("profile.name") + '<input name="name" required></label><label class="f">' + t("auth.phone") + '<span class="phonein"><i>+992</i><input name="phone" inputmode="tel" required></span></label>' +
-    '<label class="f">' + t("profile.city") + '<select name="cityId">' + (SF.state.cities || []).map(function (c) { return '<option value="' + c.id + '">' + esc(tx(c.name)) + "</option>"; }).join("") + '</select></label><p class="fine">' + t("adm.ownerNote") + '</p><button class="btn primary block">' + t("btn.create") + "</button></form>"); };
+  /* new courier: name, phone, town, vehicle (car / moto with its number, bike, on foot), passport */
+  function courForm(u) { u = u || { courier: { vehicle: "car" } }; var c = u.courier, v = SF.state.cveh || c.vehicle || "car";
+    return '<label class="f">' + t("profile.name") + '<input name="name" required value="' + esc(u.name || "") + '"></label>' +
+      (u.id ? "" : '<label class="f">' + t("auth.phone") + '<span class="phonein"><i>+992</i><input name="phone" inputmode="tel" required></span></label>') +
+      '<label class="f">' + t("profile.city") + '<select name="cityId">' + (SF.state.cities || []).map(function (y) { return '<option value="' + y.id + '"' + (y.id === u.cityId ? " selected" : "") + ">" + esc(tx(y.name)) + "</option>"; }).join("") + "</select></label>" +
+      '<p class="lbl">' + t("cour.vehicle") + '</p><div class="vehpick">' + [["car", "🚗"], ["scooter", "🛵"], ["bike", "🚲"], ["foot", "🚶"]].map(function (x) { return '<button type="button" class="' + (x[0] === v ? "on" : "") + '" aria-pressed="' + (x[0] === v) + '" data-act="cveh" data-v="' + x[0] + '"><span>' + x[1] + "</span>" + t("veh." + x[0]) + "</button>"; }).join("") + '</div><input type="hidden" name="vehicle" id="cvehv" value="' + v + '">' +
+      '<label class="f" id="carnum"' + (v === "car" || v === "scooter" ? "" : " hidden") + ">" + t("cr.carNum") + '<input name="carNumber" value="' + esc(c.carNumber || "") + '" placeholder="01 TJ 1234 AA" autocapitalize="characters"></label>' +
+      '<label class="f">' + t("cr.passport") + '<input name="passport" value="' + esc(c.passport || "") + '" placeholder="A 1234567" autocapitalize="characters"><small class="hint">' + t("cr.passportHint") + "</small></label>"; }
+  SF.actions.cveh = function (el) { SF.state.cveh = el.dataset.v; document.getElementById("cvehv").value = el.dataset.v; el.parentNode.querySelectorAll("button").forEach(function (b) { b.classList.toggle("on", b === el); b.setAttribute("aria-pressed", b === el); });
+    var cn = document.getElementById("carnum"); if (cn) cn.hidden = !(el.dataset.v === "car" || el.dataset.v === "scooter"); };
+  SF.actions.acournew = function () { SF.state.cveh = null; SF.modal('<button class="mx" data-act="closemodal" aria-label="' + t("btn.close") + '">' + I("x", 20) + '</button><form class="stack" data-form="acournew"><h2 class="h2">' + t("adm.addCourier") + "</h2>" + courForm() +
+    '<p class="fine">' + t("adm.ownerNote") + '</p><button class="btn primary block">' + t("btn.create") + "</button></form>", "wide"); };
+  SF.actions.acouredit = function (el) { return api().get("/admin/users?role=courier").then(function (l) { var u = l.filter(function (x) { return x.id === el.dataset.id; })[0]; if (!u) return; SF.state.cveh = null;
+    SF.modal('<button class="mx" data-act="closemodal" aria-label="' + t("btn.close") + '">' + I("x", 20) + '</button><form class="stack" data-form="acouredit" data-id="' + u.id + '"><h2 class="h2">' + esc(u.name) + "</h2>" + courForm(u) + '<button class="btn primary block">' + t("btn.save") + "</button></form>", "wide"); }); };
+  SF.forms.acouredit = function (fd, f) { return api().patch("/admin/couriers/" + f.dataset.id, fd).then(function () { SF.closeModal(); SF.toast(t("btn.saved")); SF.render({ quiet: true }); }); };
   SF.forms.acournew = function (fd) { return api().post("/admin/couriers", fd).then(function (u) { SF.render({ quiet: true }); creds(u.name, u.login); }); };
   R("/admin/users", { title: "adm.users", render: function (p, q) {
     var role = q.role || "", s = q.q || "";

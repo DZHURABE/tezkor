@@ -1257,3 +1257,12 @@ label.f.inline{flex-direction:row;align-items:center}
 .likec{display:inline-block;font-size:11.5px;font-weight:700;color:#0B5D3B;background:#E3F3EA;border-radius:99px;padding:1px 7px;vertical-align:2px;white-space:nowrap}
 .twaiterline{display:flex;align-items:center;gap:8px;font-size:13px;color:#0B5D3B;font-weight:600;padding:0 0 10px 20px}
 .two>.card+.card{margin-top:0}.two{gap:14px}
+/* admin: new restaurant / courier */
+.nrform{max-width:760px}
+.accgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px}
+.accgrid button,.vehpick button{border:1.5px solid var(--line);background:var(--surface);border-radius:14px;padding:10px 6px;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer}
+.accgrid button b{font-size:15px}.accgrid button small{font-size:11.5px;color:var(--muted)}
+.accgrid button.on,.vehpick button.on{border-color:#0B5D3B;background:rgba(11,93,59,.08);color:#0B5D3B}
+.vehpick{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.vehpick button{font-weight:700;font-size:13px}.vehpick span{font-size:24px}
+.nrmode button{display:inline-flex;align-items:center;justify-content:center;gap:6px}
+label.f[hidden]{display:none}

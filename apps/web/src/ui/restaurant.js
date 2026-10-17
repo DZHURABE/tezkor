@@ -179,6 +179,7 @@
     return '<article class="card tbcard' + (x.active ? "" : " off") + '"><div class="tbqr">' + SF.qrSvg(tableUrl(x.code)) + '</div><div class="tbinfo"><b>' + t("tb.table", { n: esc(x.name) }) + "</b>" +
       '<small class="muted tburl">' + esc(tableUrl(x.code).replace(/^https?:\/\//, "")) + "</small>" + (x.active ? "" : '<span class="pill p-mut">' + t("tb.offP") + "</span>") +
       '<div class="tbacts"><button type="button" class="btn sm ghost" data-act="tbprint" data-id="' + x.id + '">' + I("download", 14) + t("tb.print") + '</button>' +
+      '<a class="btn sm ghost" href="#/t/' + esc(x.code) + '">' + I("eye", 14) + t("tb.try") + "</a>" +
       '<button type="button" class="iconbtn sm" data-act="tbmenu" data-id="' + x.id + '" aria-label="' + t("tb.more") + '">' + I("cog", 16) + "</button></div></div></article>";
   }
   R("/rest/tables", { title: "tb.nav", render: function () {
