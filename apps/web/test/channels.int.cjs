@@ -33,7 +33,7 @@ let pass = 0; const t = async (n, f) => { await f(); pass++; console.log("✓", 
   const A = `http://localhost:${APP}/api`, A2 = `http://localhost:${APP2}/api`;
   const api = async (base, m, u, body) => { const r = await fetch(base + u, { method: m, headers: { "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined }); return r.json(); };
   const ch = await until(async () => { try { const r = await api(A, "GET", "/auth/verify/channels"); return r.data.channels.length === 3 && r.data; } catch { return null; } });
-  await t("ҳамма каналлар ёқилди: " + ch.channels.map(c => c.id + "/" + c.kind).join(", "), async () => { assert.deepEqual(ch.channels.map(c => c.id), ["telegram", "whatsapp", "sms"]); assert.equal(ch.required, true); });
+  await t("ҳамма каналлар ёқилди: " + ch.channels.map(c => c.id + "/" + c.kind).join(", "), async () => { assert.deepEqual(ch.channels.map(c => c.id), ["telegram", "whatsapp", "sms"]); assert.equal(ch.required, false, "стандарт: Telegramсиз ҳам мумкин"); });
 
   await t("Telegram бот: /start → «рақамни юбориш» тугмаси → контакт → тасдиқ → рўйхатдан ўтиш", async () => {
     const v = (await api(A, "POST", "/auth/verify/start", { phone: "93 888 55 00", purpose: "register", channel: "telegram" })).data;
@@ -98,7 +98,7 @@ let pass = 0; const t = async (n, f) => { await f(); pass++; console.log("✓", 
   });
   await t("бот менюси: «Тезкор» тугмаси сайтни Telegram ичида очади", async () => {
     const m = await until(() => calls.find(c => c.tgcfg === "setChatMenuButton")); assert.equal(m.body.menu_button.type, "web_app"); assert.match(m.body.menu_button.web_app.url, /^https:\/\/tezkor\.example\.tj\//); });
-  await t("тасдиқсиз рўйхатдан ўтиб бўлмайди (каналлар ёқиқ)", async () => {
-    assert.equal((await api(A, "POST", "/auth/register", { name: "Hacker", phone: "938889999", password: "Parol123" })).error.code, "VERIFY_REQUIRED"); });
+  await t("Telegramсиз ҳам рўйхатдан ўтса бўлади (стандарт), рақам «тасдиқланмаган» бўлиб қолади", async () => {
+    const r = await api(A, "POST", "/auth/register", { name: "Oddiy", phone: "938889999", password: "Parol123" }); assert.ok(r.data.token); assert.ok(!r.data.user.phoneVerified); });
   console.log(`\n${pass} та канал синови ўтди`); srv.kill(); srv2.kill(); fake.close(); process.exit(0);
 })().catch(e => { console.error("FAIL", e); process.exit(1); });

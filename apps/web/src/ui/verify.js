@@ -23,10 +23,11 @@
 
   /* step 1: choose how to confirm */
   function choose() {
-    var info = SF.verifyInfo();
-    SF.modal('<div class="stack vflow">' + head(t(F.purpose === "reset" ? "vf.resetTitle" : "vf.title"), t("vf.sub", { phone: '<b class="num">' + esc(SF.phone(F.phone)) + "</b>" })) +
-      '<div class="vch">' + info.channels.map(function (c) { var m = CH[c.id] || CH.demo;
-        return '<button type="button" class="vbtn ' + m.cls + '" data-act="vstart" data-ch="' + c.id + '">' + '<span class="vic">' + I(m.icon, 22) + '</span><span class="grow"><b>' + (m.name || t("vf.demo")) + "</b><small>" + t("vf.how." + c.id + "." + c.kind) + "</small></span>" + I("chevR", 18) + "</button>"; }).join("") + "</div>" +
+    var info = SF.verifyInfo(), opt = F.purpose === "register" && !info.required, ph = { phone: '<b class="num">' + esc(SF.phone(F.phone)) + "</b>" };
+    SF.modal('<div class="stack vflow">' + head(t(opt ? "vf.regTitle" : F.purpose === "reset" ? "vf.resetTitle" : "vf.title"), t(opt ? "vf.regSub" : "vf.sub", ph)) +
+      '<div class="vch">' + info.channels.map(function (c, i) { var m = CH[c.id] || CH.demo;
+        return '<button type="button" class="vbtn ' + m.cls + '" data-act="vstart" data-ch="' + c.id + '">' + '<span class="vic">' + I(m.icon, 22) + '</span><span class="grow"><b>' + (m.name || t("vf.demo")) + (opt && i === 0 ? ' <i class="vtag">' + t("vf.best") + "</i>" : "") + "</b><small>" + t("vf.how." + c.id + "." + c.kind) + "</small></span>" + I("chevR", 18) + "</button>"; }).join("") + "</div>" +
+      (F.purpose === "register" && !info.required ? '<div class="vor"><span>' + t("vf.or") + '</span></div><button type="button" class="vbtn skip" data-act="vskip"><span class="vic">' + I("phone", 22) + '</span><span class="grow"><b>' + t("vf.skip") + "</b><small>" + t("vf.skipSub") + "</small></span>" + I("chevR", 18) + "</button>" : "") +
       '<p class="fine center">' + t("vf.wrongNum") + ' <button type="button" class="link" data-act="vclose">' + t("vf.change") + "</button></p></div>");
   }
 
@@ -85,7 +86,8 @@
   function done() { stop(); var f = F; F = null; SF.toast(t("vf.ok")); f.onDone(f.v); }
 
   /* entry point */
-  SF.verifyPhone = function (purpose, phone, onDone) { stop(); F = { purpose: purpose, phone: phone, onDone: onDone }; choose(); };
+  SF.verifyPhone = function (purpose, phone, onDone, onSkip) { stop(); F = { purpose: purpose, phone: phone, onDone: onDone, onSkip: onSkip }; choose(); };
+  SF.actions.vskip = function () { var f = F; stop(); F = null; if (f && f.onSkip) return f.onSkip(); SF.closeModal(); };
 
   /* ---------- sign up with a verified number ---------- */
   SF.registerFlow = function (fd, enter) {
@@ -94,15 +96,30 @@
     if (String(fd.name || "").trim().length < 2) return Promise.reject({ code: "BAD_NAME" });
     if (R && !R.normPhone(fd.phone)) return Promise.reject({ code: "BAD_PHONE" });
     if (String(fd.password || "").length < (SF.state.pub.demo ? 4 : 6)) return Promise.reject({ code: SF.state.pub.demo ? "BAD_PASSWORD" : "BAD_PASSWORD_6" });
-    if (!info || !info.required) return SF.api.post("/auth/register", fd).then(function (r) { enter(r); });
-    /* check the number first so nobody verifies a number that is already taken */
-    return SF.api.post("/auth/verify/check", { phone: fd.phone, purpose: "register" }).then(function () {
+    var plain = function () { return SF.api.post("/auth/register", fd).then(function (r) { SF.closeModal(); enter(r); }).catch(function (e) { SF.toast(SF.err(e), "err"); }); };
+    if (!info) return SF.api.post("/auth/register", fd).then(function (r) { enter(r); }, function (e) { if (e.code === "PHONE_TAKEN") return known(fd.phone); throw e; });
+    /* check the number first so nobody verifies a number that is already taken.
+       Telegram is offered first; without it (verification not required) — just the phone and the password */
+    return SF.api.post("/auth/verify/check", { phone: fd.phone, purpose: "register" }).then(function () { return true; }, function (e) { if (e.code === "PHONE_TAKEN") { known(fd.phone); return false; } throw e; }).then(function (go) { if (!go) return;
       SF.verifyPhone("register", fd.phone, function (v) {
         fd.verifyId = v.id;
         SF.api.post("/auth/register", fd).then(function (r) { SF.closeModal(); enter(r); }).catch(function (e) { SF.toast(SF.err(e), "err"); });
-      });
+      }, info.required ? null : plain);
     });
   };
+
+  /* the number is already registered: recognise it and offer to log in */
+  function known(phone) { var d = String(window.SomonRules ? SomonRules.normPhone(phone) : phone).replace(/^\+992/, "");
+    SF.ls.set("lastPhone", d);
+    SF.modal('<div class="confirm"><span class="cic ok">' + I("user", 28) + '</span><h2 class="h2">' + t("vf.taken") + '</h2><p class="muted">' + t("vf.takenSub", { phone: '<b class="num">' + esc(SF.phone(phone)) + "</b>" }) + "</p>" +
+      '<button type="button" class="btn primary block lg" data-act="toLogin">' + t("auth.login") + '</button><button type="button" class="link center" data-act="toForgot">' + t("pw.forgot") + "</button></div>"); }
+
+  SF.actions.toLogin = function () { SF.closeModal(); SF.go("/login"); };
+  SF.actions.toForgot = function () { SF.closeModal(); SF.go("/login"); setTimeout(function () { SF.actions.forgot(); }, 300); };
+
+  /* ---------- signed up without confirming: confirm the number later from the profile ---------- */
+  SF.actions.vconfirm = function () { var u = SF.state.user; if (!u) return;
+    SF.verifyPhone("confirm", u.phone, function (v) { SF.api.post("/auth/me/verify", { verifyId: v.id }).then(function (nu) { SF.state.user = nu; SF.closeModal(); SF.render({ quiet: true }); }).catch(function (e) { SF.toast(SF.err(e), "err"); }); }); };
 
   /* ---------- forgot password: verify the number, choose a new password, logged in ---------- */
   SF.resetFlow = function (phone, enter) {

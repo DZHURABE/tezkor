@@ -35,14 +35,14 @@
       return '<div class="toolbar"><div class="chips">' + [["", "adm.all"], ["active", "adm.active"], ["pending", "st.pending"], ["cooking", "st.cooking"], ["ready", "st.ready"], ["picked_up", "st.picked_up"], ["delivered", "st.delivered"], ["cancelled", "st.cancelled"], ["rejected", "st.rejected"]].map(function (x) {
         return '<a class="chip' + (f === x[0] ? " on" : "") + '" href="#/admin/orders?status=' + x[0] + '">' + t(x[1]) + "</a>"; }).join("") + '</div><form class="minisearch" data-form="aosearch">' + I("search", 16) + '<input name="q" value="' + esc(s) + '" placeholder="' + t("adm.searchOrders") + '" aria-label="' + t("adm.searchOrders") + '"></form></div>' +
         (list.length ? table(["№", t("tb.time"), t("adm.restaurant"), t("role.customer"), t("role.courier"), t("tb.sum"), t("tb.pay"), t("tb.status"), ""], list.map(function (o) {
-          return '<tr><td class="num">' + o.number + '</td><td class="num">' + SF.dt(o.createdAt) + "</td><td>" + esc(tx(o.restaurant.name)) + "</td><td>" + esc(o.customer ? o.customer.name : "—") + "</td><td>" + esc(o.courier ? o.courier.name : "—") + '</td><td class="num">' + money(o.total) + "</td><td>" + t("pay." + o.payment.method) + "<small class=\"muted\"> · " + t("ps." + o.payment.status) + "</small></td><td>" + SF.statusPill(o.status) + '</td><td><button class="btn sm ghost" data-act="aorder" data-id="' + o.id + '">' + I("eye", 14) + t("btn.open") + "</button></td></tr>"; })) : SF.empty("receipt", t("adm.noOrders")));
+          return '<tr><td class="num">' + o.number + '</td><td class="num">' + SF.dt(o.createdAt) + "</td><td>" + esc(tx(o.restaurant.name)) + "</td><td>" + esc(o.customer ? o.customer.name : o.dineIn ? t("tb.table", { n: o.tableName }) : "—") + "</td><td>" + esc(o.courier ? o.courier.name : "—") + '</td><td class="num">' + money(o.total) + "</td><td>" + t("pay." + o.payment.method) + "<small class=\"muted\"> · " + t("ps." + o.payment.status) + "</small></td><td>" + SF.statusPill(o.status) + '</td><td><button class="btn sm ghost" data-act="aorder" data-id="' + o.id + '">' + I("eye", 14) + t("btn.open") + "</button></td></tr>"; })) : SF.empty("receipt", t("adm.noOrders")));
     });
   } });
   SF.forms.aosearch = function (fd) { var q = SF.match(SF.path()).query; SF.go("/admin/orders?status=" + (q.status || "") + "&q=" + encodeURIComponent(fd.q || "")); };
   SF.actions.aorder = function (el) { var o = SF.state.aorders.filter(function (x) { return x.id === el.dataset.id; })[0]; if (!o) return;
     var next = Object.keys(SomonRules.ORDER_FLOW[o.status] || {}).filter(function (s) { return SomonRules.canTransition(o.status, s, "admin") && !(s === "picked_up" && !o.courierId); });
     SF.modal('<button class="mx" data-act="closemodal" aria-label="' + t("btn.close") + '">' + I("x", 20) + '</button><div class="stack"><h2 class="h2">№' + o.number + " " + SF.statusPill(o.status) + "</h2>" +
-      '<div class="line"><span>' + t("adm.restaurant") + "</span><b>" + esc(tx(o.restaurant.name)) + '</b></div><div class="line"><span>' + t("role.customer") + "</span><span>" + esc(o.customer.name) + ' · <span class="num">' + esc(SF.phone(o.phone || o.customer.phone)) + '</span></span></div><div class="line"><span>' + t("co.address") + '</span><span class="right">' + esc(o.address.text) + "</span></div>" +
+      '<div class="line"><span>' + t("adm.restaurant") + "</span><b>" + esc(tx(o.restaurant.name)) + '</b></div><div class="line"><span>' + t("role.customer") + "</span><span>" + (o.customer ? esc(o.customer.name) + ' · <span class="num">' + esc(SF.phone(o.phone || o.customer.phone)) + "</span>" : esc(t("tb.table", { n: o.tableName || "" }) + (o.guestName ? " · " + o.guestName : ""))) + '</span></div><div class="line"><span>' + t("co.address") + '</span><span class="right">' + esc(o.address.text) + "</span></div>" +
       o.items.map(function (i) { return '<div class="line muted"><span>' + esc(tx(i.name)) + " ×" + i.qty + '</span><span class="num">' + money(i.qty * i.price) + "</span></div>"; }).join("") +
       '<div class="line"><span>' + t("co.payment") + "</span><span>" + t("pay." + o.payment.method) + " · " + t("ps." + o.payment.status) + (o.payment.receiptId ? ' <button type="button" class="btn sm ghost" data-act="rcpt" data-id="' + o.id + '">' + t("tr.receipt") + "</button>" : "") + "</span></div>" +
       '<div class="line"><span>' + t("cart.delivery") + '</span><span class="num">' + money(o.deliveryFee) + '</span></div><div class="line tot"><span>' + t("cart.total") + '</span><b class="num">' + money(o.total) + "</b></div>" +
@@ -113,7 +113,7 @@
     return '<section class="card stack"><h3>' + I("shield", 18) + t("vfa.title") + '</h3><p class="fine">' + t("vfa.sub") + "</p>" +
       (st ? row("send", "Telegram " + t("vfa.bot"), st.telegramBot) + (st.telegramBot === "off" ? row("send", "Telegram Gateway", st.telegramGateway) : "") + row("chat", "WhatsApp", st.whatsapp) + row("sms", "SMS", st.sms)
         : '<div class="line"><span>' + I("shield", 16) + " " + t("vf.demo") + '</span><span class="pill p-ok">' + t("vfa.on") + "</span></div>") +
-      (s.verifyChannels && s.verifyChannels.length ? '<label class="checkrow"><input type="checkbox" data-input="averify"' + (s.verifyRequired !== false ? " checked" : "") + "><span>" + t("vfa.required") + "</span></label>"
+      (s.verifyChannels && s.verifyChannels.length ? '<label class="checkrow"><input type="checkbox" data-input="averify"' + (s.verifyRequired === true ? " checked" : "") + "><span>" + t("vfa.required") + '<small class="muted">' + t("vfa.requiredHint") + "</small></span></label>"
         : '<div class="msg info">' + I("info", 16) + t("vfa.none") + "</div>") +
       '<p class="fine">' + t("vfa.how") + "</p></section>";
   }
@@ -175,12 +175,16 @@
   R("/admin/categories", { title: "adm.categories", render: function () {
     return api().get("/admin/categories").then(function (list) {
       return '<form class="card inlineform" data-form="acat"><label class="f grow">' + t("adm.newCat") + '<input name="name" required></label><label class="f">' + t("menu.picture") + '<select name="icon">' + SF.KINDS.map(function (k) { return '<option value="' + k + '">' + k + "</option>"; }).join("") + '</select></label><button class="btn primary">' + I("plus", 18) + t("btn.create") + "</button></form>" +
-        '<div class="catgrid">' + list.map(function (c) { return '<div class="card catcard' + (c.active ? "" : " off") + '"><span class="ci">' + SF.art(c.icon, 46) + '</span><div class="grow"><b>' + esc(tx(c.name)) + '</b><small class="muted num">' + t("adm.prodCount", { n: c.productCount }) + "</small></div>" + sw(c.active, "acatt", c.id, t("adm.activeL")) + (c.productCount ? "" : '<button class="iconbtn" data-act="acatdel" data-id="' + c.id + '" aria-label="' + t("btn.delete") + '">' + I("trash", 16) + "</button>") + "</div>"; }).join("") + "</div>";
+        '<p class="muted">' + t("cat.sub") + '</p><div class="catgrid">' + list.map(function (c) { return '<div class="card catcard' + (c.active ? "" : " off") + '"><label class="ci catpic' + (c.photo ? " hasph" : "") + '" title="' + t("cat.photo") + '">' + (c.photo ? '<img src="' + esc(c.photo) + '" alt="">' : SF.art(c.icon, 46)) + '<i class="catcam">' + I("camera", 12) + '</i><input type="file" accept="image/*" data-input="acatphoto" data-id="' + c.id + '" aria-label="' + t("cat.photo") + '"></label>' + (c.photo ? '<button class="link sm" data-act="acatphotodel" data-id="' + c.id + '">' + t("cat.photoDel") + "</button>" : "") + '<div class="grow"><b>' + esc(tx(c.name)) + '</b><small class="muted num">' + t("adm.prodCount", { n: c.productCount }) + "</small></div>" + sw(c.active, "acatt", c.id, t("adm.activeL")) + (c.productCount ? "" : '<button class="iconbtn" data-act="acatdel" data-id="' + c.id + '" aria-label="' + t("btn.delete") + '">' + I("trash", 16) + "</button>") + "</div>"; }).join("") + "</div>";
     });
   } });
   SF.forms.acat = function (fd) { return api().post("/admin/categories", fd).then(function () { SF.toast(t("btn.saved")); SF.render({ quiet: true }); return reloadCats(); }); };
   SF.actions.acatt = function (el) { return api().patch("/admin/categories/" + el.dataset.id, { active: el.getAttribute("aria-checked") !== "true" }).then(reloadCats).then(function () { SF.render({ quiet: true }); }); };
   SF.actions.acatdel = function (el) { return api().del("/admin/categories/" + el.dataset.id).then(reloadCats).then(function () { SF.render({ quiet: true }); }); };
+  SF.inputs.acatphoto = function (v, el) { var f = el.files && el.files[0]; if (!f) return;
+    SF.shrinkImage(f, 600, 0.82).then(function (d) { return api().patch("/admin/categories/" + el.dataset.id, { photo: d }); }, function () { SF.toast(t("tr.notImage"), "err"); })
+      .then(function (r) { if (r) { SF.toast(t("btn.saved")); return reloadCats().then(function () { SF.render({ quiet: true }); }); } }); };
+  SF.actions.acatphotodel = function (el) { return api().patch("/admin/categories/" + el.dataset.id, { photo: null }).then(reloadCats).then(function () { SF.render({ quiet: true }); }); };
   function reloadCats() { return api().get("/categories").then(function (c) { SF.state.categories = c; }); }
 
   /* ---------- Payments, promos, banners, cities ---------- */
@@ -200,12 +204,54 @@
   } });
   SF.forms.apromo = function (fd) { return api().post("/admin/promos", fd).then(function () { SF.toast(t("btn.saved")); SF.render({ quiet: true }); }); };
   SF.actions.apromot = function (el) { return api().patch("/admin/promos/" + el.dataset.id, { active: el.getAttribute("aria-checked") !== "true" }).then(function () { SF.render({ quiet: true }); }); };
+  /* ---------- ads on the home page: restaurants' own + the admin's (any business) ---------- */
+  var BTONES = ["#E8590C", "#0B8A5A", "#7A3E9D", "#1F6FB2", "#C2185B", "#B7791F", "#1F1A17"];
   R("/admin/banners", { title: "adm.banners", render: function () {
-    return api().get("/admin/banners").then(function (list) {
-      return '<p class="muted">' + t("adm.bannersSub") + '</p><div class="bgrid">' + list.map(function (b) { return '<div class="card">' + SF.bannerHtml(b, "div", "small") + (b.restaurantName ? '<div class="line"><span class="muted">' + t("adm.byRest") + "</span><b>" + esc(tx(b.restaurantName)) + "</b></div>" : "") + '<div class="line"><span>' + t("adm.activeL") + "</span>" + sw(b.active, "abanner", b.id, t("adm.activeL")) + "</div></div>"; }).join("") + "</div>";
+    return Promise.all([api().get("/admin/banners"), api().get("/admin/restaurants")]).then(function (a) {
+      var list = a[0]; SF.state.bnRests = a[1]; SF.state.bnList = list;
+      return '<div class="bnhead"><p class="muted">' + t("bn.sub") + '</p><button class="btn primary" data-act="bnnew">' + I("plus", 18) + t("bn.new") + "</button></div>" +
+        '<div class="bgrid">' + list.map(function (b) {
+          return '<div class="card bncard">' + SF.bannerHtml(b, "div", "small") +
+            '<div class="line"><span class="muted">' + (b.own ? t("bn.own") : t("bn.mine")) + "</span><b>" + (b.restaurantName ? esc(tx(b.restaurantName)) : b.phone ? '<span class="num">' + esc(b.phone) + "</span>" : b.url ? esc(b.url.replace(/^https?:\/\//, "").slice(0, 28)) : "") + "</b></div>" +
+            '<div class="line"><span>' + t("adm.activeL") + "</span>" + sw(b.active, "abanner", b.id, t("adm.activeL")) + "</div>" +
+            (b.own ? "" : '<div class="row2"><button class="btn sm ghost" data-act="bnedit" data-id="' + b.id + '">' + I("edit", 14) + t("btn.edit") + '</button><button class="btn sm ghost" data-act="bndel" data-id="' + b.id + '">' + I("trash", 14) + t("btn.delete") + "</button></div>") + "</div>"; }).join("") + "</div>";
     });
   } });
   SF.actions.abanner = function (el) { return api().patch("/admin/banners/" + el.dataset.id, { active: el.getAttribute("aria-checked") !== "true" }).then(function () { SF.render({ quiet: true }); }); };
+  function bnDraft() { return SF.state.bn; }
+  function bnModal() { var d = bnDraft(), rests = SF.state.bnRests || [];
+    var prev = SF.bannerHtml({ title: { tg: d.title || t("ad.titleHint") }, sub: { tg: d.sub }, tone: d.tone, art: d.art, photo: d.photo }, "div");
+    var lt = d.linkType;
+    SF.modal('<button class="mx" data-act="closemodal" aria-label="' + t("btn.close") + '">' + I("x", 20) + '</button><form class="stack" data-form="bnsave"><h2 class="h2">' + t(d.id ? "bn.edit" : "bn.new") + "</h2>" +
+      '<div class="adprev" id="bnprev">' + prev + "</div>" +
+      '<label class="f">' + t("ad.head") + '<input name="title" maxlength="40" required data-input="bntitle" value="' + esc(d.title) + '"></label>' +
+      '<label class="f">' + t("ad.text") + '<input name="sub" maxlength="70" data-input="bnsub" placeholder="' + t("ad.textHint") + '" value="' + esc(d.sub) + '"></label>' +
+      '<div class="f"><span>' + t("ad.pic") + ' <small class="muted">' + t("bn.photoTip") + '</small></span><div class="adpics"><label class="upload sm' + (d.photo ? " done" : "") + '">' + (d.photo ? '<img src="' + esc(d.photo) + '" alt="">' : I("plus", 18)) + "<b>" + t(d.photo ? "tr.change" : "ad.photo") + '</b><input type="file" accept="image/*" data-input="bnphoto"></label>' +
+        (d.photo ? '<button type="button" class="btn sm ghost" data-act="bnphotodel">' + I("trash", 14) + t("btn.remove") + "</button>" : '<div class="pkgrid">' + ["plov", "shashlik", "burger", "pizza", "samsa", "dessert", "lagman", "coffee"].map(function (k) { return '<button type="button" class="' + (k === d.art ? "on" : "") + '" aria-pressed="' + (k === d.art) + '" data-act="bnart" data-v="' + k + '" aria-label="' + k + '">' + SF.art(k, 28) + "</button>"; }).join("") + "</div>") + "</div></div>" +
+      '<div class="f"><span>' + t("ad.color") + '</span><div class="tones" role="radiogroup" aria-label="' + t("ad.color") + '">' + BTONES.map(function (c) { return '<button type="button" role="radio" aria-checked="' + (c === d.tone) + '" class="tone' + (c === d.tone ? " on" : "") + '" style="--c:' + c + '" data-act="bntone" data-v="' + c + '" aria-label="' + c + '"></button>'; }).join("") + "</div></div>" +
+      '<div class="f"><span>' + t("bn.link") + '</span><div class="seg">' + [["none", "bn.lnone"], ["rest", "bn.lrest"], ["phone", "bn.lphone"], ["url", "bn.lurl"]].map(function (x) { return '<button type="button" class="' + (lt === x[0] ? "on" : "") + '" aria-pressed="' + (lt === x[0]) + '" data-act="bnlink" data-v="' + x[0] + '">' + t(x[1]) + "</button>"; }).join("") + "</div></div>" +
+      (lt === "rest" ? '<label class="f">' + t("bn.lrest") + '<select data-input="bnval">' + rests.map(function (r) { return '<option value="' + r.id + '"' + (d.linkValue === r.id ? " selected" : "") + ">" + esc(tx(r.name)) + "</option>"; }).join("") + "</select></label>" : "") +
+      (lt === "phone" ? '<label class="f">' + t("bn.lphone") + '<input data-input="bnval" inputmode="tel" value="' + esc(d.linkValue) + '" placeholder="' + t("bn.phonePh") + '"></label>' : "") +
+      (lt === "url" ? '<label class="f">' + t("bn.lurl") + '<input data-input="bnval" inputmode="url" value="' + esc(d.linkValue) + '" placeholder="' + t("bn.urlPh") + '"></label>' : "") +
+      '<button class="btn primary block lg">' + I("check", 16) + t(d.id ? "btn.save" : "ad.publish") + "</button></form>");
+  }
+  function bnKeep() { var f = document.querySelector("[data-form=bnsave]"); if (f) { bnDraft().title = f.title.value; bnDraft().sub = f.sub.value; } }
+  SF.actions.bnnew = function () { var rs = SF.state.bnRests || []; SF.state.bn = { id: null, title: "", sub: "", tone: BTONES[0], art: "plov", photo: null, photoChanged: false, linkType: "none", linkValue: rs[0] ? rs[0].id : "" }; bnModal(); };
+  SF.actions.bnedit = function (el) { var b = (SF.state.bnList || []).filter(function (x) { return x.id === el.dataset.id; })[0]; if (!b) return;
+    SF.state.bn = { id: b.id, title: tx(b.title), sub: tx(b.sub), tone: b.tone, art: b.art || "plov", photo: b.photo || null, photoChanged: false, linkType: b.restaurantId ? "rest" : b.phone ? "phone" : b.url ? "url" : "none", linkValue: b.restaurantId || b.phone || b.url || ((SF.state.bnRests || [])[0] || {}).id || "" }; bnModal(); };
+  SF.actions.bntone = function (el) { bnKeep(); bnDraft().tone = el.dataset.v; bnModal(); };
+  SF.actions.bnart = function (el) { bnKeep(); bnDraft().art = el.dataset.v; bnModal(); };
+  SF.actions.bnlink = function (el) { bnKeep(); var d = bnDraft(); d.linkType = el.dataset.v; d.linkValue = d.linkType === "rest" ? (((SF.state.bnRests || [])[0] || {}).id || "") : ""; bnModal(); };
+  SF.actions.bnphotodel = function () { bnKeep(); bnDraft().photo = null; bnDraft().photoChanged = true; bnModal(); };
+  SF.inputs.bnphoto = function (v, el) { bnKeep(); var f = el.files && el.files[0]; if (!f) return; SF.shrinkImage(f, 1400, 0.8).then(function (d) { bnDraft().photo = d; bnDraft().photoChanged = true; bnModal(); }, function () { SF.toast(t("tr.notImage"), "err"); }); };
+  SF.inputs.bnval = function (v) { bnDraft().linkValue = v; };
+  function bnRedraw() { var el = document.getElementById("bnprev"), d = bnDraft(); if (el) el.innerHTML = SF.bannerHtml({ title: { tg: d.title || t("ad.titleHint") }, sub: { tg: d.sub }, tone: d.tone, art: d.art, photo: d.photo }, "div"); }
+  SF.inputs.bntitle = function (v) { bnDraft().title = v; bnRedraw(); };
+  SF.inputs.bnsub = function (v) { bnDraft().sub = v; bnRedraw(); };
+  SF.forms.bnsave = function (fd) { var d = bnDraft(), sel = document.querySelector("[data-input=bnval]"); if (sel) d.linkValue = sel.value;
+    var body = { title: fd.title, sub: fd.sub, tone: d.tone, art: d.art, link: { type: d.linkType, value: d.linkValue } }; if (d.photoChanged || !d.id) body.photo = d.photo || null;
+    return (d.id ? api().patch("/admin/banners/" + d.id, body) : api().post("/admin/banners", body)).then(function () { SF.state.bn = null; SF.closeModal(); SF.toast(t("bn.saved")); SF.render({ quiet: true }); }); };
+  SF.actions.bndel = function (el) { if (!confirm(t("bn.deleteQ"))) return; return api().del("/admin/banners/" + el.dataset.id).then(function () { SF.toast(t("bn.deleted"), "info"); SF.render({ quiet: true }); }); };
   R("/admin/cities", { title: "adm.cities", render: function () {
     return api().get("/admin/cities").then(function (list) { SF.state.allCities = list;
       return '<form class="card inlineform" data-form="acity"><label class="f grow">' + t("adm.cityName") + '<input name="name" required></label><label class="f">' + t("adm.lat") + '<input name="lat" inputmode="decimal" required placeholder="38.56"></label><label class="f">' + t("adm.lng") + '<input name="lng" inputmode="decimal" required placeholder="68.79"></label><button class="btn primary">' + I("plus", 18) + t("btn.create") + "</button></form>" +

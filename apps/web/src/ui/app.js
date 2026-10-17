@@ -33,7 +33,7 @@
   window.addEventListener("hashchange", function () { SF.state.drawer = false; SF.closeModal(); SF.render(); });
   window.addEventListener("storage", function (e) { if (e.key === "somon.db" && server) { server.reload(); refresh(); } });
 
-  SF.forms.search = function (fd) { SF.state.q = fd.q || ""; SF.go("/search?q=" + encodeURIComponent(fd.q || "")); };
+  SF.forms.search = function (fd) { SF.state.q = fd.q || ""; if (SF.addRecent) SF.addRecent(fd.q); SF.go("/search?q=" + encodeURIComponent(fd.q || "")); };
   SF.inputs.lang = function (v) { SF.state.lang = v; SF.ls.set("lang", v); document.documentElement.lang = v; if (SF.state.user) SF.api.patch("/auth/me", { lang: v }).catch(function () {}); SF.render({ quiet: true }); };
   SF.actions.drawer = function () { SF.state.drawer = !SF.state.drawer; var p = document.querySelector(".panel"); if (p) p.classList.toggle("open", SF.state.drawer); };
   SF.actions.city = function () {
@@ -46,7 +46,7 @@
     SF.modal('<button class="mx" data-act="closemodal" aria-label="' + t("btn.close") + '">' + I("x", 20) + '</button><h2 class="h2">' + t("n.title") + "</h2>" + (list.length ? '<div class="nlist">' + list.map(function (n) {
       return '<button class="nitem" data-act="noteopen" data-id="' + n.id + '" data-o="' + (n.orderId || "") + '" data-k="' + esc(n.key) + '" data-ph="' + esc(String((n.params || {}).phone || "").replace(/\D/g, "").slice(-9)) + '"><span class="nic">' + I(noteIcon(n.key), 18) + '</span><span class="grow"><b>' + t(n.key + ".t") + "</b><span>" + esc(t(n.key, n.params)) + '</span></span><small class="muted num">' + SF.time(n.at) + "</small></button>"; }).join("") + '</div><button class="btn ghost block" data-act="notesread">' + t("n.readAll") + "</button>" : SF.empty("bell", t("n.none"))));
   };
-  function noteIcon(k) { return { "n.newOrder": "bell", "n.accepted": "fire", "n.courierNew": "box", "n.ready": "bag", "n.readyCustomer": "bag", "n.onTheWay": "scooter", "n.delivered": "check", "n.rejected": "x", "n.cancelled": "x", "n.customerCancelled": "x", "n.courierAssigned": "scooter", "n.courierFound": "scooter", "n.rated": "star", "n.pwReset": "shield", "n.subPaid": "wallet" }[k] || "bell"; }
+  function noteIcon(k) { return { "n.newOrder": "bell", "n.waiter": "bell", "n.bill": "receipt", "n.accepted": "fire", "n.courierNew": "box", "n.ready": "bag", "n.readyCustomer": "bag", "n.onTheWay": "scooter", "n.delivered": "check", "n.rejected": "x", "n.cancelled": "x", "n.customerCancelled": "x", "n.courierAssigned": "scooter", "n.courierFound": "scooter", "n.rated": "star", "n.pwReset": "shield", "n.subPaid": "wallet" }[k] || "bell"; }
   SF.actions.notesread = function () { return SF.api.post("/notifications/read").then(function () { SF.state.notes = []; SF.closeModal(); SF.render({ quiet: true }); }); };
   SF.actions.noteopen = function (el) { var u = SF.state.user, o = el.dataset.o; SF.api.post("/notifications/read", { id: el.dataset.id }).catch(function () {}); SF.state.notes = SF.state.notes.filter(function (n) { return n.id !== el.dataset.id; }); SF.closeModal();
     if (el.dataset.k === "n.pwReset") { SF.go("/admin/users?q=" + encodeURIComponent(el.dataset.ph || "")); return; }

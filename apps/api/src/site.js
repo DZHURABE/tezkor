@@ -27,7 +27,11 @@ function headTags(base) {
         downloadUrl: base + "/tezkor.apk", offers: { "@type": "Offer", price: "0", priceCurrency: "TJS" } },
     ],
   };
-  return `
+  /* ownership checks for Google Search Console / Yandex Webmaster / Bing: paste only the code from their "HTML tag" option */
+  const code = v => String(v || "").replace(/.*content=["']?([^"'\s>]+).*/s, "$1").trim();
+  const owners = [["google-site-verification", process.env.GOOGLE_SITE_VERIFICATION], ["yandex-verification", process.env.YANDEX_VERIFICATION], ["msvalidate.01", process.env.BING_VERIFICATION]]
+    .filter(x => code(x[1])).map(x => `<meta name="${x[0]}" content="${esc(code(x[1]))}">`).join("");
+  return `${owners}
 <meta name="keywords" content="${esc(KEYWORDS)}">
 <link rel="canonical" href="${esc(base)}/">
 <meta property="og:type" content="website"><meta property="og:site_name" content="Тезкор">
@@ -45,7 +49,7 @@ function noscript(base) {
 <p><a href="${esc(base)}/download">Барномаи Тезкорро боргирӣ кунед</a> · <a href="${esc(base)}/">Фармоиш додан</a></p></div></noscript>`;
 }
 
-function robots(base) { return `User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /webhooks/\nSitemap: ${base}/sitemap.xml\n`; }
+function robots(base) { return `User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /webhooks/\nDisallow: /t/\nSitemap: ${base}/sitemap.xml\n`; }
 function sitemap(base) {
   const d = new Date().toISOString().slice(0, 10);
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +

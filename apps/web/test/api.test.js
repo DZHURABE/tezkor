@@ -207,7 +207,9 @@ t('етказиш: ўз курйери / ошхона ўзи / аралаш (7 �
   const cv=ok(c8('GET','/orders/'+o2.id,null,cu));assert.equal(cv.selfDelivery.name,'Акаи Шер');
   assert.equal(ok(c8('POST','/restaurant/orders/'+o2.id+'/delivered',{},r)).status,'delivered');
   // Тезкор режимида ошхона ўзи олиб кетолмайди
-  ok(c8('PATCH','/admin/restaurants/r1',{delivery:'platform'},a));const o3=mk();ok(c8('POST','/restaurant/orders/'+o3.id+'/accept',{prepMin:15},r));
+  ok(c8('PATCH','/admin/restaurants/r1',{delivery:'platform'},a));const o3=mk();
+  { const before=ok(c8('GET','/restaurant/orders',null,r)).find(x=>x.id===o3.id).customer.orders;assert.ok(before>=2,'шинос мижоз: олдинги буюртмалари саналади');
+    const fresh=ok(c8('POST','/auth/register',{name:'Янги',phone:'938881212',password:'123456'}));assert.equal(fresh.user.phoneVerified,undefined); }ok(c8('POST','/restaurant/orders/'+o3.id+'/accept',{prepMin:15},r));
   assert.equal(c8('POST','/restaurant/orders/'+o3.id+'/out',{},r).body.error.code,'PLATFORM_DELIVERY');
   assert.ok(ok(c8('GET','/courier/orders/available',null,k1)).some(x=>x.id===o3.id));
   assert.ok(ok(c8('GET','/courier/orders/available',null,own)).some(x=>x.id===o3.id),'ўз курйери ўз ошхонасиникини кўради');
@@ -276,7 +278,9 @@ t('кириш: рақам форматлари, «рақам йўқ» / «пар
 });
 t('тасдиқ: демо код, хато код 5 марта, муддат, ҳар рақамга лимит, тасдиқсиз рўйхат йўқ',()=>{
   let T=now;const S1=cs0({now:()=>T});const c1=(m,u,b,tk)=>S1.handle(m,u,b,tk);
-  const ch=ok(c1('GET','/auth/verify/channels'));assert.deepEqual(ch.channels.map(c=>c.id),['demo']);assert.equal(ch.required,true);
+  const ch=ok(c1('GET','/auth/verify/channels'));assert.deepEqual(ch.channels.map(c=>c.id),['demo']);assert.equal(ch.required,false,'стандарт: Telegramсиз ҳам рўйхат');
+  const free=ok(c1('POST','/auth/register',{name:'Телеграмсиз',phone:'938880099',password:'123456'}));assert.ok(!free.user.phoneVerified);
+  const a=ok(c1('POST','/auth/login',{phone:'900000001',password:'1234'})).token;ok(c1('PATCH','/admin/settings',{verifyRequired:true},a));
   assert.equal(ok(c1('GET','/settings/public')).verify.required,true);
   assert.equal(c1('POST','/auth/register',{name:'Бе тасдиқ',phone:'938880011',password:'123456'}).body.error.code,'VERIFY_REQUIRED');
   assert.equal(c1('POST','/auth/verify/start',{phone:'900000301',purpose:'register',channel:'demo'}).body.error.code,'PHONE_TAKEN');
@@ -296,8 +300,15 @@ t('тасдиқ: демо код, хато код 5 марта, муддат, ҳ
   assert.equal(c1('POST','/auth/verify/'+v3.id+'/code',{code:v3.demoCode}).body.error.code,'VERIFY_EXPIRED');assert.equal(ok(c1('GET','/auth/verify/'+v3.id)).status,'expired');
   for(let i=0;i<5;i++)ok(c1('POST','/auth/verify/start',{phone:'938880066',purpose:'register',channel:'demo'}));
   assert.equal(c1('POST','/auth/verify/start',{phone:'938880066',purpose:'register',channel:'demo'}).body.error.code,'VERIFY_TOO_MANY','10 дақиқада 5 тадан кўп эмас');
-  const a=ok(c1('POST','/auth/login',{phone:'900000001',password:'1234'})).token;ok(c1('PATCH','/admin/settings',{verifyRequired:false},a));
+  ok(c1('PATCH','/admin/settings',{verifyRequired:false},a));
   assert.ok(c1('POST','/auth/register',{name:'Ихтиёрий',phone:'938880077',password:'123456'}).body.ok,'админ ўчирса — тасдиқсиз');
+  /* тасдиқсиз рўйхатдан ўтган — кейин профилдан тасдиқлайди */
+  assert.equal(c1('POST','/auth/verify/start',{phone:'938880088',purpose:'confirm',channel:'demo'},free.token).body.error.code,'FORBIDDEN','бегона рақам эмас');
+  assert.equal(c1('POST','/auth/verify/start',{phone:'938880099',purpose:'confirm',channel:'demo'}).body.error.code,'FORBIDDEN','киришсиз эмас');
+  const vc=ok(c1('POST','/auth/verify/start',{phone:'938880099',purpose:'confirm',channel:'demo'},free.token));
+  assert.equal(c1('POST','/auth/me/verify',{verifyId:vc.id},free.token).body.error.code,'VERIFY_REQUIRED','коддан олдин йўқ');
+  ok(c1('POST','/auth/verify/'+vc.id+'/code',{code:vc.demoCode}));
+  assert.equal(ok(c1('POST','/auth/me/verify',{verifyId:vc.id},free.token)).phoneVerified,'demo');
 });
 t('паролни ўзи тиклаш: тасдиқ → янги парол → кириш; бегона рақам/админ йўқ',()=>{
   const S2=cs0({now:()=>now});const c2=(m,u,b,tk)=>S2.handle(m,u,b,tk);
@@ -360,5 +371,87 @@ t('тозалаш: 30 кундан кейин чек ўчади, 90 кундан
   const SF=createServer({now:()=>T,files,archive:()=>{throw new Error('disk full');}});const old=SF._db().orders.length;
   T+=400*86400000;SF.handle('POST','/admin/cleanup',null,SF.handle('POST','/auth/login',{phone:'900000001',password:'1234'}).body.data.token);
   assert.equal(SF._db().orders.length,old,'архивга ёзиб бўлмаса — ҳеч нарса ўчмайди');
+});
+t('v2: суроғаҳо, интихобшудаҳо, расм, промокодлар, қидирув, такрор тугма',()=>{
+  const T=login('900000302');
+  err(call('POST','/auth/me/addresses',{kind:'home',text:'x'},T),'ADDRESS_PIN_REQUIRED');
+  let u=ok(call('POST','/auth/me/addresses',{kind:'home',text:'А 1',lat:37.26,lng:68.14},T));u=ok(call('POST','/auth/me/addresses',{kind:'home',text:'Б 2',lat:37.26,lng:68.14},T));
+  assert.equal(u.addresses.filter(a=>a.kind==='home').length,1);u=ok(call('DELETE','/auth/me/addresses/0',null,T));
+  u=ok(call('POST','/auth/me/favorites',{type:'r',id:'r1'},T));assert.deepEqual(u.favs.r,['r1']);u=ok(call('POST','/auth/me/favorites',{type:'p',id:'r1p1'},T));
+  const f=ok(call('GET','/auth/me/favorites',null,T));assert.equal(f.restaurants[0].id,'r1');assert.equal(f.products[0].id,'r1p1');
+  u=ok(call('POST','/auth/me/favorites',{type:'r',id:'r1',on:false},T));assert.deepEqual(u.favs.r,[]);err(call('POST','/auth/me/favorites',{type:'r',id:'zz'},T),'NOT_FOUND');
+  u=ok(call('PATCH','/auth/me',{avatar:'data:image/jpeg;base64,AAAA'},T));assert.ok(u.avatar);u=ok(call('PATCH','/auth/me',{avatar:null},T));assert.ok(!u.avatar);
+  const pr=ok(call('GET','/promos/public'));assert.ok(pr.every(p=>p.code&&p.value>0));assert.ok(!pr.some(p=>p.code==='WELCOME20'),'тугаган код кўринмайди');
+  assert.ok(ok(call('GET','/search?q='+encodeURIComponent('палав')+'&cityId=c5')).products.length>0,'палав = палов');
+  const b={restaurantId:'r1',items:[{productId:'r1p1',qty:2}],address:{text:'кӯчаи Рӯдакӣ 10',lat:37.268,lng:68.145},paymentMethod:'cash',name:'Мадина'};
+  const o1=ok(call('POST','/orders',b,T)),o2=ok(call('POST','/orders',b,T));assert.equal(o1.id,o2.id,'дубора пахш — ҳамон фармоиш');
+  assert.equal(ok(call('GET','/auth/me',null,T)).name,'Мадина');
+  const cats=ok(call('GET','/categories'));assert.deepEqual(cats.slice(0,10).map(c=>c.id),['k3','k4','k5','k1','k10','k2','k9','k8','k11','k12']);
+  const c=ok(call('PATCH','/admin/categories/k10',{photo:'data:image/jpeg;base64,BBBB'},A));assert.ok(c.photo);
+  const rr=ok(call('PATCH','/admin/restaurants/r2',{logo:'data:image/jpeg;base64,CCCC'},A));assert.ok(rr.logo);
+  const bn=ok(call('POST','/admin/banners',{title:'Насби ноқил',link:{type:'phone',value:'001013535'}},A));assert.equal(bn.phone,'001013535');err(call('PATCH','/admin/banners/'+bn.id,{link:{type:'url',value:'x'}},A),'BAD_URL');ok(call('DELETE','/admin/banners/'+bn.id,null,A));
+});
+t('кормандон: соҳиб илова мекунад, фармоиш ба ҳама меояд, корманд кортро иваз карда наметавонад',()=>{
+  err(call('POST','/restaurant/staff',{name:'Фарзона',phone:'931234500'},C),'FORBIDDEN');
+  const s1=ok(call('POST','/restaurant/staff',{name:'Фарзона',phone:'931234500'},R1));assert.ok(s1.login.password);
+  err(call('POST','/restaurant/staff',{name:'Дигар',phone:'931234500'},R1),'PHONE_TAKEN');
+  const ST=ok(call('POST','/auth/login',{phone:'931234500',password:s1.login.password})).token;
+  err(call('POST','/restaurant/staff',{name:'X',phone:'931234501'},ST),'MANAGER_ONLY');err(call('GET','/restaurant/staff',null,ST),'MANAGER_ONLY');
+  err(call('PATCH','/restaurant/me',{payCard:{number:'4111111111111111'}},ST),'MANAGER_ONLY');
+  /* корманд: фармоиш ва «ҳаст/нест»; менюро тағйир дода наметавонад */
+  ok(call('PATCH','/restaurant/me',{open:true},ST));ok(call('PATCH','/restaurant/products/r1p3',{available:true},ST));
+  err(call('PATCH','/restaurant/products/r1p3',{price:1},ST),'MANAGER_ONLY');err(call('DELETE','/restaurant/products/r1p3',null,ST),'MANAGER_ONLY');
+  err(call('PATCH','/restaurant/me',{minOrder:1},ST),'MANAGER_ONLY');err(call('POST','/restaurant/tables',{count:1},ST),'MANAGER_ONLY');err(call('POST','/restaurant/couriers',{name:'K',phone:'931234599'},ST),'MANAGER_ONLY');
+  /* мудири филиал: ҳама чиз, ғайр аз корт ва мудирони дигар */
+  const m1=ok(call('POST','/restaurant/staff',{name:'Мудир',phone:'931234502',staffRole:'manager'},R1));assert.equal(m1.staffRole,'manager');
+  const MT=ok(call('POST','/auth/login',{phone:'931234502',password:m1.login.password})).token;assert.equal(ok(call('GET','/auth/me',null,MT)).staffRole,'manager');
+  ok(call('PATCH','/restaurant/products/r1p3',{price:33},MT));ok(call('POST','/restaurant/tables',{count:1},MT));
+  err(call('PATCH','/restaurant/me',{payCard:{number:'4111111111111111'}},MT),'OWNER_ONLY');
+  const w2=ok(call('POST','/restaurant/staff',{name:'Ошпаз',phone:'931234503'},MT));assert.equal(w2.staffRole,'worker','мудир корманд илова мекунад');
+  err(call('POST','/restaurant/staff',{name:'Мудир2',phone:'931234504',staffRole:'manager'},MT),'OWNER_ONLY');
+  err(call('PATCH','/restaurant/staff/'+m1.id,{active:false},MT),'USE_PROFILE');err(call('PATCH','/restaurant/staff/'+w2.id,{staffRole:'manager'},MT),'OWNER_ONLY');
+  ok(call('DELETE','/restaurant/staff/'+w2.id,null,MT));ok(call('DELETE','/restaurant/staff/'+m1.id,null,R1));
+  /* админ танҳо як нафар: аз барнома касеро админ кардан мумкин нест */
+  const cu=ok(call('GET','/admin/users?q=900000301',null,A))[0];assert.equal(ok(call('PATCH','/admin/users/'+cu.id,{role:'admin'},A)).role,'customer');
+  const before=ok(call('GET','/notifications',null,ST)).length;
+  const o=ok(call('POST','/orders',{restaurantId:'r1',items:[{productId:'r1p3',qty:3}],address:{text:'кӯчаи Сино 3',lat:37.268,lng:68.145},paymentMethod:'cash'},C));
+  assert.ok(ok(call('GET','/notifications',null,ST)).length>before,'огоҳӣ ба корманд омад');
+  assert.ok(ok(call('GET','/restaurant/orders',null,ST)).some(x=>x.id===o.id),'корманд фармоишро мебинад');
+  ok(call('POST','/restaurant/orders/'+o.id+'/accept',{prepMin:10},ST));
+  assert.equal(ok(call('GET','/restaurant/staff',null,R1)).length,1);
+  ok(call('PATCH','/restaurant/staff/'+s1.id,{active:false},R1));assert.equal(call('GET','/restaurant/orders',null,ST).body.error.code,'UNAUTHORIZED');
+  const np=ok(call('POST','/restaurant/staff/'+s1.id+'/password',null,R1));assert.ok(np.password);
+  err(call('DELETE','/restaurant/staff/'+s1.id,null,R2),'NOT_FOUND');ok(call('DELETE','/restaurant/staff/'+s1.id,null,R1));assert.equal(ok(call('GET','/restaurant/staff',null,R1)).length,0);
+});
+t('миз QR: меҳмон бе сабти ном фармоиш медиҳад, ошхона мебинад, курйер не, «ба миз дода шуд»',()=>{
+  const S2=createServer({now:()=>now});const c=(m,u,b,tk)=>S2.handle(m,u,b,tk);const r1=ok(c('POST','/auth/login',{phone:'900000101',password:'1234'})).token;
+  const r2=ok(c('POST','/auth/login',{phone:'900000102',password:'1234'})).token,k1=ok(c('POST','/auth/login',{phone:'900000201',password:'1234'})).token;
+  const tb=ok(c('POST','/restaurant/tables',{count:5},r1));assert.equal(tb.length,5);assert.deepEqual(tb.map(x=>x.name),['1','2','3','4','5']);assert.ok(tb[0].code.length>=8);
+  assert.equal(ok(c('POST','/restaurant/tables',{name:'VIP'},r1))[0].name,'VIP');assert.equal(ok(c('GET','/restaurant/tables',null,r1)).length,6);
+  err(c('PATCH','/restaurant/tables/'+tb[0].id,{name:'X'},r2),'NOT_FOUND');
+  const m=ok(c('GET','/table/'+tb[2].code));assert.equal(m.table.name,'3');assert.ok(m.restaurant.products.length>0);
+  const pid=m.restaurant.products.find(p=>p.available).id;
+  err(c('GET','/table/nonexistent1'),'TABLE_NOT_FOUND');
+  const o=ok(c('POST','/table/'+tb[2].code+'/orders',{items:[{productId:pid,qty:1}],comment:'бе пиёз',guest:'g1'}));
+  assert.ok(o.guestKey.length>=16);assert.equal(o.dineIn,true);assert.equal(o.tableName,'3');assert.equal(o.deliveryFee,0);assert.equal(o.customer,null);
+  assert.equal(ok(c('POST','/table/'+tb[2].code+'/orders',{items:[{productId:pid,qty:1}],comment:'бе пиёз',guest:'g1'})).id,o.id,'такрор босиш — ўша буюртма');
+  const ro=ok(c('GET','/restaurant/orders?scope=new',null,r1)).find(x=>x.id===o.id);assert.ok(ro,'ошхона кўради');assert.equal(ro.tableName,'3');
+  assert.ok(ok(c('GET','/notifications',null,r1)).some(n=>n.key==='n.newOrder'&&n.params.table==='3'));
+  ok(c('POST','/restaurant/orders/'+o.id+'/accept',{prepMin:15,delivery:'platform'},r1));
+  assert.ok(!ok(c('GET','/courier/orders/available',null,k1)).some(x=>x.id===o.id),'курйерга чиқмайди');
+  assert.equal(ok(c('GET','/dine/'+o.guestKey)).status,'cooking');err(c('GET','/dine/short'),'NOT_FOUND');
+  const sv=ok(c('POST','/restaurant/orders/'+o.id+'/served',null,r1));assert.equal(sv.status,'delivered');assert.equal(sv.payment.status,'paid');
+  assert.equal(ok(c('GET','/dine/'+o.guestKey)).status,'delivered');
+  // меҳмон бекор қилади (ҳали қабул қилинмаган)
+  const o2=ok(c('POST','/table/'+tb[0].code+'/orders',{items:[{productId:pid,qty:2}]}));assert.equal(ok(c('POST','/dine/'+o2.guestKey+'/cancel')).status,'cancelled');
+  // официантни чақириш — дақиқасига бир марта
+  assert.ok(ok(c('POST','/table/'+tb[1].code+'/call',{why:'bill'})).ok);assert.ok(ok(c('POST','/table/'+tb[1].code+'/call',{})).again>0);
+  assert.ok(ok(c('GET','/notifications',null,r1)).some(n=>n.key==='n.bill'&&n.params.table==='2'));
+  // стикер ўғирланди: янги код, эскиси ишламайди; ўчирилган миз ҳам
+  const nc=ok(c('POST','/restaurant/tables/'+tb[2].id+'/newcode',null,r1));assert.notEqual(nc.code,tb[2].code);err(c('GET','/table/'+tb[2].code),'TABLE_NOT_FOUND');
+  ok(c('PATCH','/restaurant/tables/'+tb[3].id,{active:false},r1));err(c('GET','/table/'+tb[3].code),'TABLE_OFF');
+  ok(c('DELETE','/restaurant/tables/'+tb[4].id,null,r1));err(c('GET','/table/'+tb[4].code),'TABLE_NOT_FOUND');
+  // бекор қилинган буюртмани «берилди» қилиб бўлмайди
+  err(c('POST','/restaurant/orders/'+o2.id+'/served',null,r1),'BAD_TRANSITION');
 });
 console.log(`\n${pass} та API синови ўтди`);

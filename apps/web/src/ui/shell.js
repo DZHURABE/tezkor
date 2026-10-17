@@ -16,7 +16,7 @@
     var u = SF.state.user, n = SF.cart.count(), path = SF.path().split("?")[0];
     function tab(p, icon, key, badge) { var on = p === "/" ? path === "/" : path.indexOf(p) === 0; return '<a href="#' + p + '" class="' + (on ? "on" : "") + '"' + (on ? ' aria-current="page"' : "") + ">" + I(icon, 22) + "<span>" + t(key) + "</span>" + (badge ? '<i class="badge">' + badge + "</i>" : "") + "</a>"; }
     return '<div class="flag-line" aria-hidden="true"></div>' +
-      '<header class="top' + (u ? " u" : "") + '"><div class="wrap topin">' +
+      '<header class="top' + (u ? " u" : "") + (path === "/" ? " athome" : "") + '"><div class="wrap topin">' +
         '<a href="#/" class="brandlink" aria-label="' + esc(SF.brand()) + '">' + SF.logo() + "</a>" +
         '<button class="citybtn" data-act="city" aria-label="' + t("profile.city") + ": " + esc(cityName()) + '">' + I("pin", 16) + "<span>" + esc(cityName()) + "</span>" + I("chevD", 14) + "</button>" +
         '<form class="topsearch" data-form="search" role="search"><span>' + I("search", 18) + '</span><input name="q" placeholder="' + t("home.search") + '" aria-label="' + t("home.search") + '" value="' + esc(SF.state.q || "") + '"></form>' +
@@ -31,12 +31,15 @@
 
   /* partner dashboards (restaurant, admin) */
   SF.panelNav = {
-    restaurant: [["/rest", "chart", "rest.dash"], ["/rest/orders", "receipt", "rest.orders"], ["/rest/menu", "grid", "rest.menu"], ["/rest/promo", "gift", "rest.promo"], ["/rest/couriers", "scooter", "dl.couriers"], ["/rest/history", "list", "rest.history"], ["/rest/settings", "store", "rest.settings"]],
+    restaurant: [["/rest", "chart", "rest.dash"], ["/rest/orders", "receipt", "rest.orders"], ["/rest/menu", "grid", "rest.menu"], ["/rest/promo", "gift", "rest.promo"], ["/rest/tables", "grid", "tb.nav"], ["/rest/couriers", "scooter", "dl.couriers"], ["/rest/history", "list", "rest.history"], ["/rest/staff", "users", "sf.nav"], ["/rest/settings", "store", "rest.settings"]],
     admin: [["/admin", "chart", "adm.dash"], ["/admin/orders", "receipt", "adm.orders"], ["/admin/restaurants", "store", "adm.restaurants"], ["/admin/couriers", "scooter", "adm.couriers"], ["/admin/users", "users", "adm.users"],
       ["/admin/products", "grid", "adm.products"], ["/admin/categories", "tag", "adm.categories"], ["/admin/payments", "card", "adm.payments"], ["/admin/promos", "percent", "adm.promos"], ["/admin/banners", "gift", "adm.banners"], ["/admin/cities", "city", "adm.cities"], ["/admin/stats", "bolt", "adm.stats"], ["/admin/settings", "cog", "adm.settings"]]
   };
   SF.shells.panel = function (html, r) {
-    var u = SF.state.user, path = SF.path().split("?")[0], nav = SF.panelNav[u.role] || [];
+    /* a worker of the restaurant: orders, menu (in stock / out of stock), history. A branch manager sees everything. */
+    var WORK = ["/rest", "/rest/orders", "/rest/menu", "/rest/history"];
+    var u = SF.state.user, path = SF.path().split("?")[0], worker = u.staff && u.staffRole !== "manager", nav = (SF.panelNav[u.role] || []).filter(function (n) { return !worker || WORK.indexOf(n[0]) >= 0; });
+    if (worker && u.role === "restaurant" && WORK.indexOf(path) < 0) setTimeout(function () { SF.go("/rest/orders"); }, 0);
     var cur = nav.filter(function (n) { return n[0] === path; })[0] || nav.filter(function (n) { return path.indexOf(n[0]) === 0 && n[0] !== "/rest" && n[0] !== "/admin"; })[0] || nav[0];
     return '<div class="panel' + (SF.state.drawer ? " open" : "") + '"><aside class="side"><div class="sidehead">' + SF.logo() + '<span class="rolebadge">' + t("role." + u.role) + "</span></div>" +
       '<nav class="sidenav">' + nav.map(function (n) { var on = n === cur; return '<a href="#' + n[0] + '" class="' + (on ? "on" : "") + '"' + (on ? ' aria-current="page"' : "") + ">" + I(n[1], 18) + "<span>" + t(n[2]) + "</span>" + (n[0] === "/rest/orders" && SF.state.newCount ? '<i class="badge">' + SF.state.newCount + "</i>" : "") + "</a>"; }).join("") + "</nav>" +
@@ -73,6 +76,10 @@
     function sel() { var c = document.getElementById("callnum"); if (c) { var r = document.createRange(); r.selectNodeContents(c); var s = getSelection(); s.removeAllRanges(); s.addRange(r); } SF.toast(t("call.selected"), "info"); }
     try { navigator.clipboard.writeText(v).then(ok, sel); } catch (e) { sel(); }
   };
+
+  /* ---------- a known number: regular customer (orders received before) or a new one ---------- */
+  SF.custMark = function (c) { if (!c || c.orders == null) return "";
+    return c.orders > 0 ? '<span class="cmark known">' + I("check", 12) + t("cm.known", { n: c.orders }) + "</span>" : '<span class="cmark new">' + t("cm.new") + "</span>"; };
 
   /* ---------- change own password ---------- */
   SF.pwForm = function () {

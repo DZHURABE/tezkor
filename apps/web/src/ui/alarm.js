@@ -47,10 +47,11 @@
   function restCard(o, more) {
     var prep = SF.state.inPrep || 20;
     return '<div class="incall rest"><div class="ic-head"><span class="ic-ring">' + I("bell", 30) + '</span><div><small>' + t("al.restTitle") + '</small><b class="num">№' + o.number + "</b></div>" + (more ? '<span class="ic-more num">+' + more + "</span>" : "") + "</div>" +
+      (o.dineIn ? '<p class="ic-table">' + I("grid", 16) + t("tb.table", { n: esc(o.tableName) }) + " · " + t("tb.inHall") + "</p>" : "") +
       '<ul class="ic-items">' + o.items.map(function (it) { return '<li><b class="num">' + it.qty + "×</b><span>" + esc(tx(it.name)) + "</span></li>"; }).join("") + "</ul>" +
       (o.comment ? '<p class="ic-note">' + I("info", 14) + esc(o.comment) + "</p>" : "") +
-      '<div class="ic-sum"><span>' + t("pay." + o.payment.method) + (o.payment.method === "transfer" ? " · " + t("ps." + o.payment.status) : "") + '</span><b class="num">' + money(o.subtotal) + "</b></div>" +
-      ((o.delivery || "platform") !== "platform" ? '<p class="ic-lbl">' + t("dl.who") + '</p><div class="ic-dl">' + SF.dlChoice(SF.state.inDeliv || "own", "indeliv") + "</div>" : "") +
+      '<div class="ic-sum"><span>' + (o.dineIn ? t("tb.payTable") : t("pay." + o.payment.method)) + (o.payment.method === "transfer" ? " · " + t("ps." + o.payment.status) : "") + '</span><b class="num">' + money(o.subtotal) + "</b></div>" +
+      (!o.dineIn && (o.delivery || "platform") !== "platform" ? '<p class="ic-lbl">' + t("dl.who") + '</p><div class="ic-dl">' + SF.dlChoice(SF.state.inDeliv || "own", "indeliv") + "</div>" : "") +
       '<p class="ic-lbl">' + t("rest.prep") + '</p><div class="ic-prep">' + [10, 15, 20, 30, 45].map(function (m) { return '<button type="button" class="' + (m === prep ? "on" : "") + '" data-act="inprep" data-v="' + m + '">' + m + "</button>"; }).join("") + "</div>" +
       (o.payment.method === "transfer" ? '<button type="button" class="btn ghost block ic-rcpt" data-act="rcpt" data-id="' + o.id + '">' + I("receipt", 16) + t("tr.receipt") + "</button>" : "") +
       '<div class="ic-acts"><button type="button" class="btn ic-no" data-act="indecline" data-id="' + o.id + '">' + I("x", 20) + t("rest.reject") + '</button><button type="button" class="btn ic-yes" data-act="inaccept" data-id="' + o.id + '">' + I("check", 22) + t(o.payment.method === "transfer" ? "tr.acceptPaid" : "rest.accept") + "</button></div>" +
@@ -83,6 +84,8 @@
   SF.alarmCheck = function (notes) {
     var u = SF.state.user, keys = u && KEYS[u.role];
     if (u && u.role === "courier") notes.filter(function (n) { return n.key === "n.ready" && !acked()[n.id]; }).forEach(function (n) { ack([n.id]); SF.chime(); });
+    /* a guest at a table calls the waiter / asks for the bill */
+    if (u && u.role === "restaurant") notes.filter(function (n) { return (n.key === "n.waiter" || n.key === "n.bill") && !acked()[n.id]; }).forEach(function (n) { ack([n.id]); SF.chime(); });
     if (!keys) { if (cur) close(); return; }
     var pending = notes.filter(function (n) { return keys.indexOf(n.key) >= 0 && !acked()[n.id] && n.orderId; });
     if (u.role === "courier" && (!u.courier || !u.courier.online)) pending = [];
@@ -98,7 +101,7 @@
 
   SF.actions.indeliv = function (el) { SF.state.inDeliv = el.dataset.v; el.parentNode.querySelectorAll("button").forEach(function (b) { var on = b === el; b.classList.toggle("on", on); b.setAttribute("aria-pressed", on); }); };
   SF.actions.inprep = function (el) { SF.state.inPrep = +el.dataset.v; document.querySelectorAll(".ic-prep button").forEach(function (b) { b.classList.toggle("on", b === el); }); };
-  SF.actions.inaccept = function (el) { var id = el.dataset.id, ids = cur ? cur.noteIds : []; var dl = document.querySelector(".ic-dl") ? (SF.state.inDeliv || "own") : undefined; SF.state.inDeliv = null; return SF.api.post("/restaurant/orders/" + id + "/accept", { prepMin: SF.state.inPrep || 20, delivery: dl }).then(function () { ack(ids); close(); SF.toast(t("rest.accepted")); SF.go("/rest/orders"); SF.render({ quiet: true }); }); };
+  SF.actions.inaccept = function (el) { var id = el.dataset.id, ids = cur ? cur.noteIds : []; var dl = document.querySelector(".ic-dl") ? (SF.state.inDeliv || "own") : undefined; SF.state.inDeliv = null; return SF.api.post("/restaurant/orders/" + id + "/accept", { prepMin: SF.state.inPrep || 20, delivery: dl }).then(function (o) { ack(ids); close(); SF.toast(t(o && o.dineIn ? "tb.accepted" : "rest.accepted")); SF.go("/rest/orders"); SF.render({ quiet: true }); }); };
   SF.actions.indecline = function (el) { var ids = cur ? cur.noteIds : []; ack(ids); close(); SF.go("/rest/orders"); setTimeout(function () { SF.actions.reject({ dataset: { id: el.dataset.id } }); }, 300); };
   SF.actions.inlater = function () { if (cur) ack(cur.ids); close(); SF.go(SF.state.user && SF.state.user.role === "courier" ? "/courier" : "/rest/orders"); };
   SF.actions.intake = function (el) { var ids = cur ? cur.noteIds : []; return SF.api.post("/courier/orders/" + el.dataset.id + "/accept").then(function () { ack(ids); close(); SF.toast(t("cour.taken")); SF.go("/courier"); SF.render({ quiet: true }); }).catch(function (e) { ack(ids); close(); throw e; }); };

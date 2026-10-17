@@ -187,7 +187,7 @@ SF.I18N = {};
   /* admin */
   K("adm.dash", "Лавҳаи асосӣ", "Дашборд", "Dashboard"); K("adm.orders", "Ҳамаи фармоишҳо", "Все заказы", "All orders"); K("adm.restaurants", "Ошхонаҳо", "Рестораны", "Restaurants"); K("adm.couriers", "Курйерҳо", "Курьеры", "Couriers");
   K("adm.users", "Корбарон", "Пользователи", "Users"); K("adm.products", "Хӯрокҳо", "Блюда", "Dishes"); K("adm.categories", "Категорияҳо", "Категории", "Categories"); K("adm.payments", "Пардохтҳо", "Платежи", "Payments");
-  K("adm.promos", "Рамзҳои тахфиф", "Промокоды", "Promo codes"); K("adm.banners", "Аксияҳо", "Акции", "Promotions"); K("adm.cities", "Шаҳрҳо", "Города", "Cities"); K("adm.stats", "Омор ва даромад", "Статистика и доход", "Stats & revenue"); K("adm.settings", "Танзимот", "Настройки", "Settings");
+  K("adm.promos", "Рамзҳои тахфиф", "Промокоды", "Promo codes"); K("adm.banners", "Эълонҳо", "Объявления", "Ads"); K("adm.cities", "Шаҳрҳо", "Города", "Cities"); K("adm.stats", "Омор ва даромад", "Статистика и доход", "Stats & revenue"); K("adm.settings", "Танзимот", "Настройки", "Settings");
   K("adm.all", "Ҳама", "Все", "All"); K("adm.active", "Фаъол", "Активные", "Active"); K("adm.searchOrders", "№ ё номи мизоҷ", "№ или имя клиента", "# or customer name"); K("adm.restaurant", "Ошхона", "Ресторан", "Restaurant");
   K("adm.noOrders", "Фармоиш ёфт нашуд", "Заказы не найдены", "No orders found"); K("adm.commission", "Комиссия", "Комиссия", "Commission"); K("adm.history", "Таърихи ҳолатҳо", "История статусов", "Status history");
   K("adm.changeStatus", "Иваз кардани ҳолат", "Сменить статус", "Change status"); K("adm.restCount", "{n} ошхона", "{n} ресторанов", "{n} restaurants"); K("adm.addRest", "Ошхонаи нав", "Новый ресторан", "New restaurant");
@@ -214,6 +214,10 @@ SF.I18N = {};
     NOT_FOUND: ["Ёфт нашуд", "Не найдено", "Not found"], NO_ROUTE: ["Ёфт нашуд", "Не найдено", "Not found"],
     BAD_CREDENTIALS: ["Парол нодуруст аст. Ҳарфҳои калон ва хурдро санҷед ё «Паролро фаромӯш кардед?»-ро пахш кунед.", "Неверный пароль. Проверьте заглавные буквы или нажмите «Забыли пароль?».", "Wrong password. Check capital letters or tap “Forgot password?”."], USER_BLOCKED: ["Ҳисоб баста шудааст. Ба дастгирӣ занг занед.", "Аккаунт заблокирован. Обратитесь в поддержку.", "This account is blocked. Contact support."],
     BAD_PHONE: ["Рақамро пурра нависед: 9 рақам", "Введите номер полностью: 9 цифр", "Enter the full number: 9 digits"], BAD_NAME: ["Номро нависед (ақаллан 2 ҳарф)", "Введите имя (минимум 2 буквы)", "Enter a name (at least 2 letters)"],
+    TABLE_NOT_FOUND: ["Ин QR дигар кор намекунад — аз официант пурсед", "Этот QR больше не работает — спросите официанта", "This QR no longer works — ask the waiter"],
+    TABLE_OFF: ["Фармоиш аз ин миз ҳоло хомӯш аст — аз официант пурсед", "Заказ с этого стола сейчас выключен — спросите официанта", "Ordering from this table is off — ask the waiter"],
+    TABLE_TOO_MANY: ["Аз ин миз фармоишҳои зиёд интизоранд — каме сабр кунед", "С этого стола уже много ожидающих заказов — подождите", "Too many waiting orders from this table — please wait"],
+    TABLE_LIMIT: ["Ҳадди аксар 100 миз", "Максимум 100 столов", "Up to 100 tables"], NOT_TABLE_ORDER: ["Ин фармоиши миз нест", "Это не заказ со стола", "Not a table order"],
     BAD_PASSWORD: ["Парол ақаллан 4 аломат", "Пароль минимум 4 символа", "Password must be at least 4 characters"], PHONE_TAKEN: ["Ин рақам аллакай сабт шудааст", "Этот номер уже зарегистрирован", "This number is already registered"],
     RESTAURANT_NOT_FOUND: ["Ошхона ёфт нашуд", "Ресторан не найден", "Restaurant not found"], RESTAURANT_CLOSED: ["Ошхона ҳоло пӯшида аст", "Ресторан сейчас закрыт", "The restaurant is closed now"],
     CART_EMPTY: ["Сабад холӣ аст", "Корзина пуста", "Your cart is empty"], PRODUCT_NOT_FOUND: ["Хӯрок ёфт нашуд", "Блюдо не найдено", "Dish not found"], PRODUCT_UNAVAILABLE: ["«{name}» тамом шуд", "«{name}» закончилось", "“{name}” is sold out"],
@@ -239,6 +243,11 @@ SF.I18N = {};
     STAFF_PHONE: ["Ин рақам барои ошхона ё курйер кушода шудааст. «Ворид шудан»-ро пахш кунед ва пароли аз маъмур гирифтаро нависед.", "Этот номер открыт для заведения или курьера. Нажмите «Войти» и введите пароль от администратора.", "This number belongs to a restaurant or courier. Press “Log in” and enter the password from the admin."],
     BAD_IMAGE: ["Ин акс нест", "Это не фото", "This is not a photo"], IMAGE_TOO_LARGE: ["Акс хеле калон аст", "Фото слишком большое", "The photo is too large"],
     OLD_PRICE_LOW: ["Нархи пештара бояд аз нархи нав зиёд бошад", "Старая цена должна быть больше новой", "The old price must be higher than the new one"],
+    MANAGER_ONLY: ["Инро танҳо соҳиб ё мудири филиал карда метавонад", "Это может только владелец или управляющий", "Only the owner or branch manager can do this"],
+    OWNER_ONLY: ["Инро танҳо соҳиби ошхона карда метавонад", "Это может сделать только владелец заведения", "Only the owner can do this"],
+    STAFF_LIMIT: ["Ҳадди аксар 15 корманд", "Не больше 15 сотрудников", "At most 15 staff"],
+    BAD_URL: ["Суроғаи сайтро пурра нависед (https://…)", "Введите адрес сайта полностью (https://…)", "Enter the full site address (https://…)"],
+    AD_OWN: ["Ин рекламаи ошхона аст — онро танҳо хомӯш кардан мумкин", "Это реклама заведения — её можно только выключить", "This is a restaurant's own ad — you can only switch it off"],
     BAD_AD_TITLE: ["Сарлавҳаро нависед", "Введите заголовок", "Enter a headline"], AD_BLOCKED: ["Маъмур рекламаро хомӯш кардааст", "Администратор отключил рекламу", "The admin switched this ad off"], BAD_PRODUCT: ["Хӯрок ёфт нашуд", "Блюдо не найдено", "Dish not found"],
     BAD_MONTHS: ["Моҳро интихоб кунед", "Выберите срок", "Choose the period"], BAD_TRIAL: ["Рӯзҳои бепул: 0–365", "Бесплатных дней: 0–365", "Free days: 0–365"], NOT_LAST_PAYMENT: ["Танҳо охирин пардохтро бекор кардан мумкин", "Отменить можно только последнюю оплату", "Only the last payment can be undone"],
     PLATFORM_DELIVERY: ["Ин фармоишро курйерҳои Тезкор мерасонанд", "Этот заказ доставляют курьеры Тезкор", "Тезкор couriers deliver this order"], NOT_SELF_DELIVERY: ["Ин фармоишро курйер мебарад", "Этот заказ везёт курьер", "A courier is delivering this order"],
@@ -369,7 +378,66 @@ SF.I18N = {};
   K("vfa.title", "Тасдиқи рақами телефон", "Подтверждение номера", "Phone number confirmation");
   K("vfa.sub", "Мизоҷ ҳангоми сабти ном ва барқарор кардани парол рақамашро бо Telegram, WhatsApp ё SMS тасдиқ мекунад.", "Клиент подтверждает номер при регистрации и восстановлении пароля через Telegram, WhatsApp или SMS.", "Customers confirm their number on sign-up and password reset via Telegram, WhatsApp or SMS.");
   K("vfa.bot", "(бот)", "(бот)", "(bot)"); K("vfa.on", "Фаъол", "Включено", "On"); K("vfa.off", "Пайваст нест", "Не подключено", "Not connected"); K("vfa.error", "Хато — токенро санҷед", "Ошибка — проверьте токен", "Error — check the token");
-  K("vfa.required", "Бе тасдиқи рақам сабти ном нашавад", "Регистрация только с подтверждённым номером", "Sign-up only with a confirmed number");
+  K("vfa.required", "Сабти ном танҳо бо рақами тасдиқшуда", "Регистрация только с подтверждённым номером", "Sign-up only with a confirmed number");
+  K("vfa.requiredHint", "Хомӯш бошад — мизоҷони бе Telegram ҳам бо рақам ва парол сабти ном мешаванд", "Если выключено — клиенты без Telegram тоже регистрируются по номеру и паролю", "When off, customers without Telegram can sign up with a phone number and password");
+  K("vf.regTitle", "Чӣ тавр сабти ном шавем?", "Как зарегистрироваться?", "How do you want to sign up?");
+  K("vf.regSub", "{phone} — бо Telegram рақам дар як лаҳза тасдиқ мешавад. Telegram надоред? Бе он давом диҳед.", "{phone} — через Telegram номер подтвердится за секунду. Нет Telegram? Продолжите без него.", "{phone} — Telegram confirms your number in a second. No Telegram? Continue without it.");
+  K("vf.best", "тавсия", "рекомендуем", "recommended");
+  K("vf.or", "ё", "или", "or");
+  K("vf.skip", "Бе Telegram давом додан", "Продолжить без Telegram", "Continue without Telegram");
+  K("vf.skipSub", "Танҳо рақам ва парол · баъдтар тасдиқ кардан мумкин", "Только номер и пароль · подтвердить можно позже", "Just phone and password · confirm later");
+  K("vf.confirmRow", "Рақамро тасдиқ кунед", "Подтвердите номер", "Confirm your number");
+  K("vf.notYet", "тасдиқ нашуда", "не подтверждён", "not confirmed");
+  /* ordering at the table (QR) */
+  K("tb.nav", "Мизҳо · QR", "Столы · QR", "Tables · QR"); K("tb.title", "Фармоиш аз миз", "Заказ со стола", "Order from the table");
+  K("tb.table", "Мизи {n}", "Стол {n}", "Table {n}"); K("tb.inHall", "дар толор", "в зале", "in the hall");
+  K("tb.accepted", "Қабул шуд — пухтанро сар кунед", "Принят — готовьте", "Accepted — start cooking"); K("tb.payTable", "Пардохт дар миз", "Оплата за столом", "Pay at the table");
+  K("tb.add", "Илова", "Добавить", "Add"); K("tb.other", "Дигар", "Другое", "Other");
+  K("tb.closed", "Ошхона ҳоло фармоиш қабул намекунад", "Заведение сейчас не принимает заказы", "The restaurant is not taking orders right now");
+  K("tb.hint", "Таомро интихоб кунед ва «Фармоиш» -ро пахш кунед — сабти ном лозим нест. Пардохт — ба официант.", "Выберите блюда и нажмите «Заказать» — регистрация не нужна. Оплата — официанту.", "Pick dishes and tap Order — no sign-up. Pay the waiter.");
+  K("tb.yours", "Фармоишҳои шумо", "Ваши заказы", "Your orders");
+  K("tb.s.pending", "Ошхона мебинад…", "Ресторан смотрит…", "The kitchen is looking…"); K("tb.s.cooking", "Омода мешавад", "Готовится", "Being prepared");
+  K("tb.s.served", "Ба миз оварда шуд", "Подано на стол", "Served"); K("tb.s.rejected", "Ошхона қабул накард", "Ресторан отклонил", "Declined by the restaurant"); K("tb.s.cancelled", "Бекор шуд", "Отменён", "Cancelled");
+  K("tb.left", "~{n} дақ.", "~{n} мин.", "~{n} min");
+  K("tb.callWaiter", "Даъвати официант", "Позвать официанта", "Call the waiter"); K("tb.bill", "Ҳисобро биёред", "Принесите счёт", "Bring the bill");
+  K("tb.called", "Официант меояд", "Официант подойдёт", "The waiter is coming"); K("tb.billSent", "Ҳисобро меоранд", "Счёт принесут", "The bill is on its way");
+  K("tb.calledAgain", "Аллакай даъват шуд · баъди {s} сония боз", "Уже позвали · снова через {s} сек.", "Already called · again in {s} s");
+  K("tb.promoT", "Тезкор — таом то дари хона", "Тезкор — еда до двери", "Тезкор — food to your door"); K("tb.promoS", "Аз ҳамин ошхона фармоиш бо расонидан", "Закажите доставку из этого же заведения", "Order delivery from this same place");
+  K("tb.review", "Фармоишро дидан", "Посмотреть заказ", "Review order"); K("tb.sheetT", "Фармоиш · Мизи {n}", "Заказ · стол {n}", "Order · table {n}");
+  K("tb.comment", "Хоҳиш", "Пожелание", "Note"); K("tb.commentPh", "Масалан: бе пиёз, тезтар", "Например: без лука, побыстрее", "E.g. no onion, quickly");
+  K("tb.name", "Номи шумо (ихтиёрӣ)", "Ваше имя (необязательно)", "Your name (optional)"); K("tb.namePh", "Барои официант", "Для официанта", "For the waiter");
+  K("tb.payNote", "Пардохт баъди хӯрок — ба официант (нақд ё корт).", "Оплата после еды — официанту (наличные или карта).", "Pay after the meal — to the waiter (cash or card).");
+  K("tb.send", "Фармоиш додан", "Заказать", "Place order");
+  K("tb.sentT", "Фармоиш рафт!", "Заказ отправлен!", "Order sent!"); K("tb.sentS", "№{n} — ошхона ҳозир мебинад. Ҳолатро дар ҳамин саҳифа бинед.", "№{n} — ресторан сейчас увидит. Статус — на этой странице.", "#{n} — the kitchen will see it now. Follow the status on this page.");
+  K("tb.cancelled", "Фармоиш бекор шуд", "Заказ отменён", "Order cancelled");
+  K("tb.served", "Ба миз дода шуд", "Подано на стол", "Served to the table"); K("tb.servedOk", "Хуб! Фармоиш пӯшида шуд", "Готово! Заказ закрыт", "Done! Order closed");
+  K("tb.hT", "Фармоиш аз миз бо QR", "Заказ со стола по QR", "Table ordering by QR");
+  K("tb.hS", "Ба ҳар миз стикери QR гузоред. Меҳмон камераро равона мекунад, менюро мебинад ва фармоиш медиҳад — бе сабти ном ва бе барнома. Фармоиш ба ҳамин ҷо меояд.", "Наклейте QR на каждый стол. Гость наводит камеру, видит меню и заказывает — без регистрации и приложения. Заказ приходит сюда.", "Put a QR sticker on each table. Guests point the camera, see the menu and order — no sign-up, no app. Orders arrive here.");
+  K("tb.count", "Мизҳо: {n}", "Столов: {n}", "Tables: {n}"); K("tb.howMany", "Чанд миз", "Сколько столов", "How many tables"); K("tb.addN", "Миз илова кардан", "Добавить столы", "Add tables");
+  K("tb.added", "{n} миз илова шуд", "Добавлено столов: {n}", "{n} tables added");
+  K("tb.printAll", "Чопи ҳамаи QR", "Печать всех QR", "Print all QR"); K("tb.print", "Чоп", "Печать", "Print"); K("tb.more", "Танзимот", "Настройки", "Settings");
+  K("tb.offP", "хомӯш", "выключен", "off");
+  K("tb.emptyT", "Ҳоло миз нест", "Столов пока нет", "No tables yet"); K("tb.emptyS", "Шумораи мизҳоро нависед ва «Миз илова кардан» -ро пахш кунед", "Укажите число столов и нажмите «Добавить столы»", "Enter the number of tables and tap Add tables");
+  K("tb.howT", "Чӣ тавр кор мекунад", "Как это работает", "How it works");
+  K("tb.how1", "Мизҳоро илова кунед ва «Чопи ҳамаи QR» -ро пахш кунед.", "Добавьте столы и нажмите «Печать всех QR».", "Add tables and tap Print all QR.");
+  K("tb.how2", "Стикерҳоро бурида, ба мизҳо часпонед (беҳтараш ламинат).", "Вырежьте и наклейте на столы (лучше заламинировать).", "Cut out and stick them on the tables (laminate if you can).");
+  K("tb.how3", "Меҳмон QR -ро скан мекунад → таом интихоб мекунад → «Фармоиш додан».", "Гость сканирует QR → выбирает блюда → «Заказать».", "The guest scans → picks dishes → Place order.");
+  K("tb.how4", "Фармоиш бо садо ин ҷо меояд, бо рақами миз. Пухтед, баред ва «Ба миз дода шуд» -ро пахш кунед.", "Заказ приходит сюда со звуком и номером стола. Готовьте, подайте и нажмите «Подано на стол».", "The order rings here with the table number. Cook, serve, tap Served.");
+  K("tb.nameL", "Ном ё рақами миз", "Название или номер стола", "Table name or number");
+  K("tb.turnOff", "Хомӯш кардан (QR кор намекунад)", "Выключить (QR не работает)", "Turn off (QR stops working)"); K("tb.turnOn", "Фаъол кардан", "Включить", "Turn on");
+  K("tb.newCode", "QR-и нав", "Новый QR", "New QR"); K("tb.newCodeHint", "Агар стикерро акс гирифта, аз хона фармоиш медиҳанд — QR-и нав созед; кӯҳна дигар кор намекунад.", "Если QR сфотографировали и заказывают из дома — создайте новый; старый перестанет работать.", "If someone photographed the QR and orders from home — make a new one; the old one stops working.");
+  K("tb.codeDone", "QR нав шуд — стикерро дубора чоп кунед", "QR обновлён — распечатайте наклейку заново", "QR renewed — print the sticker again");
+  K("tb.del", "Нест кардани миз", "Удалить стол", "Delete table");
+  K("tb.stk1", "Скан кунед ва фармоиш диҳед", "Сканируйте и заказывайте", "Scan to order");
+  K("tb.stk2", "Камераи телефонро равона кунед · сабти ном лозим нест", "Наведите камеру телефона · без регистрации", "Point your phone camera · no sign-up");
+  K("n.waiter", "Мизи {table}: официантро даъват мекунанд", "Стол {table}: зовут официанта", "Table {table}: calling the waiter"); K("n.waiter.t", "Даъвати официант", "Зовут официанта", "Waiter call");
+  K("n.bill", "Мизи {table}: ҳисобро мехоҳанд", "Стол {table}: просят счёт", "Table {table}: asking for the bill"); K("n.bill.t", "Ҳисоб", "Счёт", "Bill");
+  K("cm.known", "Мизоҷи шинос · {n} фармоиш", "Знакомый клиент · {n} заказ.", "Regular · {n} orders");
+  K("cm.new", "Мизоҷи нав", "Новый клиент", "New customer");
+  K("vf.taken", "Ин рақам аллакай сабт шудааст", "Этот номер уже зарегистрирован", "This number is already registered");
+  K("vf.takenSub", "{phone} — шумо аллакай ҳисоб доред. Бо пароли худ ворид шавед.", "{phone} — у вас уже есть аккаунт. Войдите со своим паролем.", "{phone} — you already have an account. Log in with your password.");
+  K("vf.unverified", "Рақами мизоҷ тасдиқ нашудааст — пеш аз пухтан занг занед", "Номер клиента не подтверждён — позвоните перед готовкой", "Customer number not confirmed — call before cooking");
+  K("vf.unverShort", "рақам тасдиқ нашуда", "номер не подтверждён", "number not confirmed");
   K("vfa.none", "Ҳоло ягон роҳ пайваст нест — мизоҷон бе тасдиқ сабти ном мешаванд.", "Пока ни один способ не подключён — клиенты регистрируются без подтверждения.", "No channel is connected yet — customers sign up without confirmation.");
   K("vfa.how", "Пайваст кардан: дар танзимоти сервер (Render → Environment) TELEGRAM_BOT_TOKEN, WHATSAPP_… ё SMS_URL гузоред — дастур дар ИШГА-ТУШИРИШ.md.", "Подключение: в настройках сервера (Render → Environment) задайте TELEGRAM_BOT_TOKEN, WHATSAPP_… или SMS_URL — инструкция в ИШГА-ТУШИРИШ.md.", "To connect: set TELEGRAM_BOT_TOKEN, WHATSAPP_… or SMS_URL in the server settings (Render → Environment) — see ИШГА-ТУШИРИШ.md.");
   K("vfa.verified", "Рақам тасдиқ шудааст", "Номер подтверждён", "Number confirmed");
@@ -394,5 +462,66 @@ SF.I18N = {};
   K("dl.selfIs", "Мебарад: {name}", "Везёт: {name}", "Delivering: {name}"); K("dl.delivered", "Расонида шуд", "Доставлено", "Delivered"); K("dl.doneToast", "Фармоиш расонида шуд", "Заказ доставлен", "Order delivered");
   K("dl.selfTitle", "Ошхона худаш мерасонад", "Доставляет само заведение", "The restaurant delivers"); K("dl.selfOnWay", "Фармоиш дар роҳ аст", "Заказ в пути", "Your order is on the way");
   K("dl.ownSearch", "Ошхона курйери худашро мефиристад", "Заведение отправит своего курьера", "The restaurant is sending its courier");
+
+  /* ---------- v2: home sections, search, favourites, profile, addresses, promos, ads ---------- */
+  K("fav.add", "Ба интихобшудаҳо", "В избранное", "Add to favourites"); K("fav.remove", "Аз интихобшудаҳо гирифтан", "Убрать из избранного", "Remove from favourites");
+  K("fav.login", "Барои интихоб кардан ворид шавед", "Войдите, чтобы добавлять в избранное", "Log in to save favourites"); K("fav.added", "Ба интихобшудаҳо илова шуд", "Добавлено в избранное", "Added to favourites"); K("fav.removed", "Аз интихобшудаҳо гирифта шуд", "Убрано из избранного", "Removed from favourites");
+  K("fav.none", "Ҳоло чизе интихоб нашудааст", "В избранном пока пусто", "No favourites yet"); K("fav.noneSub", "Дар ошхона ё хӯрок дилчаро пахш кунед — он дар ин ҷо меояд", "Нажмите на сердечко у ресторана или блюда — оно появится здесь", "Tap the heart on a restaurant or dish to keep it here");
+  K("fav.rests", "Ошхонаҳои интихобшуда", "Избранные рестораны", "Favourite restaurants"); K("fav.dishes", "Хӯрокҳои интихобшуда", "Избранные блюда", "Favourite dishes");
+  K("rc.sale", "Тахфиф", "Скидки", "Deals"); K("rc.open", "Кушода", "Открыто", "Open"); K("rc.min", "аз {sum}", "от {sum}", "from {sum}");
+  K("rf.label", "Филтр", "Фильтр", "Filter"); K("rf.all", "Ҳама", "Все", "All"); K("rf.open", "Ҳоло кушода", "Открыты сейчас", "Open now"); K("rf.sale", "Бо тахфиф", "Со скидками", "With deals");
+  K("rf.fast", "То 30 дақиқа", "До 30 минут", "Under 30 min"); K("rf.top", "Рейтинги 4.5+", "Рейтинг 4.5+", "Rated 4.5+"); K("rf.new", "Навҳо", "Новые", "New");
+  K("rf.none", "Бо ин филтр ошхона нест", "С этим фильтром ресторанов нет", "No restaurants match this filter"); K("rf.noneSub", "Филтри дигарро интихоб кунед", "Выберите другой фильтр", "Try another filter"); K("rf.reset", "Ҳамаро нишон диҳед", "Показать все", "Show all");
+  K("rs.label", "Тартиб", "Сортировка", "Sort"); K("rs.popular", "Машҳур", "Популярные", "Popular"); K("rs.rating", "Аз рӯи рейтинг", "По рейтингу", "By rating"); K("rs.fast", "Тезтар", "Быстрее", "Fastest");
+  K("rs.cheap", "Расонидани арзон", "Дешёвая доставка", "Cheapest delivery"); K("rs.new", "Навтарин", "Новые", "Newest");
+  K("home.deliverTo", "Расонидан ба", "Доставка по адресу", "Deliver to");
+  K("ec.title", "Дар {city} ҳоло ошхона нест", "В городе {city} пока нет ресторанов", "No restaurants in {city} yet"); K("ec.sub", "Ошхонаҳо ба зудӣ пайваст мешаванд. Шаҳри дигарро интихоб кунед ё баъдтар бозоед.", "Рестораны скоро подключатся. Выберите другой город или загляните позже.", "Restaurants are joining soon. Choose another city or come back later.");
+  K("ec.city", "Шаҳри дигар", "Другой город", "Another city"); K("ec.partner", "Ошхона доред? Ҳамкор шавед", "Есть заведение? Станьте партнёром", "Own a restaurant? Join us");
+  K("cat.dishes", "{n} хӯрок", "{n} блюд", "{n} dishes"); K("cat.rests", "{n} ошхона", "{n} ресторанов", "{n} restaurants"); K("cat.none", "Дар ин категория ҳоло чизе нест", "В этой категории пока пусто", "Nothing in this category yet"); K("cat.noneSub", "Категорияи дигарро интихоб кунед", "Выберите другую категорию", "Choose another category");
+  K("hs.sale", "Пешниҳодҳои махсус", "Специальные предложения", "Special offers"); K("hs.saleSub", "Хӯрокҳо бо тахфиф", "Блюда со скидкой", "Dishes on sale"); K("hs.popRest", "Ошхонаҳои машҳур", "Популярные рестораны", "Popular restaurants");
+  K("hs.fast", "Расонидани тез", "Быстрая доставка", "Fast delivery"); K("hs.fastSub", "Ҳоло кушода ва наздиктар", "Открыты сейчас и быстрее всех", "Open now and quickest"); K("hs.new", "Ошхонаҳои нав", "Новые рестораны", "New restaurants");
+  K("hs.rec", "Барои шумо", "Рекомендуем", "For you"); K("hs.recFav", "Аз ошхонаҳои дӯстдоштаатон", "Из ваших любимых ресторанов", "From your favourite places"); K("hs.recSub", "Хӯрокҳое, ки бештар мефармоянд", "Блюда, которые заказывают чаще", "Dishes people order most");
+  K("hs.all", "Ҳамаи ошхонаҳо", "Все рестораны", "All restaurants"); K("hs.help", "Савол доред? Занг занед:", "Есть вопрос? Звоните:", "Questions? Call:");
+  K("sr.clear", "Тоза кардан", "Очистить", "Clear"); K("sr.recent", "Охирин ҷустуҷӯҳо", "Недавние запросы", "Recent searches"); K("sr.clearAll", "Тоза кардан", "Очистить", "Clear"); K("sr.try", "Ҷустуҷӯи машҳур", "Популярные запросы", "Popular searches");
+  K("ps.rel", "Мувофиқтарин", "По релевантности", "Best match"); K("ps.cheap", "Арзонтар", "Сначала дешёвые", "Cheapest first"); K("ps.dear", "Қиматтар", "Сначала дорогие", "Most expensive first");
+  K("cart.remove", "Аз сабад гирифтан", "Убрать из корзины", "Remove from cart"); K("co.namePh", "Номи шумо", "Ваше имя", "Your name");
+  K("trk.1", "Фармоиш қабул шуд", "Заказ принят", "Order received"); K("trk.2", "Ошхона мепазад", "Ресторан готовит", "Being prepared"); K("trk.3", "Тайёр", "Заказ готов", "Ready");
+  K("trk.4", "Курйер гирифт", "Курьер забрал", "Picked up"); K("trk.5", "Дар роҳ", "Курьер в пути", "On the way"); K("trk.6", "Расонида шуд", "Доставлен", "Delivered");
+  K("trk.noGps", "Ҷойи курйер танҳо бо GPS-и фаъол нишон дода мешавад", "Место курьера показывается только при включённом GPS", "The courier's position shows only when their GPS is on");
+  K("ok.title", "Фармоиш қабул шуд!", "Заказ оформлен!", "Order placed!"); K("ok.sub", "{name} ҳозир фармоишро мебинад ва тасдиқ мекунад. Ҳолатро дар ҳамин саҳифа пайгирӣ кунед.", "{name} сейчас увидит заказ и подтвердит его. Следите за статусом на этой странице.", "{name} will see your order and confirm it. Follow its status on this page."); K("ok.number", "Рақами фармоиш", "Номер заказа", "Order number");
+  K("pf.photo", "Расми профил", "Фото профиля", "Profile photo"); K("pf.photoDel", "Расмро нест кунед", "Удалить фото", "Remove photo"); K("pf.editName", "Номро иваз кунед", "Изменить имя", "Change name");
+  K("pf.addresses", "Суроғаҳои ман", "Мои адреса", "My addresses"); K("pf.orders", "Фармоишҳои ман", "Мои заказы", "My orders"); K("pf.favs", "Интихобшудаҳо", "Избранное", "Favourites"); K("pf.promos", "Рамзҳои тахфиф", "Промокоды", "Promo codes");
+  K("pf.password", "Ивази парол", "Сменить пароль", "Change password"); K("pf.install", "Барномаро насб кунед", "Установить приложение", "Install the app"); K("pf.support", "Ёрӣ ва дастгирӣ", "Помощь и поддержка", "Help and support"); K("pf.version", "Версия", "Версия", "Version");
+  K("addr.home", "Хона", "Дом", "Home"); K("addr.work", "Кор", "Работа", "Work"); K("addr.other", "Дигар", "Другой", "Other");
+  K("addr.add", "Илова кардани суроға", "Добавить адрес", "Add an address"); K("addr.new", "Суроғаи нав", "Новый адрес", "New address"); K("addr.where", "Ҷойро дар харита нишон диҳед", "Отметьте место на карте", "Mark the place on the map");
+  K("addr.street", "Кӯча ва рақами хона", "Улица и номер дома", "Street and house number"); K("addr.flat", "Хонаи истиқоматӣ, даромадгоҳ", "Квартира, подъезд", "Flat, entrance");
+  K("addr.save", "Суроғаро сабт кунед", "Сохранить адрес", "Save the address"); K("addr.saved", "Суроға сабт шуд", "Адрес сохранён", "Address saved"); K("addr.deleted", "Суроға нест карда шуд", "Адрес удалён", "Address deleted");
+  K("addr.none", "Ҳоло суроға нест", "Адресов пока нет", "No addresses yet"); K("addr.noneSub", "Хона ё ҷои корро илова кунед — фармоиш тезтар мешавад", "Добавьте дом или работу — заказывать будет быстрее", "Add home or work to order faster"); K("addr.del", "Нест кардан", "Удалить", "Delete");
+  K("pr.min", "Фармоиш аз {sum}", "Заказ от {sum}", "Orders from {sum}"); K("pr.any", "Барои ҳар фармоиш", "Для любого заказа", "Any order"); K("pr.until", "то {d}", "до {d}", "until {d}");
+  K("pr.how", "Рамзро нусха кунед ва дар сабад, дар майдони «Рамзи тахфиф» гузоред.", "Скопируйте код и вставьте его в корзине, в поле «Промокод».", "Copy the code and paste it into the promo field in the cart.");
+  K("pr.none", "Ҳоло рамзи тахфиф нест", "Сейчас промокодов нет", "No promo codes right now"); K("pr.noneSub", "Рамзҳои нав дар ин ҷо ва дар баннерҳо пайдо мешаванд", "Новые коды появятся здесь и в баннерах", "New codes will appear here and in the banners");
+  K("cat.sub", "Ин категорияҳо дар саҳифаи асосӣ мебошанд. Зиёдатиро хомӯш кунед ё нест кунед (агар дар он хӯрок набошад). Барои расм ба тасвир пахш кунед.", "Это категории на главной. Лишние выключите или удалите (если в них нет блюд). Чтобы поставить фото — нажмите на картинку.", "These are the home-page categories. Switch off or delete extra ones (if they have no dishes). Tap the picture to set a photo.");
+  K("cat.photo", "Расм гузоштан", "Поставить фото", "Set a photo"); K("cat.photoDel", "Расмро гирифтан", "Убрать фото", "Remove photo");
+  K("promo.logo", "Логотип", "Логотип", "Logo"); K("promo.logoSub", "Логотипи квадратӣ дар корти ошхона дар назди ном нишон дода мешавад.", "Квадратный логотип показывается на карточке рядом с названием.", "A square logo shows on your card next to the name.");
+  K("bn.new", "Эълони нав", "Новое объявление", "New ad"); K("bn.edit", "Таҳрири эълон", "Изменить объявление", "Edit the ad");
+  K("bn.sub", "Эълонҳо дар саҳифаи асосӣ: аз ошхонаҳо ва аз худи шумо (мағоза, хизматрасонӣ, ҳар кас). Расм гузоред, ранг ва пайвандро интихоб кунед.", "Объявления на главной: от заведений и ваши собственные (магазин, услуги, кто угодно). Загрузите фото, выберите цвет и ссылку.", "Home-page ads: from restaurants and your own (a shop, a service, anyone). Upload a photo, choose a colour and a link.");
+  K("bn.link", "Ҳангоми пахш", "При нажатии", "On tap"); K("bn.lnone", "Ҳеҷ чиз", "Ничего", "Nothing"); K("bn.lrest", "Ошхона", "Заведение", "Restaurant");
+  K("bn.lphone", "Занг", "Звонок", "Call"); K("bn.lurl", "Сайт", "Сайт", "Website"); K("bn.phonePh", "+992 90 123 45 67", "+992 90 123 45 67", "+992 90 123 45 67");
+  K("bn.urlPh", "https://…", "https://…", "https://…"); K("bn.own", "Рекламаи ошхона", "Реклама заведения", "Restaurant's ad"); K("bn.mine", "Эълони шумо", "Ваше объявление", "Your ad");
+  K("bn.saved", "Эълон сабт шуд", "Объявление сохранено", "Ad saved"); K("bn.deleted", "Эълон нест шуд", "Объявление удалено", "Ad deleted"); K("bn.photoTip", "Беҳтар: расми уфуқӣ, 1200×600", "Лучше горизонтальное фото 1200×600", "Best: a landscape photo, 1200×600"); K("bn.deleteQ", "Ин эълонро нест кунем?", "Удалить это объявление?", "Delete this ad?");
+  K("sf.manager", "Мудири филиал", "Управляющий филиала", "Branch manager"); K("sf.worker", "Корманд", "Сотрудник", "Worker");
+  K("sf.managerSub", "Ҳама чизро идора мекунад: меню, нарх, мизҳо, кормандон. Корти пардохт — танҳо соҳиб.", "Управляет всем: меню, цены, столы, сотрудники. Карта оплаты — только владелец.", "Manages everything: menu, prices, tables, staff. Payment card — owner only.");
+  K("sf.workerSub", "Фармоишҳоро қабул мекунад ва таомро «ҳаст/нест» мекунад.", "Принимает заказы и отмечает блюда «есть/нет».", "Takes orders and marks dishes in/out of stock.");
+  K("sf.roleL", "Вазифа", "Роль", "Role"); K("sf.changeRole", "Иваз кардани вазифа", "Сменить роль", "Change role");
+  K("sf.makeManager", "Мудири филиал кардан", "Сделать управляющим", "Make branch manager"); K("sf.makeWorker", "Корманди оддӣ кардан", "Сделать сотрудником", "Make worker");
+  K("sf.nav", "Кормандон", "Сотрудники", "Staff"); K("sf.title", "Фармоишҳо ба ҳамаи кормандон меоянд", "Заказы приходят всем сотрудникам", "Orders reach every staff member");
+  K("sf.sub", "Ба ҳар корманд воридшавии алоҳида диҳед — фармоиш ба ҳамаашон бо садо меояд. «Корманд» фармоиш мегирад; «Мудири филиал» менюву нарх, мизҳо ва кормандонро идора мекунад. Корти пардохт — танҳо соҳиб.", "Дайте каждому свой вход — заказ приходит всем со звуком. «Сотрудник» принимает заказы; «Управляющий филиала» ведёт меню, цены, столы и сотрудников. Карта оплаты — только владелец.", "Give everyone their own login — orders ring for all. A worker takes orders; a branch manager runs the menu, prices, tables and staff. Payment card — owner only.");
+  K("sf.count", "{n} корманд · {on} фаъол", "{n} сотрудников · {on} активны", "{n} staff · {on} active"); K("sf.add", "Илова кардани корманд", "Добавить сотрудника", "Add a staff member");
+  K("sf.none", "Ҳоло корманд нест", "Сотрудников пока нет", "No staff yet"); K("sf.noneSub", "Кормандро илова кунед — вай бо рақами худ ворид мешавад ва фармоишҳоро мебинад", "Добавьте сотрудника — он войдёт со своим номером и будет видеть заказы", "Add a worker: they log in with their own number and see the orders");
+  K("sf.namePh", "Масалан: Фарзона, кассир", "Например: Фарзона, кассир", "For example: Farzona, cashier"); K("sf.addNote", "Пароли якдафъаина медиҳем. Корманд бори аввал ворид шуда, пароли худро мегузорад.", "Мы выдадим одноразовый пароль. При первом входе сотрудник задаст свой.", "We give a one-time password; the worker sets their own at first login.");
+  K("sf.credsSub", "Инро ба {name} диҳед: дар tezkor.pro ё дар барнома бо ин рақам ва парол ворид шавад.", "Передайте это {name}: вход на tezkor.pro или в приложении с этим номером и паролем.", "Give this to {name}: log in at tezkor.pro or in the app with this number and password.");
+  K("sf.credsNote", "Парол танҳо як бор нишон дода мешавад. Агар гум шавад, тугмаи сипарро пахш кунед ва пароли нав гиред.", "Пароль показывается один раз. Если потеряется — нажмите на щит и получите новый.", "The password is shown once. If it gets lost, tap the shield for a new one.");
+  K("sf.notYet", "Ҳанӯз ворид нашудааст", "Ещё не входил", "Not logged in yet"); K("sf.activeP", "Фаъол", "Активен", "Active"); K("sf.seen", "охирин бор {t}", "был {t}", "last seen {t}");
+  K("sf.del", "Нест кардан", "Удалить", "Delete"); K("sf.delQ", "{name}-ро нест кунем?", "Удалить сотрудника {name}?", "Delete {name}?"); K("sf.delSub", "Вай дигар ворид шуда наметавонад. Фармоишҳои пештара боқӣ мемонанд.", "Он больше не сможет войти. Прошлые заказы останутся.", "They can no longer log in. Past orders stay."); K("sf.deleted", "Корманд нест карда шуд", "Сотрудник удалён", "Staff member deleted");
   Object.keys(E).forEach(function (k) { K("e." + k, E[k][0], E[k][1], E[k][2]); });
 })();

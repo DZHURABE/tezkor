@@ -97,18 +97,95 @@
   SF.actions.ocact = function (el) { return api().patch("/restaurant/couriers/" + el.dataset.id, { active: el.getAttribute("aria-checked") !== "true" }).then(function () { SF.render({ quiet: true }); }); };
   SF.actions.ocpass = function (el) { return api().post("/restaurant/couriers/" + el.dataset.id + "/password").then(function (l) { ocCreds(el.dataset.name, l); }); };
 
+  /* ---------- Staff: workers with their own login ---------- */
+  R("/rest/staff", { title: "sf.nav", render: function () {
+    var me = SF.state.user; if (me.staff && me.staffRole !== "manager") { SF.go("/rest/orders"); return ""; }
+    return api().get("/restaurant/staff").then(function (list) {
+      return '<section class="card sfhero"><span class="kic">' + I("users", 22) + '</span><div class="grow"><b>' + t("sf.title") + "</b><p>" + t("sf.sub") + "</p></div></section>" +
+        '<div class="toolbar"><p class="muted">' + t("sf.count", { n: list.length, on: list.filter(function (x) { return x.active; }).length }) + '</p><button class="btn primary" data-act="sfnew">' + I("plus", 18) + t("sf.add") + "</button></div>" +
+        (list.length ? '<div class="stack">' + list.map(function (u) {
+          var st = !u.active ? '<span class="pill p-bad">' + t("dl.blocked") + "</span>" : u.mustChange ? '<span class="pill p-warn">' + t("sf.notYet") + "</span>" : '<span class="pill p-ok">' + t("sf.activeP") + "</span>";
+          return '<div class="card ocrow' + (u.active ? "" : " off") + '"><span class="avatar">' + esc(u.name.charAt(0)) + '</span><div class="grow"><b>' + esc(u.name) + (u.staffRole === "manager" ? ' <span class="pill p-brand">' + t("sf.manager") + "</span>" : ' <span class="pill p-mut">' + t("sf.worker") + "</span>") + '</b><small class="muted num">' + esc(SF.phone(u.phone)) + (u.lastSeenAt ? " · " + t("sf.seen", { t: SF.dt(u.lastSeenAt) }) : "") + "</small>" + st + "</div>" +
+            (me.staff && u.staffRole === "manager" ? "</div>" : (!me.staff ? '<button class="iconbtn" data-act="sfrole" data-id="' + u.id + '" data-r="' + (u.staffRole === "manager" ? "worker" : "manager") + '" aria-label="' + t("sf.changeRole") + '" title="' + t(u.staffRole === "manager" ? "sf.makeWorker" : "sf.makeManager") + '">' + I("users", 18) + "</button>" : "") +
+            '<button class="iconbtn" data-act="sfpass" data-id="' + u.id + '" data-name="' + esc(u.name) + '" aria-label="' + t("dl.newPass") + '" title="' + t("dl.newPass") + '">' + I("shield", 18) + "</button>" +
+            '<button class="iconbtn" data-act="sfdel" data-id="' + u.id + '" data-name="' + esc(u.name) + '" aria-label="' + t("sf.del") + '" title="' + t("sf.del") + '">' + I("trash", 18) + "</button>" +
+            '<button class="switch' + (u.active ? " on" : "") + '" role="switch" aria-checked="' + u.active + '" data-act="sfact" data-id="' + u.id + '" aria-label="' + t("adm.activeL") + '"></button></div>'); }).join("") + "</div>"
+          : SF.empty("users", t("sf.none"), t("sf.noneSub")));
+    });
+  } });
+  function sfCreds(name, login) {
+    SF.modal('<button class="mx" data-act="closemodal" aria-label="' + t("btn.close") + '">' + I("x", 20) + '</button><div class="stack"><h2 class="h2">' + t("adm.credsTitle") + '</h2><p class="muted">' + t("sf.credsSub", { name: esc(name) }) + "</p>" +
+      '<div class="creds"><span>' + t("auth.phone") + '</span><code class="num">' + esc(SF.phone(login.phone)) + "</code><span>" + t("auth.password") + '</span><code class="num">' + esc(login.password) + "</code></div>" +
+      '<button type="button" class="btn ghost block" data-act="copynum" data-v="' + esc("tezkor.pro · " + SF.phone(login.phone) + " / " + login.password) + '">' + I("copy", 16) + t("adm.credsCopy") + '</button><p class="fine">' + t("sf.credsNote") + "</p></div>"); }
+  SF.actions.sfnew = function () {
+    SF.modal('<button class="mx" data-act="closemodal" aria-label="' + t("btn.close") + '">' + I("x", 20) + '</button><form class="stack" data-form="sfnew"><h2 class="h2">' + t("sf.add") + '</h2><label class="f">' + t("profile.name") + '<input name="name" required maxlength="60" placeholder="' + t("sf.namePh") + '"></label>' +
+      '<label class="f">' + t("auth.phone") + '<span class="phonein"><i>+992</i><input name="phone" inputmode="tel" required></span></label>' +
+      (SF.state.user.staff ? '<input type="hidden" name="staffRole" value="worker">' : '<p class="lbl">' + t("sf.roleL") + '</p><div class="rolepick"><label><input type="radio" name="staffRole" value="worker" checked><span><b>' + t("sf.worker") + "</b><small>" + t("sf.workerSub") + '</small></span></label><label><input type="radio" name="staffRole" value="manager"><span><b>' + t("sf.manager") + "</b><small>" + t("sf.managerSub") + "</small></span></label></div>") +
+      '<p class="fine">' + t("sf.addNote") + '</p><button class="btn primary block">' + t("btn.create") + "</button></form>"); };
+  SF.forms.sfnew = function (fd) { return api().post("/restaurant/staff", fd).then(function (u) { SF.render({ quiet: true }); sfCreds(u.name, u.login); }); };
+  SF.actions.sfact = function (el) { return api().patch("/restaurant/staff/" + el.dataset.id, { active: el.getAttribute("aria-checked") !== "true" }).then(function () { SF.render({ quiet: true }); }); };
+  SF.actions.sfrole = function (el) { return api().patch("/restaurant/staff/" + el.dataset.id, { staffRole: el.dataset.r }).then(function () { SF.toast(t("btn.saved")); SF.render({ quiet: true }); }); };
+  SF.actions.sfpass = function (el) { return api().post("/restaurant/staff/" + el.dataset.id + "/password").then(function (l) { sfCreds(el.dataset.name, l); }); };
+  SF.actions.sfdel = function (el) {
+    SF.modal('<div class="confirm"><span class="cic">' + I("trash", 26) + '</span><h2 class="h2">' + t("sf.delQ", { name: esc(el.dataset.name) }) + '</h2><p class="muted">' + t("sf.delSub") + '</p><div class="row2"><button class="btn ghost" data-act="closemodal">' + t("btn.cancel") + '</button><button class="btn primary" data-act="sfdelok" data-id="' + el.dataset.id + '">' + t("sf.del") + "</button></div></div>"); };
+  SF.actions.sfdelok = function (el) { return api().del("/restaurant/staff/" + el.dataset.id).then(function () { SF.closeModal(); SF.toast(t("sf.deleted")); SF.render({ quiet: true }); }); };
+
+  SF.actions.served = function (el) { return api().post("/restaurant/orders/" + el.dataset.id + "/served").then(function () { SF.toast(t("tb.servedOk")); SF.render({ quiet: true }); }); };
+
+  /* ---------- tables in the hall: QR stickers, the guest orders without signing up ---------- */
+  function tableUrl(code) { var o = location.protocol.indexOf("http") === 0 ? location.origin : "https://tezkor.pro"; return o + "/t/" + code; }
+  function tableCard(x) {
+    return '<article class="card tbcard' + (x.active ? "" : " off") + '"><div class="tbqr">' + SF.qrSvg(tableUrl(x.code)) + '</div><div class="tbinfo"><b>' + t("tb.table", { n: esc(x.name) }) + "</b>" +
+      '<small class="muted tburl">' + esc(tableUrl(x.code).replace(/^https?:\/\//, "")) + "</small>" + (x.active ? "" : '<span class="pill p-mut">' + t("tb.offP") + "</span>") +
+      '<div class="tbacts"><button type="button" class="btn sm ghost" data-act="tbprint" data-id="' + x.id + '">' + I("download", 14) + t("tb.print") + '</button>' +
+      '<button type="button" class="iconbtn sm" data-act="tbmenu" data-id="' + x.id + '" aria-label="' + t("tb.more") + '">' + I("cog", 16) + "</button></div></div></article>";
+  }
+  R("/rest/tables", { title: "tb.nav", render: function () {
+    return api().get("/restaurant/tables").then(function (list) { SF.state.tables = list;
+      return '<section class="card sfhero"><span class="kic">' + I("grid", 22) + '</span><div class="grow"><b>' + t("tb.hT") + "</b><p>" + t("tb.hS") + "</p></div></section>" +
+        '<form class="toolbar tbadd" data-form="tbadd"><p class="muted">' + t("tb.count", { n: list.length }) + '</p><div class="tbaddin"><input name="count" type="number" min="1" max="50" value="' + (list.length ? 1 : 10) + '" aria-label="' + t("tb.howMany") + '"><button class="btn primary">' + I("plus", 18) + t("tb.addN") + "</button></div></form>" +
+        (list.length ? '<div class="toolbar"><span></span><button type="button" class="btn ghost" data-act="tbprint">' + I("download", 16) + t("tb.printAll") + "</button></div>" +
+          '<div class="tbgrid">' + list.map(tableCard).join("") + "</div>"
+          : SF.empty(SF.art("plate", 90), t("tb.emptyT"), t("tb.emptyS"))) +
+        '<section class="card tbhow"><h3>' + t("tb.howT") + "</h3><ol><li>" + t("tb.how1") + "</li><li>" + t("tb.how2") + "</li><li>" + t("tb.how3") + "</li><li>" + t("tb.how4") + "</li></ol></section>";
+    });
+  } });
+  SF.forms.tbadd = function (fd) { return api().post("/restaurant/tables", { count: +fd.count || 1 }).then(function (m) { SF.toast(t("tb.added", { n: m.length })); SF.render({ quiet: true }); }); };
+  function tbById(id) { return (SF.state.tables || []).filter(function (x) { return x.id === id; })[0]; }
+  SF.actions.tbmenu = function (el) { var x = tbById(el.dataset.id); if (!x) return;
+    SF.modal('<button class="mx" data-act="closemodal" aria-label="' + t("btn.close") + '">' + I("x", 20) + '</button><form class="stack" data-form="tbname"><h2 class="h2">' + t("tb.table", { n: esc(x.name) }) + "</h2>" +
+      '<input type="hidden" name="id" value="' + x.id + '"><label class="f">' + t("tb.nameL") + '<input name="name" maxlength="30" value="' + esc(x.name) + '" required></label><button class="btn primary block">' + t("btn.save") + "</button></form>" +
+      '<div class="stack tbmore"><button type="button" class="btn ghost block" data-act="tbtoggle" data-id="' + x.id + '">' + t(x.active ? "tb.turnOff" : "tb.turnOn") + "</button>" +
+      '<button type="button" class="btn ghost block" data-act="tbcode" data-id="' + x.id + '">' + t("tb.newCode") + '</button><p class="fine">' + t("tb.newCodeHint") + "</p>" +
+      '<button type="button" class="btn ghost block danger" data-act="tbdel" data-id="' + x.id + '">' + I("trash", 16) + t("tb.del") + "</button></div>"); };
+  SF.forms.tbname = function (fd) { return api().patch("/restaurant/tables/" + fd.id, { name: fd.name }).then(function () { SF.closeModal(); SF.render({ quiet: true }); }); };
+  SF.actions.tbtoggle = function (el) { var x = tbById(el.dataset.id); return api().patch("/restaurant/tables/" + x.id, { active: !x.active }).then(function () { SF.closeModal(); SF.render({ quiet: true }); }); };
+  SF.actions.tbcode = function (el) { return api().post("/restaurant/tables/" + el.dataset.id + "/newcode").then(function () { SF.closeModal(); SF.toast(t("tb.codeDone")); SF.render({ quiet: true }); }); };
+  SF.actions.tbdel = function (el) { return api().del("/restaurant/tables/" + el.dataset.id).then(function () { SF.closeModal(); SF.render({ quiet: true }); }); };
+  /* print: one sticker per table (A6-ish cards, 4 on an A4 page) — cut and stick on the tables */
+  SF.actions.tbprint = function (el) { var list = (SF.state.tables || []).filter(function (x) { return x.active && (!el.dataset.id || x.id === el.dataset.id); }); if (!list.length) return;
+    return api().get("/restaurant/me").then(function (r) {
+      var box = document.getElementById("tbprint") || document.body.appendChild(Object.assign(document.createElement("div"), { id: "tbprint" }));
+      box.innerHTML = list.map(function (x) { return '<div class="stk"><div class="stk-top">' + SF.mark(34) + "<b>" + esc(tx(r.name)) + '</b></div><div class="stk-t">' + t("tb.table", { n: esc(x.name) }) + '</div><div class="stk-qr">' + SF.qrSvg(tableUrl(x.code)) + '</div><div class="stk-s">' + t("tb.stk1") + "</div><small>" + t("tb.stk2") + "</small></div>"; }).join("");
+      document.body.classList.add("printing"); setTimeout(function () { window.print(); setTimeout(function () { document.body.classList.remove("printing"); }, 500); }, 150);
+    }); };
+
+  function worker() { var u = SF.state.user; return !!(u && u.staff && u.staffRole !== "manager"); }
   function ticket(o) {
     var acts = "";
-    if (o.status === "pending") acts = ((o.delivery || "platform") !== "platform" ? '<p class="lbl">' + t("dl.who") + '</p><div class="ic-dl">' + SF.dlChoice((SF.state.tDeliv || {})[o.id] || "own", "tdeliv", o.id) + "</div>" : "") + '<div class="seg" role="group" aria-label="' + t("rest.prep") + '">' + [10, 15, 20, 30, 45].map(function (m) { var on = (SF.state.prep[o.id] || 20) === m; return '<button class="' + (on ? "on" : "") + '" aria-pressed="' + on + '" data-act="prep" data-id="' + o.id + '" data-v="' + m + '">' + m + "</button>"; }).join("") + "</div>" +
+    if (o.dineIn && (o.status === "cooking" || o.status === "ready")) acts = '<button class="btn ok block" data-act="served" data-id="' + o.id + '">' + I("check", 16) + t("tb.served") + "</button>";
+    else if (o.status === "pending") acts = (!o.dineIn && (o.delivery || "platform") !== "platform" ? '<p class="lbl">' + t("dl.who") + '</p><div class="ic-dl">' + SF.dlChoice((SF.state.tDeliv || {})[o.id] || "own", "tdeliv", o.id) + "</div>" : "") + '<div class="seg" role="group" aria-label="' + t("rest.prep") + '">' + [10, 15, 20, 30, 45].map(function (m) { var on = (SF.state.prep[o.id] || 20) === m; return '<button class="' + (on ? "on" : "") + '" aria-pressed="' + on + '" data-act="prep" data-id="' + o.id + '" data-v="' + m + '">' + m + "</button>"; }).join("") + "</div>" +
       '<div class="row2"><button class="btn ghost" data-act="reject" data-id="' + o.id + '">' + t("rest.reject") + '</button><button class="btn primary" data-act="accept" data-id="' + o.id + '">' + I("check", 16) + t(o.payment.method === "transfer" ? "tr.acceptPaid" : "rest.accept") + "</button></div>";
     else if (o.status === "cooking") acts = '<button class="btn ok block" data-act="ready" data-id="' + o.id + '">' + I("bag", 16) + t("rest.markReady") + "</button>" + selfBtn(o);
     else if (o.selfDelivery) acts = '<div class="msg ok">' + I("store", 16) + t("dl.selfIs", { name: o.selfDelivery.name || t("dl.selfTitle") }) + "</div>" + (o.status === "picked_up" ? '<button class="btn ok block" data-act="selfdone" data-id="' + o.id + '">' + I("check", 16) + t("dl.delivered") + "</button>" : "");
     else acts = '<div class="msg ' + (o.status === "ready" ? "info" : "ok") + '">' + I("scooter", 16) + (o.courier ? t("rest.courierIs", { name: o.courier.name }) : t("rest.waitCourier")) + "</div>" + selfBtn(o);
-    if (o.status !== "pending") acts = dlNote(o) + acts;
+    if (o.status !== "pending" && !o.dineIn) acts = dlNote(o) + acts;
     return '<article class="ticket t-' + o.status + '"><header><b class="num">№' + o.number + "</b>" + SF.statusPill(o.status) + '<small class="muted">' + ago(o.history[o.history.length - 1].at) + "</small></header>" +
       '<ul class="items">' + o.items.map(function (it) { return '<li><b class="num">' + it.qty + "×</b><span>" + esc(tx(it.name)) + "</span></li>"; }).join("") + "</ul>" +
       (o.comment ? '<div class="note">' + I("info", 14) + esc(o.comment) + "</div>" : "") +
-      '<div class="tmeta"><span>' + I(o.payment.method === "cash" ? "cash" : "card", 14) + t("pay." + o.payment.method) + '</span><b class="num">' + money(o.subtotal) + "</b></div>" +
+      (o.dineIn ? '<div class="tcust tdine">' + I("grid", 14) + "<b>" + t("tb.table", { n: esc(o.tableName) }) + "</b>" + (o.guestName ? '<span class="grow muted">' + esc(o.guestName) + "</span>" : '<span class="grow"></span>') + '<span class="cmark new">' + t("tb.inHall") + "</span></div>" : "") +
+      (o.customer ? '<div class="tcust">' + I("user", 14) + '<b class="grow">' + esc(o.customer.name) + "</b>" + SF.custMark(o.customer) + "</div>" : "") +
+      '<div class="tmeta"><span>' + I(o.payment.method === "cash" ? "cash" : "card", 14) + (o.dineIn ? t("tb.payTable") : t("pay." + o.payment.method)) + '</span><b class="num">' + money(o.subtotal) + "</b></div>" +
       (o.payment.method === "transfer" ? '<div class="paycheck' + (o.payment.status === "review" ? " review" : "") + '"><span>' + (o.payment.status === "review" ? t("tr.restCheck", { sum: money(o.total), card: o.payment.toCard }) : t("ps." + o.payment.status)) + '</span><button type="button" class="btn sm ghost" data-act="rcpt" data-id="' + o.id + '">' + I("receipt", 14) + t("tr.receipt") + "</button></div>" : "") +
       (o.prepMin && o.status === "cooking" ? '<div class="timer"><i style="--p:' + Math.min(100, Math.round((Date.now() - o.history[o.history.length - 1].at) / (o.prepMin * 600))) + '%"></i><span class="num">' + t("rest.prepLeft", { n: Math.max(0, o.prepMin - Math.round((Date.now() - o.history[o.history.length - 1].at) / 60000)) }) + "</span></div>" : "") + acts + "</article>";
   }
@@ -121,7 +198,7 @@
     });
   } });
   SF.actions.prep = function (el) { SF.state.prep[el.dataset.id] = +el.dataset.v; SF.render({ quiet: true }); };
-  SF.actions.accept = function (el) { return api().post("/restaurant/orders/" + el.dataset.id + "/accept", { prepMin: SF.state.prep[el.dataset.id] || 20, delivery: el.closest(".ticket").querySelector(".ic-dl") ? ((SF.state.tDeliv || {})[el.dataset.id] || "own") : undefined }).then(function () { SF.toast(t("rest.accepted")); SF.render({ quiet: true }); }); };
+  SF.actions.accept = function (el) { return api().post("/restaurant/orders/" + el.dataset.id + "/accept", { prepMin: SF.state.prep[el.dataset.id] || 20, delivery: el.closest(".ticket").querySelector(".ic-dl") ? ((SF.state.tDeliv || {})[el.dataset.id] || "own") : undefined }).then(function (o) { SF.toast(t(o && o.dineIn ? "tb.accepted" : "rest.accepted")); SF.render({ quiet: true }); }); };
   SF.actions.ready = function (el) { return api().post("/restaurant/orders/" + el.dataset.id + "/ready").then(function () { SF.toast(t("rest.readyToast")); SF.render({ quiet: true }); }); };
   SF.actions.reject = function (el) {
     SF.modal('<div class="confirm"><span class="cic bad">' + I("x", 28) + '</span><h2 class="h2">' + t("rest.rejectTitle") + '</h2><form class="stack" data-form="reject" data-id="' + el.dataset.id + '"><div class="tags">' + ["tr.notReceived", "rest.r1", "rest.r2", "rest.r3"].map(function (k) { return '<button type="button" class="chip" data-act="rreason" data-v="' + esc(t(k)) + '">' + t(k) + "</button>"; }).join("") +
@@ -135,11 +212,11 @@
     return Promise.all([api().get("/restaurant/products"), api().get("/restaurant/me")]).then(function (a) {
       var list = a[0], r = a[1]; SF.state.myProducts = list; SF.state.tone = r.tone;
       var cats = SF.state.categories.filter(function (c) { return list.some(function (p) { return p.categoryId === c.id; }); });
-      return '<div class="toolbar"><p class="muted">' + t("menu.count", { n: list.length, off: list.filter(function (p) { return !p.available; }).length }) + '</p><button class="btn primary" data-act="prodnew">' + I("plus", 18) + t("menu.add") + "</button></div>" +
+      return '<div class="toolbar"><p class="muted">' + t("menu.count", { n: list.length, off: list.filter(function (p) { return !p.available; }).length }) + '</p>' + (worker() ? "" : '<button class="btn primary" data-act="prodnew">' + I("plus", 18) + t("menu.add") + "</button>") + "</div>" +
         (list.length ? cats.map(function (c) { return '<section class="msec"><h2>' + esc(tx(c.name)) + '</h2><div class="mtable">' + list.filter(function (p) { return p.categoryId === c.id; }).map(function (p) {
           return '<div class="mrowp' + (p.available ? "" : " off") + '"><span class="cim" style="--tone:' + esc(r.tone) + '">' + SF.pic(p, 48) + '</span><div class="grow"><b>' + esc(tx(p.name)) + (SF.sale(p) ? ' <span class="chip sale">−' + SF.sale(p) + "%</span>" : "") + (p.popular ? ' <span class="chip hot">' + I("fire", 12) + t("prod.hit") + "</span>" : "") + '</b><small class="muted">' + esc(tx(p.desc)) + (p.weight ? " · " + esc(p.weight) : "") + '</small></div><b class="num price">' + money(p.price) + (SF.sale(p) ? "<s>" + money(p.oldPrice) + "</s>" : "") + "</b>" +
             '<button class="switch' + (p.available ? " on" : "") + '" role="switch" aria-checked="' + p.available + '" aria-label="' + t("menu.inStock") + '" data-act="pavail" data-id="' + p.id + '"></button>' +
-            '<button class="iconbtn" data-act="prodedit" data-id="' + p.id + '" aria-label="' + t("btn.edit") + '">' + I("edit", 18) + '</button><button class="iconbtn" data-act="proddel" data-id="' + p.id + '" aria-label="' + t("btn.delete") + '">' + I("trash", 18) + "</button></div>"; }).join("") + "</div></section>"; }).join("")
+            (worker() ? "</div>" : '<button class="iconbtn" data-act="prodedit" data-id="' + p.id + '" aria-label="' + t("btn.edit") + '">' + I("edit", 18) + '</button><button class="iconbtn" data-act="proddel" data-id="' + p.id + '" aria-label="' + t("btn.delete") + '">' + I("trash", 18) + "</button></div>"); }).join("") + "</div></section>"; }).join("")
           : SF.empty("grid", t("menu.empty"), t("menu.emptySub")));
     });
   } });
@@ -190,10 +267,12 @@
   function coverBox(r) { var c = SF.state.coverDraft;
     return '<label class="upload cover' + (c ? " done" : "") + '" style="--tone:' + esc(r.tone) + '">' + (c ? '<img src="' + esc(c) + '" alt="">' + "<span>" + I("check", 16) + t("menu.photoSet") + "</span><small>" + t("tr.change") + "</small>" : I("plus", 22) + "<b>" + t("promo.cover") + "</b><small>" + t("promo.coverSub") + "</small>") +
       '<input type="file" accept="image/*" data-input="cover"></label>'; }
+  function logoBox(r) { var l = SF.state.logoDraft;
+    return '<label class="upload logoup' + (l ? " done" : "") + '" style="--tone:' + esc(r.tone) + '">' + (l ? '<img src="' + esc(l) + '" alt="">' : '<b class="lgletter">' + esc(tx(r.name).charAt(0)) + "</b>") + "<span>" + t(l ? "tr.change" : "promo.logo") + '</span><input type="file" accept="image/*" data-input="rlogo"></label>'; }
   R("/rest/promo", { title: "rest.promo", render: function () {
     return Promise.all([api().get("/restaurant/me"), api().get("/restaurant/ad"), api().get("/restaurant/products")]).then(function (a) {
       var r = a[0], ad = a[1], prods = a[2]; SF.state.promoRest = r;
-      if (SF.state.adFor !== r.id) { SF.state.adFor = r.id; SF.state.coverDraft = r.cover || null;
+      if (SF.state.adFor !== r.id) { SF.state.adFor = r.id; SF.state.coverDraft = r.cover || null; SF.state.logoDraft = r.logo || null;
         SF.state.adDraft = ad ? { title: tx(ad.title), sub: tx(ad.sub), tone: ad.tone, art: ad.art, photo: ad.photo, active: ad.active, productId: ad.productId }
           : { title: tx(r.name), sub: "", tone: TONES.indexOf(r.tone) >= 0 ? r.tone : TONES[0], art: (prods[0] || {}).kind || "plov", photo: null, active: true, productId: null }; }
       var d = adDraft(), sale = prods.filter(function (p) { return SF.sale(p); });
@@ -211,11 +290,11 @@
           '<label class="switchrow"><span>' + t("ad.show") + '</span><button type="button" class="switch' + (d.active ? " on" : "") + '" role="switch" aria-checked="' + !!d.active + '" data-act="adactive" aria-label="' + t("ad.show") + '"' + (ad && ad.blocked ? " disabled" : "") + "></button></label>" +
           '<div class="row2 adbtns">' + (ad ? '<button type="button" class="btn ghost" data-act="addel">' + I("trash", 16) + t("btn.delete") + "</button>" : "") + '<button class="btn primary">' + I("check", 16) + t(ad ? "btn.save" : "ad.publish") + "</button></div></form>" +
         '<div class="stack">' +
-          '<form class="card stack" data-form="rprofile"><h3>' + I("store", 18) + t("promo.page") + "</h3>" + '<div class="coverup">' + coverBox(r) + "</div>" +
+          '<form class="card stack" data-form="rprofile"><h3>' + I("store", 18) + t("promo.page") + "</h3>" + '<div class="coverup">' + coverBox(r) + '</div><div class="logorow"><div class="logoslot">' + logoBox(r) + '</div><p class="muted sm">' + t("promo.logoSub") + "</p></div>" +
             '<label class="f">' + t("promo.cuisine") + '<input name="cuisine" maxlength="60" required value="' + esc(tx(r.cuisine)) + '" placeholder="' + t("promo.cuisineHint") + '"></label>' +
             '<label class="f">' + t("promo.about") + '<textarea name="about" maxlength="200" rows="3" placeholder="' + t("promo.aboutHint") + '">' + esc(tx(r.about || "")) + "</textarea></label>" +
             '<button class="btn primary">' + t("btn.save") + "</button>" +
-            '<div class="f"><span>' + I("eye", 14) + t("promo.look") + '</span><div class="rcprev">' + SF.restCard(Object.assign({}, r, { cover: SF.state.coverDraft, art1: (prods[0] || {}).kind, art2: (prods[1] || {}).kind })).replace(/^<a /, '<div ').replace(/<\/a>$/, "</div>") + "</div></div></form>" +
+            '<div class="f"><span>' + I("eye", 14) + t("promo.look") + '</span><div class="rcprev">' + SF.restCard(Object.assign({}, r, { cover: SF.state.coverDraft, logo: SF.state.logoDraft, art1: (prods[0] || {}).kind, art2: (prods[1] || {}).kind })).replace(/^<a /, '<div ').replace(/<\/a>$/, "</div>") + "</div></div></form>" +
           '<section class="card stack"><h3>' + I("percent", 18) + t("promo.sale") + '</h3><p class="muted sm">' + t("promo.saleSub") + "</p>" +
             (sale.length ? sale.map(function (p) { return '<div class="topi"><span class="cim" style="--tone:' + esc(r.tone) + '">' + SF.pic(p, 40) + '</span><div class="grow"><b>' + esc(tx(p.name)) + '</b><small class="muted num"><s>' + money(p.oldPrice) + "</s> → " + money(p.price) + '</small></div><span class="chip sale">−' + SF.sale(p) + "%</span></div>"; }).join("") : "") +
             '<a class="btn ghost" href="#/rest/menu">' + I("edit", 16) + t("promo.toMenu") + "</a></section>" +
@@ -232,19 +311,20 @@
   SF.actions.adactive = function () { keepText(); adDraft().active = !adDraft().active; SF.render({ quiet: true }); };
   SF.actions.adphotodel = function () { keepText(); adDraft().photo = null; SF.render({ quiet: true }); };
   SF.inputs.adphoto = function (v, el) { keepText(); pickPhoto(el, 1200, function (d) { adDraft().photo = d; SF.render({ quiet: true }); }); };
+  SF.inputs.rlogo = function (v, el) { pickPhoto(el, 400, function (d) { SF.state.logoDraft = d; el.closest(".logoslot").innerHTML = logoBox(SF.state.promoRest); }); };
   SF.inputs.cover = function (v, el) { pickPhoto(el, 1400, function (d) { SF.state.coverDraft = d; el.closest(".coverup").innerHTML = coverBox(SF.state.promoRest); }); };
   SF.forms.adsave = function (fd) { var d = adDraft();
     return api().post("/restaurant/ad", { title: fd.title, sub: fd.sub, tone: d.tone, art: d.art, photo: d.photo || null, active: d.active, productId: d.productId }).then(function () { SF.state.adFor = null; SF.toast(t(d.active ? "ad.published" : "btn.saved")); SF.render({ quiet: true }); }); };
   SF.actions.addel = function () { return api().del("/restaurant/ad").then(function () { SF.state.adFor = null; SF.toast(t("ad.deleted"), "info"); SF.render({ quiet: true }); }); };
-  SF.forms.rprofile = function (fd) { return api().patch("/restaurant/me", { cuisine: fd.cuisine, about: fd.about, cover: SF.state.coverDraft || null }).then(function () { SF.state.adFor = null; SF.toast(t("btn.saved")); SF.render({ quiet: true }); }); };
+  SF.forms.rprofile = function (fd) { return api().patch("/restaurant/me", { cuisine: fd.cuisine, about: fd.about, cover: SF.state.coverDraft || null, logo: SF.state.logoDraft || null }).then(function () { SF.state.adFor = null; SF.toast(t("btn.saved")); SF.render({ quiet: true }); }); };
   /* ---------- Settings ---------- */
   R("/rest/settings", { title: "rest.settings", render: function () {
     return api().get("/restaurant/me").then(function (r) {
       return SF.installCard() + '<div class="two"><form class="card stack" data-form="rset"><h3>' + t("rest.hours") + '</h3><div class="grid2"><label class="f">' + t("rest.from") + '<input type="time" name="from" value="' + esc(r.hours.from) + '" required></label><label class="f">' + t("rest.to") + '<input type="time" name="to" value="' + esc(r.hours.to) + '" required></label></div>' +
         '<div class="grid2"><label class="f">' + t("rest.eta") + '<input name="eta" value="' + esc(r.eta) + '" placeholder="25–35"></label><label class="f">' + t("rest.minOrderL") + '<input name="minOrder" inputmode="numeric" value="' + r.minOrder + '"></label></div>' +
         '<label class="f">' + t("auth.phone") + '<input name="phone" inputmode="tel" value="' + esc(SF.phone(r.phone)) + '"></label><label class="f">' + t("rest.addressL") + '<input name="address" value="' + esc(tx(r.address)) + '"></label><button class="btn primary">' + t("btn.save") + "</button></form>" +
-        '<form class="card stack" data-form="rcard"><h3>' + t("tr.cardTitle") + '</h3><p class="muted sm">' + t("tr.cardSub") + '</p><label class="f">' + t("tr.cardNum") + '<input name="number" id="rc-num" inputmode="numeric" autocomplete="off" placeholder="0000 0000 0000 0000" value="' + esc(r.payCard ? r.payCard.number.replace(/(\d{4})(?=\d)/g, "$1 ") : "") + '"></label>' +
-        '<div class="grid2"><label class="f">' + t("tr.holder") + '<input name="holder" id="rc-holder" value="' + esc(r.payCard ? r.payCard.holder : "") + '"></label><label class="f">' + t("tr.bank") + '<input name="bank" id="rc-bank" placeholder="Алиф, Эсхата, Амонатбонк…" value="' + esc(r.payCard ? r.payCard.bank : "") + '"></label></div><button class="btn primary">' + t("btn.save") + "</button></form>" +
+        (SF.state.user.staff ? "" : '<form class="card stack" data-form="rcard"><h3>' + t("tr.cardTitle") + '</h3><p class="muted sm">' + t("tr.cardSub") + '</p><label class="f">' + t("tr.cardNum") + '<input name="number" id="rc-num" inputmode="numeric" autocomplete="off" placeholder="0000 0000 0000 0000" value="' + esc(r.payCard ? r.payCard.number.replace(/(\d{4})(?=\d)/g, "$1 ") : "") + '"></label>' +
+        '<div class="grid2"><label class="f">' + t("tr.holder") + '<input name="holder" id="rc-holder" value="' + esc(r.payCard ? r.payCard.holder : "") + '"></label><label class="f">' + t("tr.bank") + '<input name="bank" id="rc-bank" placeholder="Алиф, Эсхата, Амонатбонк…" value="' + esc(r.payCard ? r.payCard.bank : "") + '"></label></div><button class="btn primary">' + t("btn.save") + "</button></form>") +
         '<section class="card stack"><h3>' + t("rest.where") + '</h3><p class="muted sm">' + t("rest.whereSub") + "</p>" + SF.tmap({ key: "rloc", picker: true, center: { lat: r.lat, lng: r.lng }, zoom: 17, zone: SF.zone(r.cityId), label: t("rest.where"), onMove: function (p, fin) { SF.state.rloc = p; } }) +
         '<button class="btn primary" data-act="rloc">' + I("pin", 16) + t("rest.whereSave") + "</button></section>" + SF.pwForm() +
         subCard(r) + '<section class="card stack"><h3>' + t("rest.profile") + '</h3><div class="rprof" style="--tone:' + esc(r.tone) + '">' + SF.art("plov", 72) + "<div><b class=\"h2\">" + esc(tx(r.name)) + '</b><span class="muted">' + esc(tx(r.cuisine)) + "</span></div></div>" +
