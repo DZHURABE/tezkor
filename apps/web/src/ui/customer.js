@@ -14,11 +14,12 @@
   function restLogo(r) { return r.logo ? '<span class="rlogo"><img src="' + esc(r.logo) + '" alt="" loading="lazy"></span>' : '<span class="rlogo" style="--tone:' + esc(r.tone) + '"><b>' + esc(tx(r.name).charAt(0)) + "</b></span>"; }
   function restCard(r) {
     return '<article class="rc2' + (r.isOpenNow ? "" : " closed") + '"><a class="rhit" href="#/r/' + r.id + '" aria-label="' + esc(tx(r.name)) + '"></a>' +
-      '<div class="rcov' + (r.cover ? " hasph" : "") + '" style="--tone:' + esc(r.tone) + '">' + (r.cover ? '<img src="' + esc(r.cover) + '" alt="" loading="lazy">' : '<span class="a2">' + SF.art(r.art2 || "plate", 70) + '</span><span class="a1">' + SF.art(r.art1 || "plate", 118) + "</span>") +
-        (r.hasSale ? '<span class="chip sale rsale">' + I("percent", 12) + t("rc.sale") + "</span>" : "") + favBtn("r", r.id) +
-        '<span class="rstate ' + (r.isOpenNow ? "on" : "off") + '">' + (r.isOpenNow ? t("rc.open") : t("rest.closedUntil", { from: r.hours.from })) + "</span></div>" +
-      '<div class="rbody2">' + restLogo(r) + '<div class="grow"><div class="rrow"><b class="rname">' + esc(tx(r.name)) + "</b>" + SF.stars(r.rating) + '</div><span class="rmeta">' + esc(tx(r.cuisine)) + "</span>" +
-        '<div class="rfacts num"><span>' + I("clock", 14) + esc(r.eta) + " " + t("u.min") + "</span><span>" + I("scooter", 14) + money(r.deliveryFrom) + "</span>" + (r.minOrder ? "<span>" + t("rc.min", { sum: money(r.minOrder) }) + "</span>" : "") + "</div></div></div></article>";
+      '<div class="rcov hasph" style="--tone:' + esc(r.tone) + '">' + (restPhoto(r) ? '<img' + (r.cover ? "" : ' class="fb"') + ' src="' + esc(restPhoto(r)) + '" alt="" loading="lazy">' : '<span class="a1">' + SF.art(r.art1 || "plate", 118) + "</span>") +
+        '<span class="rchips"><span class="rstate ' + (r.isOpenNow ? "on" : "off") + '">' + I("clock", 13) + (r.isOpenNow ? t("rc.openTill", { to: r.hours.to }) : t("rest.closedUntil", { from: r.hours.from })) + "</span>" +
+        (r.hasSale ? '<span class="rsale">' + I("percent", 13) + t("rc.sale") + "</span>" : "") + "</span>" + favBtn("r", r.id) + "</div>" +
+      '<div class="rbody2">' + restLogo(r) + '<div class="grow"><div class="rrow"><b class="rname">' + esc(tx(r.name)) + "</b>" + (r.isNew ? '<span class="rnew">' + t("rc.new") + "</span>" : "") +
+        (r.rating != null ? '<span class="rrate">' + I("star", 14) + "<b>" + Number(r.rating).toFixed(1) + "</b>" + (r.ratingCount ? "<small>(" + r.ratingCount + ")</small>" : "") + "</span>" : "") + '</div><span class="rmeta">' + esc(tx(r.cuisine)) + "</span>" +
+        '<div class="rfacts num"><span>' + I("clock", 15) + esc(r.eta) + " " + t("u.min") + "</span><span>" + I("scooter", 15) + money(r.deliveryFrom) + "</span>" + (r.minOrder ? "<span>" + I("bag", 15) + t("rc.from", { sum: money(r.minOrder) }) + "</span>" : "") + "</div></div>" + I("chevR", 18) + "</div></article>";
   }
   function withArt(list, prods) { return list.map(function (r) { var ps = (prods || r.products || []).filter(function (p) { return p.restaurantId === r.id; });
     var ks = ps.filter(function (p) { return p.popular; }).concat(ps).map(function (p) { return p.kind; }); r.art1 = ks[0]; r.art2 = ks.filter(function (k) { return k !== ks[0]; })[0] || ks[1]; return r; }); }
@@ -43,7 +44,9 @@
   /* one banner, the same on the home page, in the restaurant's ad editor (preview) and in admin */
   SF.bannerHtml = function (b, tag, cls) { tag = tag || "div";
     return "<" + tag + ' class="banner' + (b.photo ? " hasph" : "") + (cls ? " " + cls : "") + '" style="--b:' + esc(b.tone) + '"' + (tag === "a" ? ' href="#' + (b.restaurantId ? "/r/" + b.restaurantId : "/") + '"' : "") + ">" +
-      (b.photo ? '<img class="bph" src="' + esc(b.photo) + '" alt="">' : "") + "<div><b>" + esc(tx(b.title)) + "</b><span>" + esc(tx(b.sub)) + "</span>" + (b.own ? '<em class="bgo">' + t("ad.go") + I("chevR", 14) + "</em>" : "") + "</div>" +
+      (b.photo ? '<img class="bph" src="' + esc(b.photo) + '" alt="">' : "") + "<div><b>" + esc(tx(b.title)) + "</b>" + (b.place ? '<span class="bplace">' + I("pin", 13) + esc(tx(b.place)) + "</span>" : "") + "<span>" + esc(tx(b.sub)) + "</span>" +
+        (b.own ? '<em class="bgo">' + t("ad.go") + I("chevR", 14) + "</em>" : b.restaurantId ? '<em class="bgo">' + t("h3.order") + I("chevR", 14) + "</em>" : "") + "</div>" +
+        (b.restaurantId && SF.qrSvg && cls !== "small" ? '<span class="bqr" title="' + t("h3.menuQr") + '">' + SF.qrSvg((location.protocol.indexOf("http") === 0 ? location.origin : "https://tezkor.pro") + "/#/r/" + b.restaurantId, { level: "M", pad: 2 }) + "<small>" + t("h3.menuQr") + "</small></span>" : "") +
       (b.photo ? "" : '<span class="bart">' + SF.art(b.art, cls === "small" ? 70 : 110) + "</span>") + '<i class="ornament" aria-hidden="true"></i></' + tag + ">"; };
 
   /* ---------- Home ---------- */
@@ -55,7 +58,12 @@
   function sect(title, sub, more) { return '<div class="sect2"><div><h2>' + title + "</h2>" + (sub ? '<span class="muted">' + sub + "</span>" : "") + "</div>" + (more || "") + "</div>"; }
   function rowRests(list) { return '<div class="hscroll rrowscroll">' + list.map(restCard).join("") + "</div>"; }
   function rowProds(list) { return '<div class="hscroll">' + list.map(function (p) { return prodCard(p, true); }).join("") + "</div>"; }
-  function catTile(c, on, href) { return '<a class="ctile' + (on ? " on" : "") + '" href="' + href + '"' + (on ? ' aria-current="true"' : "") + '><span class="cimg' + (c && c.photo ? " hasph" : "") + '">' + (c ? (c.photo ? '<img src="' + esc(c.photo) + '" alt="" loading="lazy">' : SF.art(c.icon, 46)) : I("grid", 24)) + "</span><span>" + (c ? esc(tx(c.name)) : t("home.all")) + "</span></a>"; }
+  /* default photos for the main categories until the admin uploads his own */
+  var CAT_PH = { k1: "plov", k2: "shashlik", k3: "burger", k4: "pizza", k9: "drinks", k8: "drinks" };
+  function catPhoto(c) { return SF.PHOTO && CAT_PH[c.id] ? SF.PHOTO[CAT_PH[c.id]] : null; }
+  var KIND_PH = { plov: "bplov", qurutob: "plov", lagman: "plov", mantu: "plov", soup: "plov", samsa: "plov", bread: "plov", plate: "bplov", shashlik: "shashlik", kebab: "shashlik", burger: "burger", fries: "burger", shawarma: "burger", pizza: "pizza", drink: "drinks", juice: "drinks", tea: "drinks", coffee: "drinks", dessert: "drinks", cake: "drinks", icecream: "drinks", ayran: "drinks" };
+  function restPhoto(r) { return r.cover || (SF.PHOTO ? SF.PHOTO[KIND_PH[r.art1] || "bplov"] : null); }
+  function catTile(c, on, href) { return '<a class="ctile' + (on ? " on" : "") + '" href="' + href + '"' + (on ? ' aria-current="true"' : "") + '><span class="cimg' + (c && (c.photo || catPhoto(c)) ? " hasph" : "") + '">' + (c ? (c.photo || catPhoto(c) ? '<img src="' + esc(c.photo || catPhoto(c)) + '" alt="" loading="lazy">' : SF.art(c.icon, 46)) : I("grid", 24)) + "</span><span>" + (c ? esc(tx(c.name)) : t("home.all")) + "</span></a>"; }
   SF.catRow = function (cur, base) { return '<nav class="ctiles" aria-label="' + t("home.cats") + '">' + catTile(null, !cur, base) + (SF.state.categories || []).map(function (c) { return catTile(c, cur === c.id, base + (base.indexOf("?") >= 0 ? "&" : "?") + "cat=" + c.id); }).join("") + "</nav>"; };
   /* what to eat now: breakfast in the morning, lunch at midday, dinner in the evening, something light at night (local time) */
   SF.mealSlot = function (h) { h = h == null ? new Date().getHours() : h; return h >= 5 && h < 11 ? "b" : h >= 11 && h < 16 ? "l" : h >= 16 && h < 22 ? "d" : "n"; };
@@ -78,12 +86,20 @@
         var u = SF.state.user, hour = new Date().getHours(), greet = hour < 12 ? "home.morning" : hour < 18 ? "home.day" : "home.evening", pub = SF.state.pub || {};
         var cityN = tx(((SF.state.cities || []).filter(function (c) { return c.id === SF.state.cityId; })[0] || {}).name), ad0 = u && (u.addresses || [])[0];
         var all = []; full.forEach(function (r) { (r.products || []).forEach(function (x) { if (x.available) all.push(Object.assign({}, x, { restaurant: { id: r.id, name: r.name, tone: r.tone } })); }); }); remember(all);
-        var top = '<section class="hello"><div class="grow"><p class="eyebrow">' + t(greet) + (u ? ", " + esc(u.name.split(" ")[0]) : "") + '</p><h1 class="h1">' + t("home.title") + "</h1></div></section>" +
-          '<button class="addrbar" data-act="addrpick"><span class="apin">' + I("pin", 18) + '</span><span class="grow"><small>' + t("home.deliverTo") + "</small><b>" + esc(ad0 ? (ad0.text || t("addr." + (ad0.kind || "other"))) + " · " + cityN : cityN) + "</b></span>" + I("chevD", 16) + "</button>" +
-          '<form class="bigsearch" data-form="search" role="search">' + I("search", 20) + '<input name="q" placeholder="' + t("home.search") + '" aria-label="' + t("home.search") + '" enterkeyhint="search"><button class="btn primary">' + t("btn.find") + "</button></form>";
-        var ban = banners.length ? '<section class="banners" id="banners" aria-label="' + t("home.offers") + '">' + banners.map(function (b) { return SF.bannerHtml(b, "a"); }).join("") + "</section>" + (banners.length > 1 ? '<div class="bdots" aria-hidden="true">' + banners.map(function (b, i) { return '<i class="' + (i ? "" : "on") + '"></i>'; }).join("") + "</div>" : "") : "";
+        /* hero: greeting + big title over a food photo, three promises; then a glass panel with the address, «on the map» and search */
+        var top = '<section class="hero3"><div class="h3bg" style="background-image:url(' + SF.PHOTO.hero + ')" aria-hidden="true"></div><div class="h3in"><p class="h3eye">' + t(greet) + (u ? ", " + esc(u.name.split(" ")[0]) : "") + " · " + t("h3.eye") + "</p>" +
+            '<h1 class="h3title">' + t("h3.t1") + " <em>" + t("h3.t2") + "</em></h1>" +
+            '<div class="h3feat"><span>' + I("scooter", 18) + t("h3.f1") + "</span><span>" + I("shield", 18) + t("h3.f2") + "</span><span>" + I("heart", 18) + t("h3.f3") + "</span></div></div></section>" +
+          '<section class="gpanel"><div class="gprow"><button class="addrbar" data-act="addrpick"><span class="apin">' + I("pin", 18) + '</span><span class="grow"><small>' + t("home.deliverTo") + "</small><b>" + esc(ad0 ? (ad0.text || t("addr." + (ad0.kind || "other"))) + " · " + cityN : cityN) + "</b></span>" + I("chevD", 16) + "</button>" +
+            '<button type="button" class="onmap" data-act="onmap">' + I("map", 18) + "<span>" + t("h3.map") + "</span></button></div>" +
+          '<form class="bigsearch" data-form="search" role="search">' + I("search", 20) + '<input name="q" placeholder="' + t("home.search") + '" aria-label="' + t("home.search") + '" enterkeyhint="search"><button class="btn primary">' + t("btn.find") + "</button></form></section>";
+        /* ads: restaurant banners (swipe, auto-play) + a card about delivery from the real settings */
+        var etas = full.filter(function (r) { return r.isOpenNow; }).map(etaMin).filter(function (x) { return x > 0; }), eLo = etas.length ? Math.min.apply(null, etas) : 30, eHi = etas.length ? Math.max.apply(null, etas) + 15 : 45;
+        var dcard = '<a class="banner dcard" href="#/" data-act="toall"><div><b>' + t("h3.fastT") + '</b><span class="dfrom">' + t("h3.from", { sum: money(pub.deliveryMin || 0) }) + "</span><ul><li>" + I("clock", 14) + eLo + "–" + eHi + " " + t("u.min") + "</li><li>" + I("shield", 14) + t("h3.safe") + "</li><li>" + I("pin", 14) + t("h3.city") + '</li></ul></div><img class="dph" src="' + SF.PHOTO.courier + '" alt=""></a>';
+        var slides = banners.map(function (b) { return SF.bannerHtml(b, "a"); }).concat([dcard]);
+        var ban = '<section class="banners b3" id="banners" aria-label="' + t("home.offers") + '">' + slides.join("") + "</section>" + (slides.length > 1 ? '<div class="bdots" aria-hidden="true">' + slides.map(function (b, i) { return '<i class="' + (i ? "" : "on") + '"></i>'; }).join("") + "</div>" : "");
         var cats = SF.catRow(cat, "#/");
-        if (!rests.length && !cat) return top + ban + cats + '<section class="emptycity">' + SF.art("scooter", 120) + "<h2>" + t("ec.title", { city: esc(cityN) }) + "</h2><p>" + t("ec.sub") + '</p><div class="row2"><button class="btn primary" data-act="city">' + I("city", 16) + t("ec.city") + '</button><a class="btn ghost" href="#/login">' + I("store", 16) + t("ec.partner") + "</a></div></section>";
+        if (!rests.length && !cat) return top + cats + ban + '<section class="emptycity">' + SF.art("scooter", 120) + "<h2>" + t("ec.title", { city: esc(cityN) }) + "</h2><p>" + t("ec.sub") + '</p><div class="row2"><button class="btn primary" data-act="city">' + I("city", 16) + t("ec.city") + '</button><a class="btn ghost" href="#/login">' + I("store", 16) + t("ec.partner") + "</a></div></section>";
         if (cat) { var cp = all.filter(function (x) { return x.categoryId === cat; }), cn = tx(((SF.state.categories || []).filter(function (c) { return c.id === cat; })[0] || {}).name);
           return top + cats + (cp.length ? sect(cn, t("cat.dishes", { n: cp.length })) + '<div class="pgrid">' + cp.map(function (x) { return prodCard(x, true); }).join("") + "</div>" : "") +
             (full.length ? sect(t("home.restaurants"), t("cat.rests", { n: full.length })) + '<div class="rgrid2">' + sortRests(full, so).map(restCard).join("") + "</div>" : SF.empty(SF.art("plate", 90), t("cat.none"), t("cat.noneSub"), '<a class="btn" href="#/">' + t("home.all") + "</a>")); }
@@ -92,7 +108,7 @@
         var popIds = pop.map(function (x) { return x.id; }), favR = (u && u.favs && u.favs.r) || [];
         var rec = all.filter(function (x) { return popIds.indexOf(x.id) < 0 && (favR.indexOf(x.restaurantId) >= 0 || x.popular); }).sort(function (a, b) { return (favR.indexOf(b.restaurantId) >= 0) - (favR.indexOf(a.restaurantId) >= 0); }).slice(0, 10);
         var list = sortRests(filterRests(full, f), so), slot = SF.mealSlot(), forNow = mealPicks(all, full, slot);
-        return top + ban + cats +
+        return top + cats + ban +
           (forNow.length >= 3 ? sect(t("ml.t." + slot), t("ml.s." + slot)) + rowProds(forNow) : "") +
           (sale.length ? sect(t("hs.sale"), t("hs.saleSub")) + rowProds(sale) : "") +
           (popR.length > 1 ? sect(t("hs.popRest")) + rowRests(popR) : "") +
@@ -110,6 +126,13 @@
   SF.actions.rfilter = function (el) { SF.state.rf = el.dataset.v; SF.render({ quiet: true }); };
   SF.inputs.rsort = function (v) { SF.state.rs = v; SF.render({ quiet: true }); };
   SF.actions.addrpick = function () { if (SF.state.user && SF.state.user.role === "customer") SF.go("/addresses"); else SF.actions.city(); };
+  /* banners slide by themselves every 5 s; a finger on them pauses it */
+  SF.after.push(function () { var b = document.getElementById("banners"); clearInterval(SF._bauto); if (!b || b.children.length < 2) return; var hold = 0;
+    b.addEventListener("pointerdown", function () { hold = Date.now(); }); b.addEventListener("touchstart", function () { hold = Date.now(); }, { passive: true });
+    SF._bauto = setInterval(function () { if (!document.body.contains(b)) { clearInterval(SF._bauto); return; } if (Date.now() - hold < 7000 || document.hidden) return;
+      var w = b.firstElementChild.getBoundingClientRect().width + 12, n = Math.round(b.scrollLeft / w) + 1; if (n * w > b.scrollWidth - b.clientWidth + 5) n = 0; b.scrollTo({ left: n * w, behavior: "smooth" }); }, 5000); });
+  SF.actions.toall = function () { var el = document.getElementById("allrests"); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); };
+  SF.actions.onmap = function () { var u = SF.state.user; if (u && u.role === "customer") SF.go("/addresses/new"); else { SF.state.after = "/addresses/new"; SF.go("/login"); } };
   SF.after.push(function () { var b = document.getElementById("banners"), d = document.querySelector(".bdots"); if (!b || !d) return;
     b.onscroll = function () { var w = b.firstElementChild ? b.firstElementChild.getBoundingClientRect().width + 12 : 1, i = Math.round(b.scrollLeft / w);
       Array.prototype.forEach.call(d.children, function (x, k) { x.classList.toggle("on", k === i); }); }; });

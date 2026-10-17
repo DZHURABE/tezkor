@@ -2,7 +2,7 @@
    dist/index.html — one self-contained page (online demo: runs the API inside the browser)
    dist/app.html   — the same app for the real server, plus "install as an app" (PWA): manifest, icons, service worker */
 import fs from "fs";
-const order = ["core/rules.js","core/seed.js","core/server.js","core/client.js","ui/kit.js","ui/qr.js","ui/i18n.js","ui/map.js","ui/shell.js","ui/customer.js","ui/table.js","ui/auth.js","ui/verify.js","ui/restaurant.js","ui/courier.js","ui/admin.js","ui/pwa.js","ui/alarm.js","ui/app.js"];
+const order = ["core/rules.js","core/seed.js","core/server.js","core/client.js","ui/kit.js","ui/photos.js","ui/qr.js","ui/i18n.js","ui/map.js","ui/shell.js","ui/customer.js","ui/table.js","ui/auth.js","ui/verify.js","ui/restaurant.js","ui/courier.js","ui/admin.js","ui/pwa.js","ui/alarm.js","ui/app.js"];
 const NAME = "Тезкор", VERSION = new Date().toISOString().replace(/\D/g, "").slice(0, 14);
 const css = fs.readFileSync("src/styles.css", "utf8");
 const js = order.map(f => `/* ==== ${f} ==== */\n` + fs.readFileSync("src/" + f, "utf8")).join("\n");

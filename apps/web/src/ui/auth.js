@@ -8,8 +8,11 @@
       '</div><p class="fine">' + t("auth.demoPass") + "</p></div>";
   }
   function layout(form) {
-    return '<div class="auth"><section class="authart"><div class="authbrand">' + SF.logo() + '</div><h1 class="display">' + t("auth.hero") + "</h1><p>" + t("auth.heroSub") + '</p><div class="authpics">' + ["plov", "qurutob", "samsa", "shashlik", "burger", "dessert"].map(function (k, i) { return '<span style="--d:' + i + '">' + SF.art(k, 88) + "</span>"; }).join("") + '</div><i class="ornament" aria-hidden="true"></i></section>' +
-      '<section class="authform"><div class="authtop"><a href="#/" class="link">' + I("chevL", 16) + t("auth.toShop") + "</a>" + SF.langSel() + "</div>" + form + "</section></div>";
+    /* modern sign-in: a living background (slow colour waves + floating dishes) and a frosted-glass card */
+    var arts = ["plov", "pizza", "samsa", "burger", "shashlik", "dessert", "sushi", "tea", "lagman", "shawarma", "mantu", "juice"];
+    return '<div class="auth2"><div class="abg" aria-hidden="true"><i class="blob bl1"></i><i class="blob bl2"></i><i class="blob bl3"></i>' +
+      arts.map(function (k, i) { return '<span class="fly" style="--i:' + i + ";--x:" + ((i * 37 + 7) % 92) + "%;--s:" + (44 + (i % 4) * 14) + 'px">' + SF.art(k, 64) + "</span>"; }).join("") + "</div>" +
+      '<div class="aglass"><div class="authtop"><a href="#/" class="link">' + I("chevL", 16) + t("auth.toShop") + "</a>" + SF.langSel() + '</div><div class="abrand">' + SF.mark(56) + '<div><b>' + esc(SF.brand()) + "</b><small>" + t("auth.heroSub") + "</small></div></div>" + form + "</div></div>";
   }
   SF.route("/login", { guest: true, shell: SF.shells.bare, title: "auth.login", render: function () {
     return layout('<form class="stack" data-form="login"><h2 class="h1">' + t("auth.welcome") + '</h2><p class="muted">' + t("auth.loginSub") + "</p>" +

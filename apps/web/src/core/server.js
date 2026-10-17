@@ -334,7 +334,9 @@
     route("GET", "/cities", null, function () { return db.cities.filter(function (c) { return c.active; }); });
     route("GET", "/categories", null, function () { return db.categories.filter(function (c) { return c.active; }).sort(function (a, b) { return a.sort - b.sort; }); });
     route("GET", "/banners", null, function () { return db.banners.filter(function (b) { if (!b.active || b.blocked) return false; if (!b.restaurantId) return true; var r = find(db.restaurants, b.restaurantId); return r && orderable(r); })
-      .sort(function (a, b) { return (b.own ? 1 : 0) - (a.own ? 1 : 0) || (b.updatedAt || 0) - (a.updatedAt || 0); }); });
+      .sort(function (a, b) { return (b.own ? 1 : 0) - (a.own ? 1 : 0) || (b.updatedAt || 0) - (a.updatedAt || 0); })
+      /* a restaurant's ad shows its town (and its real menu link for the QR code) */
+      .map(function (b) { var r = b.restaurantId && find(db.restaurants, b.restaurantId); return r ? Object.assign({}, b, { place: (cityOf(r.cityId) || {}).name || null, restName: r.name }) : b; }); });
     route("GET", "/settings/public", null, function () { var s = db.settings; return { deliveryBase: s.deliveryBase, deliveryPerKm: s.deliveryPerKm, deliveryMin: s.deliveryMin, currency: s.currency, defaultCityId: s.defaultCityId, supportPhone: s.supportPhone, courierPct: s.courierPct, zoneKm: s.zoneKm || 5, handoffMin: setting("handoffMin"), verify: { channels: vChannels().map(function (c) { return { id: c.id, kind: c.kind }; }), required: verifyRequired() }, apk: !!(opts.apkAvailable && opts.apkAvailable()), cardEnabled: cardOn(), cashEnabled: payOn("cash"), transferEnabled: payOn("transfer"), demo: !PROD }; });
     route("GET", "/restaurants", null, function (req, b, q) {
       var list = db.restaurants.filter(function (r) { return orderable(r) && (!q.cityId || r.cityId === q.cityId); });
@@ -797,6 +799,8 @@
       if (b.vehicle != null && ["scooter", "bike", "car", "foot"].indexOf(b.vehicle) >= 0) u.courier.vehicle = b.vehicle;
       if (b.carNumber != null) u.courier.carNumber = str(b.carNumber, 20).toUpperCase() || null; if (b.passport != null) u.courier.passport = str(b.passport, 30).toUpperCase() || null;
       if (b.cityId != null) { if (!find(db.cities, b.cityId)) E(400, "BAD_CITY"); u.cityId = b.cityId; }
+      /* attach to one restaurant (its own courier) or back to all Тезкор orders */
+      if (b.restaurantId !== undefined) { if (b.restaurantId && !find(db.restaurants, b.restaurantId)) E(400, "BAD_RESTAURANT"); if (activeOf(u.id)) E(409, "HAS_ACTIVE_ORDER"); u.courier.restaurantId = b.restaurantId || null; }
       save(); return pubUser(u); });
     route("POST", "/admin/couriers", ["admin"], function (req, b) { var rr = b.restaurantId ? find(db.restaurants, b.restaurantId) : null; if (b.restaurantId && !rr) E(400, "BAD_RESTAURANT");
       var nc = newCourier(b, rr ? cityOf(rr.cityId) : (find(db.cities, b.cityId) || db.cities[0]), rr ? rr.id : null); save(); return Object.assign(pubUser(nc.user), { login: nc.login }); });

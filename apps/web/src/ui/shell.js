@@ -3,7 +3,7 @@
   var t = SF.t, esc = SF.esc, I = SF.icon;
 
   function langSel() {
-    return '<label class="lang"><span class="sr">' + t("profile.lang") + '</span>' + I("globe", 16) + '<select data-input="lang" aria-label="' + t("profile.lang") + '">' +
+    return '<label class="lang"><span class="sr">' + t("profile.lang") + '</span><span class="flag" aria-hidden="true">' + ({ tg: "🇹🇯", ru: "🇷🇺", en: "🇬🇧" }[SF.state.lang] || "🌐") + '</span><select data-input="lang" aria-label="' + t("profile.lang") + '">' +
       [["tg", "Тоҷ"], ["ru", "Рус"], ["en", "Eng"]].map(function (l) { return '<option value="' + l[0] + '"' + (SF.state.lang === l[0] ? " selected" : "") + ">" + l[1] + "</option>"; }).join("") + "</select></label>";
   }
   function bell() { if (!SF.state.user) return ""; var n = (SF.state.notes || []).length;
@@ -31,9 +31,9 @@
 
   /* partner dashboards (restaurant, admin) */
   SF.panelNav = {
-    restaurant: [["/rest", "chart", "rest.dash"], ["/rest/orders", "receipt", "rest.orders"], ["/rest/sales", "wallet", "sl.nav"], ["/rest/me", "user", "my.nav"], ["/rest/menu", "grid", "rest.menu"], ["/rest/promo", "gift", "rest.promo"], ["/rest/tables", "grid", "tb.nav"], ["/rest/couriers", "scooter", "dl.couriers"], ["/rest/history", "list", "rest.history"], ["/rest/staff", "users", "sf.nav"], ["/rest/settings", "store", "rest.settings"]],
+    restaurant: [["/rest", "chart", "rest.dash"], ["/rest/orders", "receipt", "rest.orders"], ["/rest/sales", "wallet", "sl.nav"], ["/rest/me", "user", "my.nav"], ["/rest/menu", "grid", "rest.menu"], ["/rest/promo", "gift", "rest.promo"], ["/rest/tables", "grid", "tb.nav"], ["/rest/history", "list", "rest.history"], ["/rest/staff", "users", "sf.nav"], ["/rest/settings", "store", "rest.settings"]],
     admin: [["/admin", "chart", "adm.dash"], ["/admin/orders", "receipt", "adm.orders"], ["/admin/restaurants", "store", "adm.restaurants"], ["/admin/couriers", "scooter", "adm.couriers"], ["/admin/users", "users", "adm.users"],
-      ["/admin/products", "grid", "adm.products"], ["/admin/categories", "tag", "adm.categories"], ["/admin/payments", "card", "adm.payments"], ["/admin/promos", "percent", "adm.promos"], ["/admin/banners", "gift", "adm.banners"], ["/admin/cities", "city", "adm.cities"], ["/admin/stats", "bolt", "adm.stats"], ["/admin/settings", "cog", "adm.settings"]]
+      ["/admin/banners", "gift", "adm.banners"], ["/admin/promos", "percent", "adm.promos"], ["/admin/cities", "city", "adm.cities"], ["/admin/settings", "cog", "adm.settings"]]
   };
   SF.shells.panel = function (html, r) {
     /* a worker of the restaurant: orders, menu (in stock / out of stock), history. A branch manager sees everything. */
