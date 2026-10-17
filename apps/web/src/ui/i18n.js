@@ -94,7 +94,7 @@ SF.I18N = {};
   K("track.help", "Ёрӣ лозим аст?", "Нужна помощь?", "Need help?"); K("track.callRest", "Занг ба ошхона", "Позвонить в ресторан", "Call the restaurant"); K("profile.demo", "Демо: нақши дигар", "Демо: другая роль", "Demo: switch role");
   K("brand.sub", "расонидани тез", "быстрая доставка", "fast delivery");
   K("pw.title", "Ивази парол", "Сменить пароль", "Change password"); K("pw.old", "Пароли ҳозира", "Текущий пароль", "Current password"); K("pw.new", "Пароли нав (ақаллан 6 аломат)", "Новый пароль (минимум 6 символов)", "New password (at least 6 characters)"); K("pw.save", "Иваз кардан", "Сменить", "Change"); K("pw.done", "Парол иваз шуд", "Пароль изменён", "Password changed");
-  K("rest.where", "Ҷои ошхона дар харита", "Ресторан на карте", "Restaurant on the map"); K("rest.whereSub", "Харитаро кашед, то нишона рӯи дари ошхона истад. Курйерҳо ба ҳамин ҷо меоянд.", "Двигайте карту, чтобы метка стояла у входа. Курьеры приедут сюда.", "Move the map so the pin sits on your entrance. Couriers come here."); K("rest.whereSave", "Ҷойро нигоҳ доштан", "Сохранить место", "Save location"); K("rest.whereDone", "Ҷои ошхона нигоҳ дошта шуд", "Место сохранено", "Location saved");
+  K("rest.where", "Ҷои ошхона дар харита", "Ресторан на карте", "Restaurant on the map"); K("rest.whereSub", "Ҷое, ки админ гузоштааст, ва минтақаи расонидан", "Место, указанное админом, и зона доставки", "The place set by the admin and the delivery area"); K("rest.whereSave", "Ҷойро нигоҳ доштан", "Сохранить место", "Save location"); K("rest.whereDone", "Ҷои ошхона нигоҳ дошта шуд", "Место сохранено", "Location saved");
   K("adm.credsTitle", "Маълумоти воридшавӣ", "Данные для входа", "Login details"); K("adm.credsSub", "Инро ба {name} диҳед. Парол танҳо ҳозир нишон дода мешавад.", "Передайте это: {name}. Пароль показывается только сейчас.", "Give this to {name}. The password is shown only now."); K("adm.credsCopy", "Нусха кардан", "Скопировать", "Copy"); K("adm.credsNote", "Баъди воридшавӣ паролро дар танзимот иваз кунанд.", "После входа пусть сменят пароль в настройках.", "Ask them to change the password in settings after logging in."); K("adm.newPass", "Пароли нав", "Новый пароль", "New password");
   K("rest.new", "Нав", "Новый", "New");
   K("pay.transfer", "Интиқол ба корти ошхона", "Перевод на карту ресторана", "Transfer to the restaurant's card"); K("pay.transferSub", "Пеш аз фармоиш, бо чек", "Заранее, с чеком", "Before ordering, with a receipt");
@@ -244,6 +244,7 @@ SF.I18N = {};
     BAD_IMAGE: ["Ин акс нест", "Это не фото", "This is not a photo"], IMAGE_TOO_LARGE: ["Акс хеле калон аст", "Фото слишком большое", "The photo is too large"],
     OLD_PRICE_LOW: ["Нархи пештара бояд аз нархи нав зиёд бошад", "Старая цена должна быть больше новой", "The old price must be higher than the new one"],
     OUT_OF_AREA: ["Ин суроға берун аз минтақаи расонидан аст", "Этот адрес вне зоны доставки", "This address is outside the delivery area"], BAD_ZONE: ["Минтақа нодуруст кашида шуд", "Зона нарисована неверно", "The area is drawn wrong"],
+    PLACE_BY_ADMIN: ["Ҷойро танҳо админ иваз мекунад", "Место меняет только админ", "Only the admin can move the place"],
     MAIN_ADMIN_ONLY: ["Инро танҳо админи асосӣ карда метавонад", "Это может только главный админ", "Only the main admin can do this"], ADMIN_LIMIT: ["Ҳадди аксар {max} админ", "Не больше {max} админов", "Up to {max} admins"],
     BAD_TEMPLATE: ["Чунин меню нест", "Такого шаблона нет", "No such template"],
     MANAGER_ONLY: ["Инро танҳо соҳиб ё мудири филиал карда метавонад", "Это может только владелец или управляющий", "Only the owner or branch manager can do this"],
@@ -409,7 +410,7 @@ SF.I18N = {};
   K("zn.need", "Нуқтаҳо: {n} — ақаллан 3 лозим", "Точек: {n} — нужно минимум 3", "Points: {n} — at least 3 needed"); K("zn.ok", "{n} нуқта — минтақа тайёр", "{n} точек — зона готова", "{n} points — area ready");
   K("zn.saved", "Минтақа захира шуд", "Зона сохранена", "Area saved"); K("zn.circle", "Минтақаро нест кардан (доираи {km} км)", "Убрать зону (круг {km} км)", "Remove the area (circle {km} km)");
   K("zn.nowCircle", "Ҳоло: доираи {km} км аз маркази шаҳр", "Сейчас: круг {km} км от центра", "Now: a {km} km circle around the centre");
-  K("zn.rdraw", "Минтақаи расонидани ошхона", "Зона доставки заведения", "This restaurant's delivery area"); K("zn.redit", "Минтақаи ошхона · таҳрир", "Зона заведения · изменить", "Restaurant area · edit");
+  K("zn.rdraw", "Ҷой ва минтақаи ошхона", "Место и зона заведения", "Place and delivery area"); K("zn.redit", "Ҷой ва минтақаи ошхона", "Место и зона заведения", "Place and delivery area");
   K("zn.rhow", "Минтақаеро кашед, ки ин ошхона то он ҷо мерасонад: кунҷҳоро бо навбат пахш кунед. Мизоҷ берун аз он аз ин ошхона фармоиш дода наметавонад.", "Нарисуйте, докуда доставляет это заведение: нажимайте углы по очереди. Вне зоны клиент не сможет заказать отсюда.", "Draw how far this restaurant delivers: tap the corners in turn. Outside it customers cannot order from here.");
   K("zn.roff", "Минтақаи ошхонаро нест кардан (минтақаи шаҳр амал мекунад)", "Убрать зону заведения (будет зона города)", "Remove the restaurant's area (the town's area applies)");
   K("zn.rnowCity", "Ҳоло: минтақаи шаҳр", "Сейчас: зона города", "Now: the town's area");
@@ -449,6 +450,7 @@ SF.I18N = {};
   K("nr.create", "Сохтани ошхона ва додани дастрасӣ", "Создать и дать доступ", "Create and give access");
   K("cr.carNum", "Рақами мошин / мотосикл", "Номер машины / мото", "Car / moto number"); K("cr.passport", "Шиноснома (силсила ва рақам)", "Паспорт (серия и номер)", "Passport (series and number)");
   K("cr.passportHint", "Танҳо админ мебинад.", "Видит только админ.", "Only the admin sees it.");
+  K("rest.placeAdmin", "Ҷойи ошхона ва минтақаи расониданро админи Тезкор муайян мекунад. Агар нодуруст бошад — ба админ занг занед.", "Место заведения и зону доставки задаёт админ Тезкор. Если неверно — позвоните админу.", "The restaurant's place and delivery area are set by the Tezkor admin. If wrong, call the admin.");
   K("tb.nav", "Мизҳо · QR", "Столы · QR", "Tables · QR"); K("tb.title", "Фармоиш аз миз", "Заказ со стола", "Order from the table");
   K("tb.table", "Мизи {n}", "Стол {n}", "Table {n}"); K("tb.inHall", "дар толор", "в зале", "in the hall");
   K("tb.accepted", "Қабул шуд — пухтанро сар кунед", "Принят — готовьте", "Accepted — start cooking"); K("tb.payTable", "Пардохт дар миз", "Оплата за столом", "Pay at the table");

@@ -329,11 +329,13 @@
   /* ---------- delivery area: the admin taps the corners of the area on the map ---------- */
   /* one editor for both: a town's area and a restaurant's own area */
   function zoneEditor(o) {
-    var Z = SF.state.zoneEdit; if (!Z || Z.key !== o.key) Z = SF.state.zoneEdit = { key: o.key, url: o.url, back: o.back, pts: (o.zone || []).map(function (x) { return { lat: x.lat, lng: x.lng }; }) };
-    var has = o.zone && o.zone.length > 2;
+    var Z = SF.state.zoneEdit; if (!Z || Z.key !== o.key) Z = SF.state.zoneEdit = { key: o.key, url: o.url, pinUrl: o.pinUrl, back: o.back, mode: "zone", pin: o.pinUrl ? { lat: o.center.lat, lng: o.center.lng } : null, moved: false, marks: [], pts: (o.zone || []).map(function (x) { return { lat: x.lat, lng: x.lng }; }) };
+    var has = o.zone && o.zone.length > 2; Z.marks.length = 0; Z.marks.push(Z.pin ? { lat: Z.pin.lat, lng: Z.pin.lng, type: "rest", label: o.mark } : { lat: o.center.lat, lng: o.center.lng, type: "rest", label: o.mark });
     return '<a class="backlink" href="#' + o.back + '">' + I("chevL", 18) + esc(o.backLabel) + '</a><section class="card stack"><h3>' + t("zn.title") + " · " + esc(o.name) + '</h3><p class="fine">' + t(o.how) + "</p>" +
-      '<div class="zmap">' + SF.tmap({ key: o.key, center: o.center, zoom: 14, free: true, label: t("zn.title"), markers: [{ lat: o.center.lat, lng: o.center.lng, type: "rest", label: o.mark }], edit: function () { return SF.state.zoneEdit ? SF.state.zoneEdit.pts : []; },
-        onTap: function (pt) { var z = SF.state.zoneEdit; if (!z || z.pts.length >= 200) return; z.pts.push(pt); zcount(); } }) + "</div>" +
+      /* a restaurant: two modes — move its place («R»), or draw its area */
+      (o.pinUrl ? '<div class="seg nrmode" role="group">' + [["pin", "pin", "nr.modePin"], ["zone", "edit", "nr.modeZone"]].map(function (m) { return '<button type="button" class="' + (Z.mode === m[0] ? "on" : "") + '" aria-pressed="' + (Z.mode === m[0]) + '" data-act="zmode" data-v="' + m[0] + '">' + I(m[1], 16) + " " + t(m[2]) + "</button>"; }).join("") + '</div><p class="fine">' + t(Z.mode === "pin" ? "nr.pinHow" : "nr.zoneHow") + "</p>" : "") +
+      '<div class="zmap">' + SF.tmap({ key: o.key, center: o.center, zoom: 14, free: true, label: t("zn.title"), markers: Z.marks, edit: function () { return SF.state.zoneEdit ? SF.state.zoneEdit.pts : []; },
+        onTap: function (pt) { var z = SF.state.zoneEdit; if (!z) return; if (z.mode === "pin" && z.pinUrl) { z.pin = pt; z.moved = true; z.marks.length = 0; z.marks.push({ lat: pt.lat, lng: pt.lng, type: "rest", label: o.mark }); return; } if (z.pts.length >= 200) return; z.pts.push(pt); zcount(); } }) + "</div>" +
       '<p class="zcount" id="zcount"></p>' +
       '<div class="zbtns"><button type="button" class="btn ghost" data-act="zundo">' + I("chevL", 16) + t("zn.undo") + '</button><button type="button" class="btn ghost" data-act="zclear">' + I("trash", 16) + t("zn.clear") + "</button></div>" +
       '<button type="button" class="btn primary block lg" data-act="zsave">' + I("check", 18) + t("zn.save") + "</button>" +
@@ -347,7 +349,7 @@
   R("/admin/rzone/:id", { title: "zn.title", render: function (p) {
     return Promise.all([api().get("/admin/restaurants"), api().get("/admin/cities")]).then(function (a) { var r = a[0].filter(function (x) { return x.id === p.id; })[0]; if (!r) { SF.go("/admin/restaurants"); return ""; }
       var c = a[1].filter(function (x) { return x.id === r.cityId; })[0], cz = c && c.zone && c.zone.length > 2;
-      return zoneEditor({ key: "rzed-" + r.id, url: "/admin/restaurants/" + r.id + "/zone", back: "/admin/restaurants", backLabel: t("adm.restaurants"), name: tx(r.name), center: { lat: r.lat, lng: r.lng }, zone: r.zone, mark: "R", how: "zn.rhow", offKey: "zn.roff", nowKey: cz ? "zn.rnowCity" : "zn.nowCircle" });
+      return zoneEditor({ key: "rzed-" + r.id, url: "/admin/restaurants/" + r.id + "/zone", pinUrl: "/admin/restaurants/" + r.id, back: "/admin/restaurants", backLabel: t("adm.restaurants"), name: tx(r.name), center: { lat: r.lat, lng: r.lng }, zone: r.zone, mark: "R", how: "zn.rhow", offKey: "zn.roff", nowKey: cz ? "zn.rnowCity" : "zn.nowCircle" });
     });
   } });
   function zcount() { var el = document.getElementById("zcount"), n = SF.state.zoneEdit ? SF.state.zoneEdit.pts.length : 0; if (el) el.innerHTML = n < 3 ? t("zn.need", { n: n }) : I("check", 14) + " " + t("zn.ok", { n: n }); }
@@ -356,8 +358,12 @@
   SF.actions.zundo = function () { var z = SF.state.zoneEdit; if (z && z.pts.length) z.pts.pop(); zredraw(); };
   SF.actions.zclear = function () { var z = SF.state.zoneEdit; if (z) z.pts = []; zredraw(); };
   function zdone(z) { return api().get("/cities").then(function (cs) { SF.state.cities = cs; SF.state.zoneEdit = null; SF.toast(t("zn.saved")); SF.go(z.back); }); }
-  SF.actions.zsave = function () { var z = SF.state.zoneEdit; if (!z || z.pts.length < 3) { SF.toast(t("zn.need", { n: z ? z.pts.length : 0 }), "err"); return; }
-    return api().post(z.url, { zone: z.pts }).then(function () { return zdone(z); }); };
+  SF.actions.zmode = function (el) { var z = SF.state.zoneEdit; if (z) { z.mode = el.dataset.v; SF.render({ quiet: true }); } };
+  SF.actions.zsave = function () { var z = SF.state.zoneEdit; if (!z) return;
+    var pin = z.pinUrl && z.moved ? api().patch(z.pinUrl, { lat: z.pin.lat, lng: z.pin.lng }) : Promise.resolve();
+    if (z.pts.length && z.pts.length < 3) { SF.toast(t("zn.need", { n: z.pts.length }), "err"); return; }
+    if (!z.pts.length && !z.moved) { SF.toast(t("zn.need", { n: 0 }), "err"); return; }
+    return pin.then(function () { return z.pts.length ? api().post(z.url, { zone: z.pts }) : null; }).then(function () { return zdone(z); }); };
   SF.actions.zcircle = function () { var z = SF.state.zoneEdit; if (!z) return; return api().post(z.url, { zone: [] }).then(function () { return zdone(z); }); };
   SF.forms.acity = function (fd) { return api().post("/admin/cities", fd).then(function () { SF.toast(t("btn.saved")); SF.render({ quiet: true }); }); };
   SF.actions.acityt = function (el) { return api().patch("/admin/cities/" + el.dataset.id, { active: el.getAttribute("aria-checked") !== "true" }).then(function () { return api().get("/cities"); }).then(function (c) { SF.state.cities = c; SF.render({ quiet: true }); }); };

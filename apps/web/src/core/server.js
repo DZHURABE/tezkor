@@ -456,8 +456,8 @@
       if (b.payCard != null && r.ownerId !== req.user.id) E(403, "OWNER_ONLY");
       if (b.payCard != null) { var cn = String(b.payCard.number || "").replace(/\D/g, ""); if (cn && (cn.length < 16 || cn.length > 19)) E(400, "BAD_PAY_CARD");
         r.payCard = cn ? { number: cn, holder: str(b.payCard.holder, 60), bank: str(b.payCard.bank, 40) } : null; }
-      if (b.lat != null || b.lng != null) { var pt = { lat: Number(b.lat), lng: Number(b.lng) }, c0 = cityOf(r.cityId); if (!isFinite(pt.lat) || !isFinite(pt.lng)) E(400, "BAD_LOCATION");
-        var dk = Rules.distanceKm(c0, pt), mx = db.settings.zoneKm || 5; if (dk > mx) E(422, "OUT_OF_ZONE", { km: Math.round(dk * 10) / 10, max: mx }); r.lat = pt.lat; r.lng = pt.lng; }
+      /* the restaurant's place on the map is set only by the main admin */
+      if (b.lat != null || b.lng != null) E(403, "PLACE_BY_ADMIN");
       save(); return pubRest(r); });
     route("GET", "/restaurant/orders", ["restaurant"], function (req, b, q) { var r = myRest(req), list = by(db.orders, "restaurantId", r.id).filter(function (o) { return o.status !== "awaiting_payment"; });
       if (q.scope === "new") list = list.filter(function (o) { return o.status === "pending"; });
@@ -753,6 +753,7 @@
       if (b.cuisine != null) r.cuisine = L(str(b.cuisine, 60) || "—"); if (b.address != null) r.address = L(str(b.address, 80));
       if (b.cityId != null) { var cc = find(db.cities, b.cityId); if (!cc) E(400, "BAD_CITY"); if (cc.id !== r.cityId) { r.cityId = cc.id; r.lat = cc.lat + 0.004; r.lng = cc.lng - 0.004; } }
       if (b.phone != null) { var rp = Rules.normPhone(b.phone); if (!rp) E(400, "BAD_PHONE"); r.phone = rp; }
+      if (b.lat != null && b.lng != null) { var pl = { lat: Number(b.lat), lng: Number(b.lng) }; if (!isFinite(pl.lat) || !isFinite(pl.lng) || Rules.distanceKm(cityOf(r.cityId), pl) > 60) E(400, "BAD_LOCATION"); r.lat = pl.lat; r.lng = pl.lng; }
       var ow = find(db.users, r.ownerId);
       if (ow && b.ownerName != null) { var on = str(b.ownerName, 60); if (on.length < 2) E(400, "BAD_NAME"); ow.name = on; }
       if (ow && b.ownerPhone != null) { var op = Rules.normPhone(b.ownerPhone); if (!op) E(400, "BAD_PHONE");
