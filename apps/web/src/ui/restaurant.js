@@ -220,6 +220,7 @@
       document.body.classList.add("printing"); setTimeout(function () { window.print(); setTimeout(function () { document.body.classList.remove("printing"); }, 500); }, 150);
     }); };
 
+  SF.actions.mcat = function (el) { SF.state.mcat = el.dataset.v; SF.render({ quiet: true }); };
   SF.actions.rtpl = function () { SF.modal('<div class="confirm"><span class="cic">' + I("grid", 26) + '</span><h2 class="h2">' + t("tpl.q") + '</h2><p class="muted">' + t("tpl.sub") + '</p><div class="row2"><button class="btn ghost" data-act="closemodal">' + t("btn.cancel") + '</button><button class="btn primary" data-act="rtplok">' + t("tpl.go") + "</button></div></div>"); };
   SF.actions.rtplok = function () { return api().post("/restaurant/menu/template", { key: "tj-uz" }).then(function (r) { SF.closeModal(); SF.toast(t("tpl.done", { n: r.added })); SF.render({ quiet: true }); }); };
   function worker() { var u = SF.state.user; return !!(u && u.staff && u.staffRole !== "manager"); }
@@ -264,9 +265,15 @@
   R("/rest/menu", { title: "rest.menu", render: function () {
     return Promise.all([api().get("/restaurant/products"), api().get("/restaurant/me")]).then(function (a) {
       var list = a[0], r = a[1]; SF.state.myProducts = list; SF.state.tone = r.tone;
-      var cats = SF.state.categories.filter(function (c) { return list.some(function (p) { return p.categoryId === c.id; }); });
+      var cats = SF.state.categories.filter(function (c) { return list.some(function (p) { return p.categoryId === c.id; }); }).map(function (c) { return { id: c.id, name: tx(c.name) }; });
+      if (list.some(function (p) { return !cats.some(function (c) { return c.id === p.categoryId; }); })) cats.push({ id: "_", name: t("tb.other") });
+      var inCat = function (p, c) { return c.id === "_" ? !cats.some(function (k) { return k.id === p.categoryId; }) : p.categoryId === c.id; };
+      /* one category at a time (tabs with counts), compact rows */
+      var cur = SF.state.mcat && cats.some(function (c) { return c.id === SF.state.mcat; }) ? SF.state.mcat : (cats[0] || {}).id; var show = cats.filter(function (c) { return c.id === cur; });
       return '<div class="toolbar"><p class="muted">' + t("menu.count", { n: list.length, off: list.filter(function (p) { return !p.available; }).length }) + '</p>' + (worker() ? "" : '<button class="btn primary" data-act="prodnew">' + I("plus", 18) + t("menu.add") + "</button>") + "</div>" +
-        (list.length ? cats.map(function (c) { return '<section class="msec"><h2>' + esc(tx(c.name)) + '</h2><div class="mtable">' + list.filter(function (p) { return p.categoryId === c.id; }).map(function (p) {
+        (cats.length > 1 ? '<div class="chips mcats" role="tablist">' + cats.map(function (c) { var n = list.filter(function (p) { return inCat(p, c); }), off = n.filter(function (p) { return !p.available; }).length;
+          return '<button type="button" role="tab" aria-selected="' + (c.id === cur) + '" class="chip' + (c.id === cur ? " on" : "") + '" data-act="mcat" data-v="' + c.id + '">' + esc(c.name) + ' <i class="num">' + n.length + (off ? " · " + off + "✕" : "") + "</i></button>"; }).join("") + "</div>" : "") +
+        (list.length ? show.map(function (c) { return '<section class="msec mcompact"><div class="mtable">' + list.filter(function (p) { return inCat(p, c); }).map(function (p) {
           return '<div class="mrowp' + (p.available ? "" : " off") + '"><span class="cim" style="--tone:' + esc(r.tone) + '">' + SF.pic(p, 48) + '</span><div class="grow"><b>' + esc(tx(p.name)) + (SF.sale(p) ? ' <span class="chip sale">−' + SF.sale(p) + "%</span>" : "") + (p.popular ? ' <span class="chip hot">' + I("fire", 12) + t("prod.hit") + "</span>" : "") + '</b><small class="muted">' + esc(tx(p.desc)) + (p.weight ? " · " + esc(p.weight) : "") + '</small></div><b class="num price">' + money(p.price) + (SF.sale(p) ? "<s>" + money(p.oldPrice) + "</s>" : "") + "</b>" +
             '<button class="switch' + (p.available ? " on" : "") + '" role="switch" aria-checked="' + p.available + '" aria-label="' + t("menu.inStock") + '" data-act="pavail" data-id="' + p.id + '"></button>' +
             (worker() ? "</div>" : '<button class="iconbtn" data-act="prodedit" data-id="' + p.id + '" aria-label="' + t("btn.edit") + '">' + I("edit", 18) + '</button><button class="iconbtn" data-act="proddel" data-id="' + p.id + '" aria-label="' + t("btn.delete") + '">' + I("trash", 18) + "</button></div>"); }).join("") + "</div></section>"; }).join("")
@@ -378,8 +385,7 @@
       return SF.installCard() + '<div class="two"><form class="card stack" data-form="rset"><h3>' + t("rest.hours") + '</h3><div class="grid2"><label class="f">' + t("rest.from") + '<input type="time" name="from" value="' + esc(r.hours.from) + '" required></label><label class="f">' + t("rest.to") + '<input type="time" name="to" value="' + esc(r.hours.to) + '" required></label></div>' +
         '<div class="grid2"><label class="f">' + t("rest.eta") + '<input name="eta" value="' + esc(r.eta) + '" placeholder="25–35"></label><label class="f">' + t("rest.minOrderL") + '<input name="minOrder" inputmode="numeric" value="' + r.minOrder + '"></label></div>' +
         '<label class="f">' + t("auth.phone") + '<input name="phone" inputmode="tel" value="' + esc(SF.phone(r.phone)) + '"></label><label class="f">' + t("rest.addressL") + '<input name="address" value="' + esc(tx(r.address)) + '"></label><button class="btn primary">' + t("btn.save") + "</button></form>" +
-        (SF.state.user.staff ? "" : '<form class="card stack" data-form="rcard"><h3>' + t("tr.cardTitle") + '</h3><p class="muted sm">' + t("tr.cardSub") + '</p><label class="f">' + t("tr.cardNum") + '<input name="number" id="rc-num" inputmode="numeric" autocomplete="off" placeholder="0000 0000 0000 0000" value="' + esc(r.payCard ? r.payCard.number.replace(/(\d{4})(?=\d)/g, "$1 ") : "") + '"></label>' +
-        '<div class="grid2"><label class="f">' + t("tr.holder") + '<input name="holder" id="rc-holder" value="' + esc(r.payCard ? r.payCard.holder : "") + '"></label><label class="f">' + t("tr.bank") + '<input name="bank" id="rc-bank" placeholder="Алиф, Эсхата, Амонатбонк…" value="' + esc(r.payCard ? r.payCard.bank : "") + '"></label></div><button class="btn primary">' + t("btn.save") + "</button></form>") +
+        (SF.state.user.staff ? "" : payAccForm(r)) +
         '<section class="card stack"><h3>' + t("rest.where") + '</h3><p class="muted sm">' + t("rest.whereSub") + "</p>" + SF.tmap({ key: "rloc", center: { lat: r.lat, lng: r.lng }, zoom: 15, zone: SF.restZone(r), markers: [{ lat: r.lat, lng: r.lng, type: "rest", label: "R" }], label: t("rest.where") }) +
         '<p class="fine">' + I("info", 14) + " " + t("rest.placeAdmin") + "</p></section>" + SF.pwForm() +
         subCard(r) + '<section class="card stack"><h3>' + t("rest.profile") + '</h3><div class="rprof" style="--tone:' + esc(r.tone) + '">' + SF.art("plov", 72) + "<div><b class=\"h2\">" + esc(tx(r.name)) + '</b><span class="muted">' + esc(tx(r.cuisine)) + "</span></div></div>" +
@@ -391,6 +397,26 @@
   /* receipt photo: restaurant (and admin) check it against their bank app before accepting */
   SF.actions.rcpt = function (el) { return api().get("/orders/" + el.dataset.id + "/receipt").then(function (r) {
     SF.modal('<button class="mx" data-act="closemodal" aria-label="' + t("btn.close") + '">' + I("x", 20) + '</button><div class="stack"><h2 class="h2">' + t("tr.receipt") + '</h2><img class="rcptimg" src="' + r.image + '" alt="' + t("tr.receipt") + '"><p class="fine">' + t("tr.verify") + "</p></div>", "wide"); }); };
+  /* where guests send money: several cards or e-wallet phone numbers, each with its bank */
+  var BANKS = ["Алиф Бонк", "Душанбе Сити (DC)", "Эсхата", "Амонатбонк", "Ориёнбонк", "Спитамен Бонк", "Хумо", "Бонки байналмилалии Тоҷикистон (IBT)", "Коммерсбонк", "Арванд", "Матин", "Тавҳидбонк"];
+  function pacc() { return SF.state.pacc; }
+  function payAccForm(r) {
+    if (!SF.state.pacc || SF.state.paccFor !== r.id) { SF.state.paccFor = r.id; SF.state.pacc = (r.payAccounts || (r.payCard ? [r.payCard] : [])).map(function (x) { return { kind: x.kind || "card", bank: x.bank || "", number: x.kind === "phone" ? String(x.number).slice(-9) : String(x.number).replace(/(\d{4})(?=\d)/g, "$1 "), holder: x.holder || "" }; }); if (!SF.state.pacc.length) SF.state.pacc.push({ kind: "card", bank: "", number: "", holder: "" }); }
+    return '<section class="card stack paccs"><h3>' + I("card", 18) + " " + t("pa.title") + '</h3><p class="muted sm">' + t("pa.sub") + '</p><datalist id="banks">' + BANKS.map(function (b) { return '<option value="' + esc(b) + '">'; }).join("") + "</datalist>" +
+      pacc().map(function (x, i) { return '<div class="pacc"><div class="paccTop"><div class="seg">' + ["card", "phone"].map(function (k) { return '<button type="button" class="' + (x.kind === k ? "on" : "") + '" data-act="pakind" data-i="' + i + '" data-v="' + k + '">' + I(k === "card" ? "card" : "phone", 14) + t(k === "card" ? "pa.card" : "pa.phoneS") + "</button>"; }).join("") + "</div>" +
+          '<button type="button" class="iconbtn" data-act="padel" data-i="' + i + '" aria-label="' + t("btn.delete") + '">' + I("trash", 16) + "</button></div>" +
+          '<div class="grid2"><label class="f">' + t("tr.bank") + '<input list="banks" data-input="pa" data-i="' + i + '" data-k="bank"' + (i ? "" : ' id="rc-bank"') + ' value="' + esc(x.bank) + '" placeholder="' + t("pa.bankPh") + '"></label>' +
+          '<label class="f">' + t(x.kind === "card" ? "tr.cardNum" : "pa.phoneNum") + (x.kind === "card" ? '<input data-input="pa" data-i="' + i + '" data-k="number"' + (i ? "" : ' id="rc-num"') + ' inputmode="numeric" autocomplete="off" placeholder="0000 0000 0000 0000" value="' + esc(x.number) + '">'
+            : '<span class="phonein"><i>+992</i><input data-input="pa" data-i="' + i + '" data-k="number" inputmode="tel" placeholder="93 123 45 67" value="' + esc(x.number) + '"></span>') + "</label></div>" +
+          '<label class="f">' + t("tr.holder") + '<input data-input="pa" data-i="' + i + '" data-k="holder"' + (i ? "" : ' id="rc-holder"') + ' value="' + esc(x.holder) + '" placeholder="' + t("pa.holderPh") + '"></label></div>'; }).join("") +
+      (pacc().length < 6 ? '<button type="button" class="btn ghost" data-act="paadd">' + I("plus", 16) + t("pa.add") + "</button>" : "") +
+      '<button type="button" class="btn primary" data-act="pasave">' + t("btn.save") + "</button></section>"; }
+  SF.inputs.pa = function (v, el) { pacc()[+el.dataset.i][el.dataset.k] = v; };
+  SF.actions.pakind = function (el) { var x = pacc()[+el.dataset.i]; if (x.kind !== el.dataset.v) { x.kind = el.dataset.v; x.number = ""; } SF.render({ quiet: true }); };
+  SF.actions.paadd = function () { pacc().push({ kind: "card", bank: "", number: "", holder: "" }); SF.render({ quiet: true }); };
+  SF.actions.padel = function (el) { pacc().splice(+el.dataset.i, 1); SF.render({ quiet: true }); };
+  SF.actions.pasave = function () { var l = pacc().filter(function (x) { return String(x.number).replace(/\D/g, ""); });
+    return api().patch("/restaurant/me", { payAccounts: l }).then(function () { SF.state.pacc = null; SF.toast(t("btn.saved")); SF.render({ quiet: true }); }); };
   SF.forms.rcard = function (fd) { return api().patch("/restaurant/me", { payCard: { number: fd.number, holder: fd.holder, bank: fd.bank } }).then(function () { SF.toast(t("btn.saved")); SF.render({ quiet: true }); }); };
 
   /* ---------- Hall: floors / rooms, every table a square — green free, red busy, orange «waiter called» ---------- */
@@ -432,17 +458,29 @@
     return Promise.all([api().get("/restaurant/products"), api().get("/restaurant/hall")]).then(function (r) { var prods = r[0].filter(function (x) { return x.available; }), h = r[1], st = pos();
       if (q.table !== undefined) st.table = q.table || ""; SF.state.posProds = prods; SF.state.hall = h;
       var tb = (h.tables.filter(function (x) { return x.id === st.table; })[0]) || null; if (!tb) st.table = "";
-      return '<div class="posw"><section class="card posl"><label class="posfind">' + I("search", 20) + '<input id="posq" data-input="posq" value="' + esc(st.q) + '" placeholder="' + t("pos.findPh") + '" aria-label="' + t("pos.findPh") + '" autocomplete="off" enterkeyhint="search"></label>' +
-          '<div class="poslist" id="poslist">' + posList(prods, st.q) + "</div></section>" +
+      /* the categories that have something in stock: «Чой», «Нӯшокӣ», «Таомҳо»… */
+      var cats = (SF.state.categories || []).filter(function (c) { return prods.some(function (x) { return x.categoryId === c.id; }); }).map(function (c) { return { id: c.id, name: tx(c.name) }; });
+      if (prods.some(function (x) { return !cats.some(function (c) { return c.id === x.categoryId; }); })) cats.push({ id: "_", name: t("tb.other") });
+      SF.state.posCats = cats; if (!st.cat || (st.cat !== "*" && !cats.some(function (c) { return c.id === st.cat; }))) st.cat = (cats[0] || {}).id || "*";
+      return '<div class="posw"><section class="posl"><label class="posfind">' + I("search", 20) + '<input id="posq" data-input="posq" value="' + esc(st.q) + '" placeholder="' + t("pos.findPh") + '" aria-label="' + t("pos.findPh") + '" autocomplete="off" enterkeyhint="search">' +
+          (st.q ? '<button type="button" class="iconbtn sm" data-act="posqx" aria-label="' + t("btn.close") + '">' + I("x", 16) + "</button>" : "") + "</label>" +
+          '<div class="poscats" id="poscats" role="tablist">' + posCatsHtml() + "</div>" +
+          '<div class="posgrid" id="poslist">' + posList(prods, st.q) + "</div></section>" +
         '<section class="card posr"><label class="f">' + t("pos.where") + '<select data-input="postable"><option value="">' + t("pos.counter") + "</option>" +
           h.tables.map(function (x) { return '<option value="' + x.id + '"' + (x.id === st.table ? " selected" : "") + ">" + esc((x.zone ? x.zone + " · " : "") + t(x.kind === "cabin" ? "hl.cabin" : "tb.table", { n: x.name })) + (x.busy ? " ● " + money(x.sum) : "") + "</option>"; }).join("") + "</select></label>" +
           '<div id="posticket">' + posTicket() + "</div></section></div>";
     });
   } });
-  function posList(prods, s) { s = String(s || "").trim().toLowerCase();
-    var l = prods.filter(function (x) { return !s || [x.name.tg, x.name.ru, x.name.en].join(" ").toLowerCase().indexOf(s) >= 0; }).slice(0, 60);
-    return l.length ? l.map(function (x) { var n = pos().items[x.id] || 0;
-      return '<button type="button" class="posp' + (n ? " in" : "") + '" data-act="posadd" data-id="' + x.id + '">' + (x.photo ? '<img src="' + esc(x.photo) + '" alt="">' : '<span class="pospa">' + SF.art(x.kind, 34) + "</span>") + '<span class="grow"><b>' + esc(tx(x.name)) + '</b><small class="num">' + money(x.price) + "</small></span>" + (n ? '<i class="num">' + n + "</i>" : I("plus", 18)) + "</button>"; }).join("")
+  function posCatsHtml() { var st = pos(), prods = SF.state.posProds || [];
+    return [{ id: "*", name: t("home.all") }].concat(SF.state.posCats || []).map(function (c) { var n = c.id === "*" ? prods.length : prods.filter(function (x) { return posIn(x, c.id); }).length, on = !st.q && st.cat === c.id;
+      return '<button type="button" role="tab" aria-selected="' + on + '" class="' + (on ? "on" : "") + '" data-act="poscat" data-v="' + c.id + '">' + esc(c.name) + ' <i class="num">' + n + "</i></button>"; }).join(""); }
+  function posIn(x, cat) { var cats = SF.state.posCats || []; return cat === "*" || (cat === "_" ? !cats.some(function (c) { return c.id === x.categoryId; }) : x.categoryId === cat); }
+  /* typing searches everything; otherwise the chosen category. Square buttons: tap = +1 */
+  function posList(prods, s) { s = String(s || "").trim().toLowerCase(); var st = pos();
+    var l = prods.filter(function (x) { return s ? [x.name.tg, x.name.ru, x.name.en].join(" ").toLowerCase().indexOf(s) >= 0 : posIn(x, st.cat); }).slice(0, 120);
+    return l.length ? l.map(function (x) { var n = st.items[x.id] || 0;
+      return '<button type="button" class="posq' + (n ? " in" : "") + '" data-act="posadd" data-id="' + x.id + '"><span class="posqi">' + (x.photo ? '<img src="' + esc(x.photo) + '" alt="">' : SF.art(x.kind, 46)) + "</span>" +
+        '<b>' + esc(tx(x.name)) + '</b><span class="num">' + money(x.price) + "</span>" + (n ? '<i class="num">' + n + "</i>" : "") + "</button>"; }).join("")
       : '<p class="muted">' + t("pos.none") + "</p>"; }
   function posTicket() { var st = pos(), prods = SF.state.posProds || [], ids = Object.keys(st.items).filter(function (k) { return st.items[k] > 0; }), sum = 0;
     var rows = ids.map(function (k) { var x = prods.filter(function (y) { return y.id === k; })[0]; if (!x) return ""; sum += x.price * st.items[k];
@@ -452,10 +490,13 @@
       (st.table ? '<button type="button" class="btn primary block lg" data-act="possend"' + (ids.length ? "" : " disabled") + ">" + I("fire", 18) + t("pos.toKitchen") + "</button>"
         : '<div class="seg posm">' + ["cash", "card"].map(function (m) { return '<button type="button" class="' + (st.method === m ? "on" : "") + '" data-act="posm" data-v="' + m + '">' + I(m, 16) + t("pos." + m) + "</button>"; }).join("") + "</div>" +
           '<button type="button" class="btn ok block lg" data-act="possend"' + (ids.length ? "" : " disabled") + ">" + I("check", 18) + t("pos.sell", { sum: money(sum) }) + "</button>"); }
-  function posRefresh() { var a = document.getElementById("posticket"), b = document.getElementById("poslist"); if (a) a.innerHTML = posTicket(); if (b) b.innerHTML = posList(SF.state.posProds || [], pos().q); }
-  SF.inputs.posq = function (v) { pos().q = v; var b = document.getElementById("poslist"); if (b) b.innerHTML = posList(SF.state.posProds || [], v); };
+  function posRefresh() { var a = document.getElementById("posticket"), b = document.getElementById("poslist"), c = document.getElementById("poscats"); if (a) a.innerHTML = posTicket(); if (b) b.innerHTML = posList(SF.state.posProds || [], pos().q); if (c) c.innerHTML = posCatsHtml(); }
+  SF.inputs.posq = function (v) { pos().q = v; var b = document.getElementById("poslist"), c = document.getElementById("poscats"); if (b) b.innerHTML = posList(SF.state.posProds || [], v); if (c) c.innerHTML = posCatsHtml(); };
+  SF.actions.poscat = function (el) { var st = pos(); st.cat = el.dataset.v; st.q = ""; var q = document.getElementById("posq"); if (q) q.value = ""; posRefresh(); };
+  SF.actions.posqx = function () { pos().q = ""; SF.render({ quiet: true }); };
   SF.inputs.postable = function (v) { pos().table = v; posRefresh(); };
-  SF.actions.posadd = function (el) { var st = pos(); st.items[el.dataset.id] = (st.items[el.dataset.id] || 0) + 1; posRefresh(); };
+  SF.actions.posadd = function (el) { var st = pos(); st.items[el.dataset.id] = (st.items[el.dataset.id] || 0) + 1; posRefresh();
+    var b = document.querySelector('#poslist [data-id="' + el.dataset.id + '"]'); if (b) { b.classList.add("pop"); setTimeout(function () { b.classList.remove("pop"); }, 180); } };
   SF.actions.posdec = function (el) { var st = pos(); st.items[el.dataset.id] = Math.max(0, (st.items[el.dataset.id] || 0) - 1); posRefresh(); };
   SF.actions.posm = function (el) { pos().method = el.dataset.v; posRefresh(); };
   SF.actions.possend = function () { var st = pos(), items = Object.keys(st.items).filter(function (k) { return st.items[k] > 0; }).map(function (k) { return { productId: k, qty: st.items[k] }; }); if (!items.length) return;

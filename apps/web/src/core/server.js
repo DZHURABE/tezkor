@@ -456,6 +456,13 @@
       if (b.about != null) r.about = L(str(b.about, 200));
       if (b.cover !== undefined) r.cover = photoField(b.cover, r.cover || null, "cv");
       if (b.logo !== undefined) r.logo = photoField(b.logo, r.logo || null, "lg");
+      /* where guests send money: several cards / e-wallet phone numbers of different banks (only the owner) */
+      if (b.payAccounts != null) { if (r.ownerId !== req.user.id) E(403, "OWNER_ONLY"); if (!Array.isArray(b.payAccounts) || b.payAccounts.length > 6) E(400, "BAD_PAY_CARD");
+        r.payAccounts = b.payAccounts.map(function (x) { var kind = x.kind === "phone" ? "phone" : "card", num;
+          if (kind === "card") { num = String(x.number || "").replace(/\D/g, ""); if (num.length < 16 || num.length > 19) E(400, "BAD_PAY_CARD"); }
+          else { num = Rules.normPhone(x.number); if (!num) E(400, "BAD_PHONE"); }
+          return { kind: kind, bank: str(x.bank, 40), number: num, holder: str(x.holder, 60) }; });
+        var f = r.payAccounts[0]; r.payCard = f ? { number: f.number, holder: f.holder, bank: f.bank, kind: f.kind } : null; }
       if (b.payCard != null && r.ownerId !== req.user.id) E(403, "OWNER_ONLY");
       if (b.payCard != null) { var cn = String(b.payCard.number || "").replace(/\D/g, ""); if (cn && (cn.length < 16 || cn.length > 19)) E(400, "BAD_PAY_CARD");
         r.payCard = cn ? { number: cn, holder: str(b.payCard.holder, 60), bank: str(b.payCard.bank, 40) } : null; }

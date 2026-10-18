@@ -262,8 +262,10 @@
   function transferBox(r, qt) {
     var x = co(), pc = r.payCard, num = pc.number.replace(/(\d{4})(?=\d)/g, "$1 ");
     return '<div class="transfer"><ol class="tsteps"><li>' + t("tr.s1") + "</li><li>" + t("tr.s2") + "</li><li>" + t("tr.s3") + "</li></ol>" +
-      '<div class="tcard"><small>' + t("tr.card") + (pc.bank ? " · " + esc(pc.bank) : "") + '</small><code class="num" id="callnum">' + esc(num) + "</code>" + (pc.holder ? "<span>" + esc(pc.holder) + "</span>" : "") +
-      '<button type="button" class="btn sm ghost" data-act="copynum" data-v="' + esc(pc.number) + '">' + I("copy", 14) + t("cour.copy") + "</button></div>" +
+      /* every card / wallet number of the restaurant, each with its bank, to copy */
+      (r.payAccounts && r.payAccounts.length ? r.payAccounts : [pc]).map(function (x, i) { var ph = x.kind === "phone", shown = ph ? SF.phone(x.number) : String(x.number).replace(/(\d{4})(?=\d)/g, "$1 "), raw = ph ? String(x.number).replace(/[^+\d]/g, "") : x.number;
+        return '<div class="tcard"><small>' + I(ph ? "phone" : "card", 13) + " " + t(ph ? "pa.phone" : "tr.card") + (x.bank ? " · " + esc(x.bank) : "") + '</small><code class="num"' + (i ? "" : ' id="callnum"') + ">" + esc(shown) + "</code>" + (x.holder ? "<span>" + esc(x.holder) + "</span>" : "") +
+          '<button type="button" class="btn sm ghost" data-act="copynum" data-v="' + esc(raw) + '">' + I("copy", 14) + t("cour.copy") + "</button></div>"; }).join("") +
       '<div class="tsum"><span>' + t("tr.amount") + '</span><b class="num">' + (qt.deliveryFee != null ? money(qt.total) : t("co.pinFirst")) + "</b></div>" +
       '<label class="upload' + (x.receipt ? " done" : "") + '">' + (x.receipt ? '<img src="' + x.receipt + '" alt="' + t("tr.receipt") + '"><span>' + I("check", 16) + t("tr.uploaded") + "</span><small>" + t("tr.change") + "</small>" : I("receipt", 22) + "<b>" + t("tr.upload") + "</b><small>" + t("tr.uploadSub") + "</small>") +
       '<input type="file" accept="image/*" data-input="receipt" id="receipt-file"></label></div>';

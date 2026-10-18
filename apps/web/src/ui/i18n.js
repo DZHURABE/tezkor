@@ -752,4 +752,8 @@ SF.I18N = {};
   K("rz.type", "Барои тасдиқ 0 нависед", "Для подтверждения введите 0", "Type 0 to confirm"); K("rz.go", "Ҳа, ҳамаашро ба 0", "Да, всё в 0", "Yes, all to 0");
   K("rz.done", "Тайёр: {n} фармоиши санҷишӣ нест шуд, рақамҳо аз 0", "Готово: удалено {n} тестовых заказов, цифры с 0", "Done: {n} test orders removed, numbers from 0");
   K("e.CONFIRM_ZERO", "Барои тасдиқ 0 нависед", "Для подтверждения введите 0", "Type 0 to confirm");
+  K("pa.title", "Кортҳо ва ҳамёнҳо барои пардохт", "Карты и кошельки для оплаты", "Cards and wallets for payment"); K("pa.sub", "Мизоҷ ба яке аз инҳо пул мегузаронад. То 6 адад — бонкҳои гуногун.", "Клиент переводит деньги на любой из них. До 6 — разные банки.", "Guests transfer to any of them. Up to 6, different banks.");
+  K("pa.card", "Корт", "Карта", "Card"); K("pa.phone", "Ҳамён (рақами телефон)", "Кошелёк (номер телефона)", "Wallet (phone number)"); K("pa.phoneNum", "Рақами ҳамён", "Номер кошелька", "Wallet number");
+  K("pa.bankPh", "Алиф, DC, Эсхата…", "Алиф, DC, Эсхата…", "Alif, DC, Eskhata…"); K("pa.holderPh", "Номи соҳиб", "Имя владельца", "Owner's name"); K("pa.add", "Боз корт / ҳамён", "Ещё карта / кошелёк", "Another card / wallet");
+  K("pa.phoneS", "Ҳамён", "Кошелёк", "Wallet");
 })();
