@@ -780,7 +780,7 @@
         couriers: by(db.users, "role", "courier").length, restaurants: db.restaurants.filter(function (r) { return r.active; }).length, byRest: byRest, byCity: byCity, byStatus: byStatus,
         subs: (function () { var m0s = clock() - 30 * DAY, l = (db.subs || []).filter(function (s) { return s.kind === "paid" && s.at >= m0s; });
           return { month: l.reduce(function (x, s) { return x + s.amount; }, 0), count: l.length, soon: db.restaurants.filter(function (r) { return r.active && subOf(r).state === "soon"; }).length, expired: db.restaurants.filter(function (r) { return r.active && subOf(r).state === "expired"; }).length }; })(),
-        payMix: { card: month.filter(function (o) { return o.payment.method === "card"; }).length, cash: month.filter(function (o) { return o.payment.method === "cash"; }).length } });
+        payMix: { card: month.filter(function (o) { return o.payment && o.payment.method === "card"; }).length, cash: month.filter(function (o) { return o.payment && o.payment.method === "cash"; }).length } });
     });
     route("GET", "/admin/orders", ["admin"], function (req, b, q) { var l = db.orders;
       if (q.status) l = l.filter(function (o) { return q.status === "active" ? Rules.ACTIVE.indexOf(o.status) >= 0 : o.status === q.status; });
