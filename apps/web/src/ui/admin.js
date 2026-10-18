@@ -411,4 +411,74 @@
   SF.actions.aadel = function (el) { SF.modal('<div class="confirm"><span class="cic">' + I("trash", 26) + '</span><h2 class="h2">' + t("aa.delQ", { name: esc(el.dataset.name) }) + '</h2><div class="row2"><button class="btn ghost" data-act="closemodal">' + t("btn.cancel") + '</button><button class="btn primary" data-act="aadelok" data-id="' + el.dataset.id + '">' + t("sf.del") + "</button></div></div>"); };
   SF.actions.aadelok = function (el) { return api().del("/admin/admins/" + el.dataset.id).then(function () { SF.closeModal(); SF.render({ quiet: true }); }); };
   SF.actions.areset = function () { return api().post("/admin/reset-demo").then(function () { SF.toast(t("adm.resetDone"), "info"); SF.render(); }); };
+
+  /* ---------- Tezkor services: switch a ready service on, the apps show it at once ---------- */
+  R("/admin/services", { title: "adm.services", render: function () {
+    return Promise.all([api().get("/admin/services"), api().get("/admin/ads-settings")]).then(function (r) { var list = r[0], cfg = r[1];
+      var em = {}; (SF.SERVICES || []).forEach(function (x) { em[x[0]] = x; });
+      return '<p class="muted">' + t("asv.lead") + '</p><div class="card svadm">' + list.map(function (x) { var e = em[x.key] || ["", "✨", "#F2F4F3"];
+          return '<div class="svarow"><span class="sve" style="--sb:' + e[2] + '" aria-hidden="true">' + e[1] + '</span><span class="grow"><b>' + t("sv." + x.key) + ' <span class="pill ' + (x.on ? "p-ok" : x.ready ? "p-brand" : "p-mut") + '">' + t(x.on ? "sa.works" : x.ready ? "asv.ready" : "asv.soon") + "</span></b><small>" + t("svd." + x.key) + "</small>" +
+            (x.core ? '<small class="muted">' + t("asv.core") + "</small>" : !x.ready ? '<small class="muted">' + t("asv.notReady") + "</small>" : "") + "</span>" +
+            (x.core || !x.ready ? '<button class="switch' + (x.on ? " on" : "") + '" role="switch" aria-checked="' + x.on + '" disabled aria-label="' + esc(t("sv." + x.key)) + '"></button>' : sw(x.on, "asvc", x.key, t("sv." + x.key))) + "</div>"; }).join("") + "</div>" +
+        adsCfgCard(cfg);
+    }); } });
+  SF.actions.asvc = function (el) { var on = el.getAttribute("aria-checked") !== "true";
+    return api().patch("/admin/services/" + el.dataset.id, { on: on }).then(function (m) { SF.state.pub.services = m; SF.toast(t(on ? "asv.onDone" : "asv.offDone")); SF.render({ quiet: true }); }); };
+  /* the «one button»: free ↔ paid classifieds, prices kept ready in advance */
+  function adsCfgCard(c) {
+    return '<form class="card stack adcfg" data-form="adcfg"><div class="row between"><h3>' + I("megaphone", 20) + " " + t("acfg.title") + '</h3></div>' +
+      '<div class="paybig' + (c.paid ? " on" : "") + '"><span class="grow"><b>' + t(c.paid ? "acfg.paidOn" : "acfg.freeOn") + "</b><small>" + t(c.paid ? "acfg.paidSub" : "acfg.freeSub") + "</small></span>" + sw(c.paid, "adpaid", "1", t("acfg.switch")) + "</div>" +
+      '<p class="muted sm">' + t("acfg.prices") + '</p><div class="grid2"><label class="f">' + t("acfg.fee") + '<input name="fee" inputmode="numeric" value="' + c.fee + '"><small class="muted">' + t("acfg.feeHint") + "</small></label>" +
+      '<label class="f">' + t("acfg.days") + '<input name="days" inputmode="numeric" value="' + c.days + '"></label><label class="f">' + t("ads.p.top") + '<input name="top" inputmode="numeric" value="' + c.top + '"></label>' +
+      '<label class="f">' + t("ads.p.color") + '<input name="color" inputmode="numeric" value="' + c.color + '"></label><label class="f">' + t("ads.p.vip") + '<input name="vip" inputmode="numeric" value="' + c.vip + '"></label></div>' +
+      '<label class="checkrow"><input type="checkbox" name="moderation"' + (c.moderation ? " checked" : "") + "><span>" + t("acfg.moder") + '<small class="muted">' + t("acfg.moderHint") + "</small></span></label>" +
+      '<button class="btn primary">' + t("btn.save") + "</button></form>"; }
+  SF.forms.adcfg = function (fd) { return api().patch("/admin/ads-settings", { fee: fd.fee || 0, days: fd.days || 30, top: fd.top || 0, color: fd.color || 0, vip: fd.vip || 0, moderation: !!fd.moderation }).then(function () { SF.toast(t("btn.saved")); SF.render({ quiet: true }); }); };
+  SF.actions.adpaid = function (el) { var on = el.getAttribute("aria-checked") !== "true";
+    SF.modal('<div class="confirm"><span class="cic">' + I("wallet", 26) + '</span><h2 class="h2">' + t(on ? "acfg.toPaidQ" : "acfg.toFreeQ") + '</h2><p class="muted">' + t(on ? "acfg.toPaidSub" : "acfg.toFreeSub") + '</p><div class="row2"><button class="btn ghost" data-act="closemodal">' + t("btn.cancel") + '</button><button class="btn primary" data-act="adpaidok" data-v="' + (on ? 1 : 0) + '">' + t("btn.yes") + "</button></div></div>"); };
+  SF.actions.adpaidok = function (el) { return api().patch("/admin/ads-settings", { paid: el.dataset.v === "1" }).then(function (c) { SF.state.pub.adsPaid = c.paid; SF.closeModal(); SF.toast(t("btn.saved")); SF.render({ quiet: true }); }); };
+
+  /* ---------- classifieds: checking, blocking, payments ---------- */
+  var AST = [["", "aads.all"], ["pending", "ads.st.pending"], ["active", "ads.st.active"], ["rejected", "ads.st.rejected"], ["blocked", "ads.st.blocked"], ["archived", "ads.st.archived"], ["draft", "ads.st.draft"]];
+  function apill(s) { var c = { draft: "mut", pending: "warn", active: "ok", rejected: "bad", archived: "mut", blocked: "bad" }[s] || "mut"; return '<span class="pill p-' + c + '">' + t("ads.st." + s) + "</span>"; }
+  R("/admin/ads", { title: "adm.ads", live: true, render: function (p, q) { var st = q.status === undefined ? "pending" : q.status, f = SF.state.aadf || {};
+    var qs = "?status=" + st + (f.cat ? "&cat=" + f.cat : "") + (f.cityId ? "&cityId=" + f.cityId : "") + (f.q ? "&q=" + encodeURIComponent(f.q) : "");
+    return api().get("/admin/ads" + qs).then(function (d) { SF.state.aads = d.list; var on = SF.svcOn ? SF.svcOn("ads") : true, pub = SF.state.pub || {};
+      return (on ? "" : '<div class="note warn">' + I("info", 16) + "<span>" + t("aads.offNote") + ' <a class="link" href="#/admin/services">' + t("adm.services") + "</a></span></div>") +
+        '<div class="row between wrap"><p class="muted">' + t(pub.adsPaid ? "acfg.paidOn" : "acfg.freeOn") + ' · <a class="link" href="#/admin/services">' + t("acfg.title") + "</a></p></div>" +
+        (d.pays.length ? '<div class="card stack"><h3>' + I("wallet", 18) + " " + t("aads.pays", { n: d.pays.length }) + "</h3>" + d.pays.map(function (x) {
+          return '<div class="payrow"><span class="grow"><b>' + esc(x.title) + "</b><small>" + t("aads.k." + x.kind) + " · " + esc(x.userName) + ' · <span class="num">' + esc(SF.phone(x.userPhone)) + '</span></small></span><b class="num">' + money(x.amount) + '</b><button class="btn sm ok" data-act="apay" data-id="' + x.id + '" data-ok="1">' + t("aads.paid") + '</button><button class="btn sm ghost" data-act="apay" data-id="' + x.id + '">' + t("aads.notPaid") + "</button></div>"; }).join("") + "</div>" : "") +
+        '<div class="chips aadtabs" role="tablist">' + AST.map(function (x) { var n = x[0] ? d.counts[x[0]] : d.counts.all, cur = x[0] === st;
+          return '<a role="tab" aria-selected="' + cur + '" class="chip' + (cur ? " on" : "") + '" href="#/admin/ads?status=' + x[0] + '">' + t(x[1]) + ' <i class="num">' + (n || 0) + "</i></a>"; }).join("") + "</div>" +
+        '<form class="filters" data-form="aadf"><select name="cat" aria-label="' + t("ads.cat") + '"><option value="">' + t("aads.allCats") + "</option>" + (SF.AD_CATS || []).map(function (c) { return '<option value="' + c[0] + '"' + (f.cat === c[0] ? " selected" : "") + ">" + t("adc." + c[0]) + "</option>"; }).join("") + "</select>" +
+          '<select name="cityId" aria-label="' + t("profile.city") + '"><option value="">' + t("aads.allCities") + "</option>" + (SF.state.allCities || SF.state.cities || []).map(function (c) { return '<option value="' + c.id + '"' + (f.cityId === c.id ? " selected" : "") + ">" + esc(tx(c.name)) + "</option>"; }).join("") + "</select>" +
+          '<input name="q" value="' + esc(f.q || "") + '" placeholder="' + t("aads.search") + '" aria-label="' + t("aads.search") + '"><button class="btn sm">' + I("search", 16) + t("btn.find") + "</button></form>" +
+        (d.list.length ? table(["", t("ads.title"), t("ads.cat"), t("ads.price"), t("aads.status"), t("aads.actions")], d.list.map(function (a) {
+          return "<tr><td>" + (a.photos[0] ? '<img class="athumb" src="' + esc(a.photos[0]) + '" alt="">' : '<span class="athumb">' + I("image", 18) + "</span>") + "</td><td><b>" + esc(a.title) + '</b><small class="muted"> ' + esc(tx(a.city)) + " · " + SF.dt(a.updatedAt || a.createdAt) + "</small>" + (a.reason ? '<small class="adwhy">' + esc(a.reason) + "</small>" : "") + "</td><td>" + t("adc." + a.cat) + '</td><td class="num">' + (a.price == null ? t("ad.deal") : money(a.price)) + "</td><td>" + apill(a.status) + (a.feeDue ? ' <span class="pill p-warn">' + t("aads.unpaid") + "</span>" : "") + "</td>" +
+            '<td class="acts"><button class="iconbtn" data-act="aadview" data-id="' + a.id + '" aria-label="' + t("ads.view") + '">' + I("eye", 18) + "</button>" +
+            (a.status !== "active" && a.status !== "draft" ? '<button class="iconbtn ok" data-act="aadok" data-id="' + a.id + '" aria-label="' + t("aads.approve") + '">' + I("check", 18) + "</button>" : "") +
+            (a.status === "pending" || a.status === "active" ? '<button class="iconbtn" data-act="aadno" data-id="' + a.id + '" data-v="rejected" aria-label="' + t("aads.reject") + '">' + I("x", 18) + "</button>" : "") +
+            (a.status !== "blocked" ? '<button class="iconbtn" data-act="aadno" data-id="' + a.id + '" data-v="blocked" aria-label="' + t("aads.block") + '">' + I("lock", 18) + "</button>" : "") +
+            '<button class="iconbtn danger" data-act="aaddel" data-id="' + a.id + '" aria-label="' + t("ads.delete") + '">' + I("trash", 18) + "</button></td></tr>"; })) : SF.empty("megaphone", t("aads.none"), ""));
+    }); } });
+  SF.forms.aadf = function (fd) { SF.state.aadf = { cat: fd.cat, cityId: fd.cityId, q: fd.q }; SF.render({ quiet: true }); };
+  function aad(id) { return (SF.state.aads || []).filter(function (x) { return x.id === id; })[0]; }
+  SF.actions.aadview = function (el) { var a = aad(el.dataset.id); if (!a) return;
+    SF.modal('<button class="mx" data-act="closemodal" aria-label="' + t("btn.close") + '">' + I("x", 20) + '</button><div class="stack"><h2 class="h2">' + esc(a.title) + "</h2>" + apill(a.status) +
+      (a.photos.length ? '<div class="adgal small">' + a.photos.map(function (x) { return '<img src="' + esc(x) + '" alt="">'; }).join("") + "</div>" : "") +
+      '<b class="adprice num">' + (a.price == null ? t("ad.deal") : money(a.price)) + "</b><p>" + esc(a.desc || "").replace(/\n/g, "<br>") + '</p><dl class="adattrs"><dt>' + t("ads.cat") + "</dt><dd>" + t("adc." + a.cat) + "</dd><dt>" + t("profile.city") + "</dt><dd>" + esc(tx(a.city)) + "</dd><dt>" + t("ads.seller") + "</dt><dd>" + esc(a.seller) + ' · <span class="num">' + esc(SF.phone(a.userPhone)) + "</span></dd><dt>" + t("ads.phone") + '</dt><dd class="num">' + esc(SF.phone(a.phone)) + "</dd><dt>" + t("ads.views") + '</dt><dd class="num">' + a.views + "</dd></dl>" +
+      '<div class="row2">' + (a.status !== "active" && a.status !== "draft" ? '<button class="btn ok" data-act="aadok" data-id="' + a.id + '">' + I("check", 16) + t("aads.approve") + "</button>" : "") + (a.status === "pending" || a.status === "active" ? '<button class="btn ghost" data-act="aadno" data-id="' + a.id + '" data-v="rejected">' + I("x", 16) + t("aads.reject") + "</button>" : "") + "</div></div>"); };
+  SF.actions.aadok = function (el) { var a = aad(el.dataset.id);
+    if (a && a.feeDue) { SF.modal('<div class="confirm"><span class="cic">' + I("wallet", 26) + '</span><h2 class="h2">' + t("aads.feeQ") + '</h2><p class="muted">' + t("aads.feeSub") + '</p><div class="row2"><button class="btn ghost" data-act="closemodal">' + t("btn.cancel") + '</button><button class="btn ok" data-act="aadokpaid" data-id="' + a.id + '">' + t("aads.paidApprove") + "</button></div></div>"); return; }
+    return api().post("/admin/ads/" + el.dataset.id + "/status", { status: "active" }).then(function () { SF.closeModal(); SF.toast(t("aads.approved")); SF.render({ quiet: true }); }); };
+  SF.actions.aadokpaid = function (el) { return api().post("/admin/ads/" + el.dataset.id + "/status", { status: "active", paid: true }).then(function () { SF.closeModal(); SF.toast(t("aads.approved")); SF.render({ quiet: true }); }); };
+  SF.actions.aadno = function (el) { var v = el.dataset.v, reasons = ["aads.r1", "aads.r2", "aads.r3", "aads.r4"];
+    SF.modal('<div class="confirm"><span class="cic bad">' + I(v === "blocked" ? "lock" : "x", 26) + '</span><h2 class="h2">' + t(v === "blocked" ? "aads.blockQ" : "aads.rejectQ") + '</h2><form class="stack" data-form="aadno" data-id="' + el.dataset.id + '" data-v="' + v + '"><div class="tags">' +
+      reasons.map(function (k) { return '<button type="button" class="chip" data-act="aadwhy" data-v="' + esc(t(k)) + '">' + t(k) + "</button>"; }).join("") + '</div><label class="f">' + t("aads.reason") + '<textarea name="reason" id="aadreason" rows="3" required minlength="3"></textarea></label>' +
+      '<div class="row2"><button type="button" class="btn ghost" data-act="closemodal">' + t("btn.cancel") + '</button><button class="btn danger">' + t(v === "blocked" ? "aads.block" : "aads.reject") + "</button></div></form></div>"); };
+  SF.actions.aadwhy = function (el) { var r = document.getElementById("aadreason"); if (r) r.value = el.dataset.v; };
+  SF.forms.aadno = function (fd, f) { return api().post("/admin/ads/" + f.dataset.id + "/status", { status: f.dataset.v, reason: fd.reason }).then(function () { SF.closeModal(); SF.toast(t("btn.saved")); SF.render({ quiet: true }); }); };
+  SF.actions.aaddel = function (el) { SF.modal('<div class="confirm"><span class="cic bad">' + I("trash", 26) + '</span><h2 class="h2">' + t("ads.delQ") + '</h2><div class="row2"><button class="btn ghost" data-act="closemodal">' + t("btn.cancel") + '</button><button class="btn danger" data-act="aaddelok" data-id="' + el.dataset.id + '">' + t("ads.delete") + "</button></div></div>"); };
+  SF.actions.aaddelok = function (el) { return api().del("/admin/ads/" + el.dataset.id).then(function () { SF.closeModal(); SF.toast(t("ads.deleted")); SF.render({ quiet: true }); }); };
+  SF.actions.apay = function (el) { return api().post("/admin/ad-pays/" + el.dataset.id, { ok: !!el.dataset.ok }).then(function () { SF.toast(t("btn.saved")); SF.render({ quiet: true }); }); };
 })();

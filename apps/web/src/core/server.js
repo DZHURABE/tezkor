@@ -323,11 +323,12 @@
     route("DELETE", "/auth/me/addresses/:i", "*", function (req, b, q, p) { var u = req.user, i = +p.i;
       if (!(u.addresses || [])[i]) E(404, "NOT_FOUND"); u.addresses.splice(i, 1); save(); return pubUser(u); });
     /* favourites: restaurants (r) and dishes (p) */
-    route("POST", "/auth/me/favorites", "*", function (req, b) { var u = req.user, ty = b.type === "p" ? "p" : "r", list = ty === "p" ? db.products : db.restaurants;
+    route("POST", "/auth/me/favorites", "*", function (req, b) { var u = req.user, ty = b.type === "p" ? "p" : b.type === "a" ? "a" : "r", list = ty === "p" ? db.products : ty === "a" ? (db.ads || []) : db.restaurants;
       if (!find(list, b.id)) E(404, "NOT_FOUND"); u.favs = u.favs || { r: [], p: [] }; u.favs[ty] = (u.favs[ty] || []).filter(function (x) { return x !== b.id; });
       if (b.on !== false) u.favs[ty].unshift(b.id); u.favs[ty].length = Math.min(u.favs[ty].length, 100); save(); return pubUser(u); });
     route("GET", "/auth/me/favorites", "*", function (req) { var f = req.user.favs || { r: [], p: [] };
       return { restaurants: (f.r || []).map(function (id) { return find(db.restaurants, id); }).filter(function (r) { return r && r.active; }).map(pubRest),
+        ads: (f.a || []).map(function (id) { return find(db.ads || [], id); }).filter(function (a) { return a && a.status === "active"; }).map(function (a) { return pubAd(a, req.user); }),
         products: (f.p || []).map(function (id) { return find(db.products, id); }).filter(Boolean).map(function (p) { var r = find(db.restaurants, p.restaurantId); return Object.assign({}, p, { restaurant: r ? { id: r.id, name: r.name, tone: r.tone } : null }); }) }; });
 
     /* ---------- catalogue (public) ---------- */
@@ -337,7 +338,7 @@
       .sort(function (a, b) { return (b.own ? 1 : 0) - (a.own ? 1 : 0) || (b.updatedAt || 0) - (a.updatedAt || 0); })
       /* a restaurant's ad shows its town (and its real menu link for the QR code) */
       .map(function (b) { var r = b.restaurantId && find(db.restaurants, b.restaurantId); return r ? Object.assign({}, b, { place: (cityOf(r.cityId) || {}).name || null, restName: r.name }) : b; }); });
-    route("GET", "/settings/public", null, function () { var s = db.settings; return { deliveryBase: s.deliveryBase, deliveryPerKm: s.deliveryPerKm, deliveryMin: s.deliveryMin, currency: s.currency, defaultCityId: s.defaultCityId, supportPhone: s.supportPhone, courierPct: s.courierPct, zoneKm: s.zoneKm || 5, handoffMin: setting("handoffMin"), verify: { channels: vChannels().map(function (c) { return { id: c.id, kind: c.kind }; }), required: verifyRequired() }, apk: !!(opts.apkAvailable && opts.apkAvailable()), cardEnabled: cardOn(), cashEnabled: payOn("cash"), transferEnabled: payOn("transfer"), demo: !PROD }; });
+    route("GET", "/settings/public", null, function () { var s = db.settings; return { deliveryBase: s.deliveryBase, deliveryPerKm: s.deliveryPerKm, deliveryMin: s.deliveryMin, currency: s.currency, defaultCityId: s.defaultCityId, supportPhone: s.supportPhone, courierPct: s.courierPct, zoneKm: s.zoneKm || 5, handoffMin: setting("handoffMin"), verify: { channels: vChannels().map(function (c) { return { id: c.id, kind: c.kind }; }), required: verifyRequired() }, apk: !!(opts.apkAvailable && opts.apkAvailable()), cardEnabled: cardOn(), cashEnabled: payOn("cash"), services: svcMap(), adsPaid: adCfg().paid, transferEnabled: payOn("transfer"), demo: !PROD }; });
     route("GET", "/restaurants", null, function (req, b, q) {
       var list = db.restaurants.filter(function (r) { return orderable(r) && (!q.cityId || r.cityId === q.cityId); });
       if (q.categoryId) list = list.filter(function (r) { return db.products.some(function (p) { return p.restaurantId === r.id && p.categoryId === q.categoryId && p.available; }); });
@@ -866,6 +867,108 @@
       var next = {}; keys.forEach(function (k) { var v = b[k] == null ? (s[k] == null ? setting(k) : s[k]) : int(b[k]); if (!(v >= (k === "zoneKm" || k === "handoffMin" ? 1 : k === "receiptDays" ? 7 : k === "archiveDays" ? 30 : 0) && v <= (k === "courierPct" ? 100 : k === "zoneKm" ? 30 : k === "subFee" ? 100000 : k === "trialDays" ? 365 : k === "handoffMin" ? 60 : k === "receiptDays" ? 3650 : k === "archiveDays" ? 3650 : 500))) E(400, "BAD_SETTINGS", { field: k }); next[k] = v; });
       if (b.supportPhone != null) { if (!Rules.normPhone(b.supportPhone)) E(400, "BAD_PHONE"); next.supportPhone = Rules.fmtPhone(Rules.normPhone(b.supportPhone)); }
       Object.assign(s, next); save(); return s; });
+    /* ---------- Tezkor services: one account, many services. Only the ones with a ready module can be switched on;
+       the admin switches them on and off himself, the apps read the switches from /settings/public ---------- */
+    var SERVICES = [["food", true], ["taxi"], ["shops"], ["ads", true], ["masters"], ["jobs"], ["grocery"], ["pharmacy"], ["realty"]];
+    function svcMap() { var s = db.settings.services || {}, o = {}; SERVICES.forEach(function (x) { o[x[0]] = x[0] === "food" ? s.food !== false : !!(x[1] && s[x[0]]); }); return o; }
+    function svcOn(k) { return !!svcMap()[k]; }
+    function needSvc(k, req) { if (!svcOn(k) && !(req && req.user && req.user.role === "admin")) E(403, "SERVICE_OFF", { service: k }); }
+    route("GET", "/admin/services", ["admin"], function () { var m = svcMap(); return SERVICES.map(function (x) { return { key: x[0], ready: !!x[1], on: m[x[0]], core: x[0] === "food" }; }); });
+    route("PATCH", "/admin/services/:key", ["admin"], function (req, b, q, p) { var x = SERVICES.filter(function (s) { return s[0] === p.key; })[0]; if (!x) E(404, "NOT_FOUND");
+      if (x[0] === "food") E(409, "SERVICE_CORE"); if (!x[1] && b.on) E(409, "SERVICE_NOT_READY");
+      db.settings.services = db.settings.services || {}; db.settings.services[x[0]] = !!b.on; save(); return svcMap(); });
+
+    /* ---------- classifieds (эълонҳо) ----------
+       draft → pending (the admin checks) → active (30 days) → archived; the admin may reject (with a reason) or block.
+       Free at launch: no prices are shown anywhere. The admin turns on «paid» later with one switch: then a placement fee
+       and promotions (top / colour / VIP) appear. Money is never taken here — the customer pays the admin,
+       the admin confirms the payment in his panel, only then the ad or promotion goes live. */
+    var AD_CATS = ["auto", "realty", "phones", "electronics", "furniture", "clothes", "jobs", "services", "other"];
+    var AD_ST = ["draft", "pending", "active", "rejected", "archived", "blocked"], DAY_MS = 86400000;
+    function adCfg() { var a = db.settings.ads || {}; return { paid: !!a.paid, moderation: a.moderation !== false, days: a.days || 30, fee: a.fee || 0, top: a.top == null ? 5 : a.top, color: a.color == null ? 10 : a.color, vip: a.vip == null ? 20 : a.vip }; }
+    function adList() { return db.ads || (db.ads = []); }
+    function adPays() { return db.adPays || (db.adPays = []); }
+    function adSweep() { var t = clock(), ch = false; adList().forEach(function (a) { if (a.status === "active" && a.until && a.until < t) { a.status = "archived"; a.archivedAt = t; ch = true; } }); if (ch) save(); }
+    function adRank(a) { var t = clock(); return (a.vipUntil > t ? 2e13 : 0) + Math.max(a.bumpAt && a.topUntil > t ? a.bumpAt : 0, a.publishedAt || a.createdAt); }
+    function pubAd(a, viewer) { var c = cityOf(a.cityId), u = find(db.users, a.userId), t = clock(), own = viewer && (viewer.id === a.userId || viewer.role === "admin");
+      var o = { id: a.id, cat: a.cat, title: a.title, desc: a.desc, price: a.price, cityId: a.cityId, city: c ? c.name : null, phone: a.phone, photos: a.photos || [], status: a.status, views: a.views || 0,
+        createdAt: a.createdAt, publishedAt: a.publishedAt || null, until: a.until || null, seller: u ? u.name : "", vip: a.vipUntil > t, color: a.colorUntil > t, top: a.topUntil > t };
+      if (own) { o.reason = a.reason || null; o.mine = viewer.id === a.userId; o.updatedAt = a.updatedAt; var pp = adPays().filter(function (x) { return x.adId === a.id && x.status === "awaiting"; }); if (pp.length) o.awaiting = pp.map(function (x) { return { id: x.id, kind: x.kind, amount: x.amount }; });
+        if (viewer.role === "admin") { o.userId = a.userId; o.userPhone = u ? u.phone : null; o.feeDue = !!a.feeDue; } }
+      return o; }
+    function adOf(req, id) { var a = find(adList(), id); if (!a || (a.userId !== req.user.id && req.user.role !== "admin")) E(404, "NOT_FOUND"); return a; }
+    function adPhotos(v, cur) { if (!Array.isArray(v)) E(400, "BAD_PHOTOS"); if (v.length > 10) E(400, "TOO_MANY_PHOTOS");
+      var keep = (cur || []).filter(function (u) { return v.indexOf(u) >= 0; }); (cur || []).forEach(function (u) { if (keep.indexOf(u) < 0) media.del(u); });
+      return v.map(function (x) { return (cur || []).indexOf(x) >= 0 ? x : image(x, "ad"); }); }
+    function adFields(a, b) {
+      if (b.cat !== undefined) { if (AD_CATS.indexOf(b.cat) < 0) E(400, "BAD_AD_CAT"); a.cat = b.cat; }
+      if (b.title !== undefined) { var ti = str(b.title, 80); if (ti.length < 3) E(400, "BAD_AD_TITLE"); a.title = ti; }
+      if (b.desc !== undefined) a.desc = str(b.desc, 3000);
+      if (b.price !== undefined) { var pr = b.price === "" || b.price == null ? null : Number(b.price); if (pr != null && !(pr >= 0 && pr <= 1e8)) E(400, "BAD_PRICE"); a.price = pr == null ? null : Math.round(pr); }
+      if (b.cityId !== undefined) { if (!find(db.cities, b.cityId)) E(400, "BAD_CITY"); a.cityId = b.cityId; }
+      if (b.phone !== undefined) { var ph = Rules.normPhone(b.phone); if (!ph) E(400, "BAD_PHONE"); a.phone = ph; }
+      if (b.photos !== undefined) a.photos = adPhotos(b.photos, a.photos); }
+    /* send to the admin (or straight live when the admin switched checking off) */
+    function adSubmit(a) { var cfg = adCfg(), t = clock(); a.reason = null;
+      if (cfg.paid && cfg.fee > 0 && !a.feePaid && !adPays().some(function (x) { return x.adId === a.id && x.kind === "place" && x.status === "awaiting"; })) {
+        a.feeDue = true; adPays().unshift({ id: id("ap"), adId: a.id, userId: a.userId, kind: "place", amount: cfg.fee, status: "awaiting", at: t }); }
+      if (!cfg.moderation && !a.feeDue) { a.status = "active"; a.publishedAt = t; a.until = t + cfg.days * DAY_MS; }
+      else { a.status = "pending"; notify("admins", "n.adNew", { title: a.title }); } }
+    route("GET", "/ads", null, function (req, b, q) { needSvc("ads", req); adSweep(); var s = str(q.q, 60).toLowerCase();
+      var l = adList().filter(function (a) { return a.status === "active" && (!q.cat || a.cat === q.cat) && (!q.cityId || a.cityId === q.cityId) && (!s || (a.title + " " + a.desc).toLowerCase().indexOf(s) >= 0); });
+      l.sort(q.sort === "cheap" ? function (x, y) { return (x.price == null ? 1e9 : x.price) - (y.price == null ? 1e9 : y.price); } : q.sort === "dear" ? function (x, y) { return (y.price || 0) - (x.price || 0); } : function (x, y) { return adRank(y) - adRank(x); });
+      return l.slice(0, 200).map(function (a) { return pubAd(a, req.user); }); });
+    route("GET", "/ads/my", ["customer"], function (req) { adSweep(); return adList().filter(function (a) { return a.userId === req.user.id; }).sort(function (x, y) { return (y.updatedAt || y.createdAt) - (x.updatedAt || x.createdAt); }).map(function (a) { return pubAd(a, req.user); }); });
+    route("GET", "/ads/config", null, function () { var c = adCfg(); return c.paid ? c : { paid: false, days: c.days, moderation: c.moderation }; });
+    route("GET", "/ads/:id", null, function (req, b, q, p) { adSweep(); var a = find(adList(), p.id), me = req.user;
+      if (!a || (a.status !== "active" && !(me && (me.id === a.userId || me.role === "admin")))) E(404, "NOT_FOUND");
+      if (a.status === "active") needSvc("ads", req); if (!me || me.id !== a.userId) { a.views = (a.views || 0) + 1; save(); } return pubAd(a, me); });
+    route("POST", "/ads", ["customer"], function (req, b) { needSvc("ads", req); var u = req.user, t = clock();
+      if (adList().filter(function (a) { return a.userId === u.id && a.status !== "archived"; }).length >= 50) E(409, "AD_LIMIT");
+      if (adList().filter(function (a) { return a.userId === u.id && t - a.createdAt < DAY_MS; }).length >= 10) E(429, "AD_DAY_LIMIT");
+      var a = { id: id("ad"), userId: u.id, cat: "other", title: "", desc: "", price: null, cityId: u.cityId || db.settings.defaultCityId, phone: u.phone, photos: [], status: "draft", views: 0, createdAt: t, updatedAt: t };
+      adFields(a, Object.assign({ cat: b.cat, title: b.title }, b)); if (!a.title) E(400, "BAD_AD_TITLE");
+      adList().unshift(a); if (!b.draft) adSubmit(a); save(); return pubAd(a, u); });
+    route("PATCH", "/ads/:id", ["customer"], function (req, b, q, p) { var a = adOf(req, p.id); if (a.status === "blocked") E(409, "AD_BLOCKED");
+      adFields(a, b); a.updatedAt = clock();
+      /* a changed live ad is checked again; a draft stays a draft until it is sent */
+      if (!b.draft && a.status !== "draft" && a.status !== "archived") { if (a.status !== "pending") adSubmit(a); }
+      else if (!b.draft && a.status === "draft") adSubmit(a);
+      save(); return pubAd(a, req.user); });
+    route("POST", "/ads/:id/archive", ["customer"], function (req, b, q, p) { var a = adOf(req, p.id); if (a.status === "blocked") E(409, "AD_BLOCKED"); a.status = "archived"; a.archivedAt = clock(); a.updatedAt = clock(); save(); return pubAd(a, req.user); });
+    route("POST", "/ads/:id/restore", ["customer"], function (req, b, q, p) { needSvc("ads", req); var a = adOf(req, p.id); if (a.status !== "archived") E(409, "BAD_STATUS"); a.updatedAt = clock(); a.until = null; adSubmit(a); save(); return pubAd(a, req.user); });
+    route("DELETE", "/ads/:id", ["customer"], function (req, b, q, p) { var a = adOf(req, p.id); (a.photos || []).forEach(function (u) { media.del(u); });
+      db.ads = adList().filter(function (x) { return x !== a; }); db.adPays = adPays().filter(function (x) { return x.adId !== a.id || x.status !== "awaiting"; }); save(); return true; });
+    /* promotion — only when the admin switched paid ads on; waits for the admin to confirm the payment */
+    route("POST", "/ads/:id/promote", ["customer"], function (req, b, q, p) { var a = adOf(req, p.id), cfg = adCfg(); if (!cfg.paid) E(409, "ADS_FREE");
+      if (["top", "color", "vip"].indexOf(b.kind) < 0) E(400, "BAD_KIND"); if (["active", "pending"].indexOf(a.status) < 0) E(409, "BAD_STATUS");
+      if (adPays().some(function (x) { return x.adId === a.id && x.kind === b.kind && x.status === "awaiting"; })) E(409, "ALREADY_ASKED");
+      var x = { id: id("ap"), adId: a.id, userId: req.user.id, kind: b.kind, amount: cfg[b.kind], status: "awaiting", at: clock() }; adPays().unshift(x);
+      notify("admins", "n.adPay", { title: a.title, sum: x.amount }); save(); return x; });
+    /* admin: check, block, confirm payments, settings */
+    route("GET", "/admin/ads", ["admin"], function (req, b, q) { adSweep(); var s = str(q.q, 60).toLowerCase(), all = adList(), cnt = { all: all.length };
+      AD_ST.forEach(function (k) { cnt[k] = 0; }); all.forEach(function (a) { cnt[a.status]++; });
+      var l = all.filter(function (a) { return (!q.status || a.status === q.status) && (!q.cat || a.cat === q.cat) && (!q.cityId || a.cityId === q.cityId) && (!s || (a.title + " " + a.desc + " " + a.phone).toLowerCase().indexOf(s) >= 0); });
+      l.sort(function (x, y) { return (y.status === "pending") - (x.status === "pending") || (y.updatedAt || y.createdAt) - (x.updatedAt || x.createdAt); });
+      return { counts: cnt, list: l.slice(0, 300).map(function (a) { return pubAd(a, req.user); }), pays: adPays().filter(function (x) { return x.status === "awaiting"; }).map(function (x) { var a = find(adList(), x.adId), u = find(db.users, x.userId); return Object.assign({}, x, { title: a ? a.title : "", userName: u ? u.name : "", userPhone: u ? u.phone : "" }); }) }; });
+    route("POST", "/admin/ads/:id/status", ["admin"], function (req, b, q, p) { var a = find(adList(), p.id), t = clock(), cfg = adCfg(); if (!a) E(404, "NOT_FOUND");
+      var st = b.status; if (["active", "rejected", "blocked", "archived"].indexOf(st) < 0) E(400, "BAD_STATUS");
+      if (st === "active") { if (a.feeDue && !b.paid) E(409, "AD_UNPAID"); if (a.feeDue) payDone(adPays().filter(function (x) { return x.adId === a.id && x.kind === "place" && x.status === "awaiting"; })[0], req);
+        a.status = "active"; a.reason = null; if (!a.publishedAt || a.until == null || a.until < t) { a.publishedAt = t; a.until = t + cfg.days * DAY_MS; } notify("u:" + a.userId, "n.adOk", { title: a.title }); }
+      else { var why = str(b.reason, 300); if (st !== "archived" && why.length < 3) E(400, "REASON_REQUIRED"); a.status = st; a.reason = why || null; if (st !== "archived") notify("u:" + a.userId, st === "blocked" ? "n.adBlocked" : "n.adNo", { title: a.title, reason: why }); }
+      a.updatedAt = t; a.checkedBy = req.user.id; save(); return pubAd(a, req.user); });
+    route("DELETE", "/admin/ads/:id", ["admin"], function (req, b, q, p) { var a = find(adList(), p.id); if (!a) E(404, "NOT_FOUND"); (a.photos || []).forEach(function (u) { media.del(u); }); db.ads = adList().filter(function (x) { return x !== a; }); save(); return true; });
+    function payDone(x, req) { if (!x) return; var a = find(adList(), x.adId), t = clock(); x.status = "paid"; x.paidAt = t; x.by = req.user.id; if (!a) return;
+      if (x.kind === "place") { a.feeDue = false; a.feePaid = true; }
+      if (x.kind === "top") { a.bumpAt = t; a.topUntil = t + 7 * DAY_MS; } if (x.kind === "color") a.colorUntil = t + 7 * DAY_MS; if (x.kind === "vip") a.vipUntil = t + 7 * DAY_MS;
+      notify("u:" + x.userId, "n.adPaid", { title: a.title }); }
+    route("POST", "/admin/ad-pays/:id", ["admin"], function (req, b, q, p) { var x = find(adPays(), p.id); if (!x || x.status !== "awaiting") E(404, "NOT_FOUND");
+      if (b.ok === false) { x.status = "declined"; x.by = req.user.id; var a0 = find(adList(), x.adId); if (a0 && x.kind === "place") a0.feeDue = true; } else payDone(x, req); save(); return x; });
+    route("GET", "/admin/ads-settings", ["admin"], function () { return adCfg(); });
+    route("PATCH", "/admin/ads-settings", ["admin"], function (req, b) { var a = db.settings.ads = Object.assign({}, adCfg());
+      if (b.paid != null) a.paid = !!b.paid; if (b.moderation != null) a.moderation = !!b.moderation;
+      ["fee", "top", "color", "vip", "days"].forEach(function (k) { if (b[k] == null) return; var v = int(b[k]); if (!(v >= (k === "days" ? 1 : 0) && v <= (k === "days" ? 365 : 100000))) E(400, "BAD_SETTINGS", { field: k }); a[k] = v; });
+      save(); return adCfg(); });
     route("POST", "/admin/reset-demo", ["admin"], function () { if (PROD) E(404, "NOT_FOUND"); var keep = db.sessions; db = Seed.build(clock()); db.sessions = keep; save(); return true; });
 
     function luhn(n) { if (!/^\d{12,19}$/.test(n)) return false; var s = 0, alt = false; for (var i = n.length - 1; i >= 0; i--) { var d = +n[i]; if (alt) { d *= 2; if (d > 9) d -= 9; } s += d; alt = !alt; } return s % 10 === 0; }

@@ -26,6 +26,15 @@ var SF = (function () {
 
   /* ---------- icons (24px line set) ---------- */
   var P = {
+    car: '<path d="M4 16V12l2.2-5.2A2 2 0 0 1 8 5.6h8a2 2 0 0 1 1.8 1.2L20 12v4"/><path d="M3 12h18v4.5a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><circle cx="7.5" cy="14.8" r="1.2" fill="currentColor"/><circle cx="16.5" cy="14.8" r="1.2" fill="currentColor"/><path d="M5.5 17.5V20M18.5 17.5V20"/>',
+    house: '<path d="M3 11l9-7 9 7"/><path d="M5 9.5V20h14V9.5"/><path d="M10 20v-5.5h4V20"/>', mobile: '<rect x="6.5" y="2.5" width="11" height="19" rx="2.6"/><path d="M11 18.3h2"/>',
+    laptop: '<rect x="4.5" y="5" width="15" height="10.5" rx="1.6"/><path d="M2.5 19h19"/>', sofa: '<path d="M5.5 11V8.5a3 3 0 0 1 3-3h7a3 3 0 0 1 3 3V11"/><path d="M3 12.5a2 2 0 0 1 4 0V14h10v-1.5a2 2 0 0 1 4 0V18H3z"/><path d="M5 18v2M19 18v2"/>',
+    shirt: '<path d="M8.5 3.5 3.5 6l2 4.2 2-1V20h9V9.2l2 1 2-4.2-5-2.5a3.5 3.5 0 0 1-7 0z"/>', wrench: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
+    dots: '<circle cx="5" cy="12" r="1.4" fill="currentColor"/><circle cx="12" cy="12" r="1.4" fill="currentColor"/><circle cx="19" cy="12" r="1.4" fill="currentColor"/>',
+    share: '<circle cx="18" cy="5" r="2.8"/><circle cx="6" cy="12" r="2.8"/><circle cx="18" cy="19" r="2.8"/><path d="M8.5 13.4l7 4.1M15.5 6.5l-7 4.1"/>',
+    megaphone: '<path d="M3.5 10.5v3a1 1 0 0 0 1 1h2.2L12 18.5v-13L6.7 9.5H4.5a1 1 0 0 0-1 1z"/><path d="M15.5 9a4.2 4.2 0 0 1 0 6M18.3 6.3a8 8 0 0 1 0 11.4"/>',
+    image: '<rect x="3" y="4" width="18" height="16" rx="2.5"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/>', crown: '<path d="M3.5 8l4.2 4L12 5.5 16.3 12l4.2-4-2 11h-13z"/>',
+    up: '<path d="M12 19V5M5.5 11.5 12 5l6.5 6.5"/>', palette: '<path d="M12 3a9 9 0 1 0 0 18c1.2 0 1.8-.8 1.8-1.7 0-1.3-1-1.6-1-2.6 0-1 .8-1.7 1.8-1.7H17a4 4 0 0 0 4-4C21 6.6 17 3 12 3z"/><circle cx="7.5" cy="11" r="1.2" fill="currentColor"/><circle cx="10.5" cy="7" r="1.2" fill="currentColor"/><circle cx="15.5" cy="7.5" r="1.2" fill="currentColor"/>',
     locate: '<circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.5" fill="currentColor"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>', copy: '<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 012-2h9"/>', link: '<path d="M10 14a5 5 0 007 0l3-3a5 5 0 00-7-7l-1 1"/><path d="M14 10a5 5 0 00-7 0l-3 3a5 5 0 007 7l1-1"/>', navarrow: '<path d="M3 11l18-8-8 18-2-8z"/>',
     home: '<path d="M3 11l9-7 9 7v9a1 1 0 01-1 1h-5v-6H9v6H4a1 1 0 01-1-1z"/>', search: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>',
     cart: '<circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2 3h3l2.6 12.2a1 1 0 001 .8h9.7a1 1 0 001-.8L21 7H6"/>',
@@ -63,8 +72,10 @@ var SF = (function () {
   SF.brand = function () { return SF.BRAND[SF.state.lang] || SF.BRAND.tg; };
   /* mark: a map pin with a T cut out of it and a dot for the door, on a deep-green tile (logo «Манзил-Т») */
   SF.markInner = '<path d="M60 12C37 12 22 29 22 50C22 75 60 104 60 104C60 104 98 75 98 50C98 29 83 12 60 12Z" fill="#E8590C"/><rect x="40" y="35" width="40" height="11" rx="3" fill="#fff"/><rect x="54.5" y="35" width="11" height="34" rx="3" fill="#fff"/><circle cx="60" cy="110" r="4.5" fill="#E8590C"/>';
-  SF.mark = function (s) { s = s || 36; return '<svg width="' + s + '" height="' + s + '" viewBox="0 0 120 120" aria-hidden="true"><rect width="120" height="120" rx="28" fill="#0B5D3B"/><g transform="translate(60 60) scale(.78) translate(-60 -60)">' + SF.markInner + "</g></svg>"; };
-  SF.logo = function () { return '<span class="logo">' + SF.mark(34) + '<span class="wm"><b>' + SF.esc(SF.brand()) + "</b><i>" + SF.esc(SF.t("brand.sub")) + "</i></span></span>"; };
+  /* the Tezkor sign: an orange disc with a white T and two speed lines — one sign for every Tezkor service */
+  SF.mark = function (s) { s = s || 36; return '<svg class="tzmark" width="' + s + '" height="' + s + '" viewBox="0 0 120 120" aria-hidden="true"><defs><linearGradient id="tzm" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FF8C3A"/><stop offset="1" stop-color="#E4570B"/></linearGradient></defs>' +
+    '<circle cx="60" cy="60" r="57" fill="url(#tzm)"/><path d="M42 36h50v14H74v40H59V50H42z" fill="#fff"/><path d="M16 62h20M22 76h16" stroke="#fff" stroke-width="7" stroke-linecap="round" opacity=".9"/></svg>'; };
+  SF.logo = function () { var b = SF.brand(); return '<span class="logo">' + SF.mark(34) + '<span class="wm"><b>' + SF.esc(b.slice(0, 3)) + "<em>" + SF.esc(b.slice(3)) + "</em></b><i>" + SF.esc(SF.t("brand.sub")) + "</i></span></span>"; };
 
   /* ---------- food art (original illustrations) ---------- */
   var A = {

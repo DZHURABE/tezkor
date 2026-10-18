@@ -26,14 +26,18 @@
         "</div></div></header>" +
       '<main class="wrap main page">' + html + "</main>" +
       '<footer class="foot"><div class="wrap footin">' + SF.logo() + '<p>' + t("foot.about") + '</p><div class="footlinks"><a href="#/login">' + t("foot.partners") + '</a><span>' + t("foot.support") + ': <b class="num">' + esc(SF.state.pub ? SF.state.pub.supportPhone : "") + "</b></span></div></div></footer>" +
-      '<nav class="tabbar" aria-label="' + t("nav.main") + '">' + tab("/", "home", "nav.home") + tab("/search", "search", "nav.search") + tab("/cart", "cart", "nav.cart", n) + tab("/orders", "receipt", "nav.orders") + tab(u ? "/profile" : "/login", "user", u ? "nav.profile" : "auth.login") + "</nav>";
+      '<nav class="tabbar" aria-label="' + t("nav.main") + '">' + tab("/", "home", "nav.home") + tab("/search", "search", "nav.search") +
+        '<button type="button" class="tcreate" data-act="create" aria-label="' + t("sa.create") + '"><span>' + I("plus", 26) + "</span><b>" + t("sa.create") + "</b></button>" +
+        tab("/orders", "receipt", "nav.orders") + tab(u ? "/profile" : "/login", "user", u ? "nav.profile" : "auth.login") + "</nav>" +
+      /* the cart left the bottom bar for «Create»: on phones a floating cart pill shows while something is in it */
+      (n && !/^\/(cart|checkout|pay|r\/)/.test(path) ? '<a href="#/cart" class="cartfab"><span class="cfi">' + I("cart", 20) + '<i class="badge">' + n + "</i></span><b>" + t("nav.cart") + '</b><span class="num">' + SF.money(SF.state.cartSum || 0) + "</span>" + I("chevR", 16) + "</a>" : "");
   };
 
   /* partner dashboards (restaurant, admin) */
   SF.panelNav = {
     restaurant: [["/rest", "chart", "rest.dash"], ["/rest/orders", "receipt", "rest.orders"], ["/rest/sales", "wallet", "sl.nav"], ["/rest/me", "user", "my.nav"], ["/rest/menu", "grid", "rest.menu"], ["/rest/promo", "gift", "rest.promo"], ["/rest/tables", "grid", "tb.nav"], ["/rest/history", "list", "rest.history"], ["/rest/staff", "users", "sf.nav"], ["/rest/settings", "store", "rest.settings"]],
     admin: [["/admin", "chart", "adm.dash"], ["/admin/orders", "receipt", "adm.orders"], ["/admin/restaurants", "store", "adm.restaurants"], ["/admin/couriers", "scooter", "adm.couriers"], ["/admin/users", "users", "adm.users"],
-      ["/admin/banners", "gift", "adm.banners"], ["/admin/promos", "percent", "adm.promos"], ["/admin/cities", "city", "adm.cities"], ["/admin/settings", "cog", "adm.settings"]]
+      ["/admin/banners", "gift", "adm.banners"], ["/admin/ads", "megaphone", "adm.ads"], ["/admin/promos", "percent", "adm.promos"], ["/admin/cities", "city", "adm.cities"], ["/admin/services", "grid", "adm.services"], ["/admin/settings", "cog", "adm.settings"]]
   };
   SF.shells.panel = function (html, r) {
     /* a worker of the restaurant: orders, menu (in stock / out of stock), history. A branch manager sees everything. */
