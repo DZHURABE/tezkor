@@ -9,7 +9,7 @@ const monthOf = o => new Date(o.createdAt).toISOString().slice(0, 7);
 const usedMedia = db => { const used = new Set(), add = u => { if (u && String(u).startsWith("/media/")) used.add(path.basename(u)); };
   db.products.forEach(p => add(p.photo)); db.restaurants.forEach(r => add(r.cover)); db.banners.forEach(b => add(b.photo));
   /* also category pictures, restaurant logos, profile photos and classified-ad photos */
-  (db.categories || []).forEach(c => add(c.photo)); db.restaurants.forEach(r => add(r.logo)); (db.users || []).forEach(u => add(u.avatar)); (db.ads || []).forEach(a => (a.photos || []).forEach(add));
+  (db.categories || []).forEach(c => add(c.photo)); db.restaurants.forEach(r => add(r.logo)); (db.users || []).forEach(u => add(u.avatar)); (db.ads || []).forEach(a => (a.photos || []).forEach(add)); Object.values((db.settings || {}).svcPhotos || {}).forEach(add);
   db.orders.forEach(o => (o.items || []).forEach(i => add(i.photo))); return used; };
 
 /* ------------------------------------------------------------------ file ------------------------------------------------------------------ */

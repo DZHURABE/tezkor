@@ -28,7 +28,7 @@
   function back(href, title, extra) { return '<div class="svhead"><a class="svback" href="#' + href + '" aria-label="' + t("btn.back") + '">' + I("chevL", 20) + "</a><h1>" + title + "</h1>" + (extra || "") + "</div>"; }
   function isAdmin() { return SF.state.user && SF.state.user.role === "admin"; }
   /* while the admin keeps a service off, every page of it says «soon» */
-  function gate(sv) { SF.state.L = sv; return SF.svcOn(sv) || isAdmin() ? null : back("/", t("sv." + sv)) + '<div class="soonbox page">' + '<span class="sbig" aria-hidden="true">' + CFG[sv].emoji + '</span><h2 class="h2">' + t("sa.soonT") + '</h2><p class="muted">' + t("sa.soonSub") + '</p><a class="btn primary" href="#/food">🍔 ' + t("sa.orderFood") + "</a></div>"; }
+  function gate(sv) { SF.state.L = sv; return SF.svcOn(sv) || isAdmin() ? null : back("/", t("sv." + sv)) + '<div class="soonbox page">' + SF.svVis(sv, true) + '<h2 class="h2">' + t("sa.soonT") + '</h2><p class="muted">' + t("sa.soonSub") + '</p><a class="btn primary" href="#/food">🍔 ' + t("sa.orderFood") + "</a></div>"; }
   function stPill(s) { var c = { draft: "mut", pending: "warn", active: "ok", rejected: "bad", archived: "mut", blocked: "bad" }[s] || "mut"; return '<span class="pill p-' + c + '">' + t("ads.st." + s) + "</span>"; }
   function favA(a) { var u = SF.state.user, on = !!(u && u.favs && (u.favs.a || []).indexOf(a.id) >= 0);
     return '<button type="button" class="favbtn adfav' + (on ? " on" : "") + '" data-act="fav" data-t="a" data-id="' + a.id + '" aria-pressed="' + on + '" aria-label="' + t(on ? "fav.remove" : "fav.add") + '">' + I("heart", 18) + "</button>"; }
@@ -44,7 +44,7 @@
     if (!on.length) { SF.actions.soon({ dataset: { k: "ads" } }); return; }
     if (on.length === 1) { SF.state.adf = null; SF.go(CFG[on[0]].base + "/new"); return; }
     SF.modal('<button class="mx" data-act="closemodal" aria-label="' + t("btn.close") + '">' + I("x", 20) + '</button><h2 class="h2">' + t("sa.createQ") + '</h2><div class="svlist">' + on.map(function (k, i) {
-      return '<a class="svrowi" href="#' + CFG[k].base + '/new" data-act="closemodal" style="--sb:#F2F4F3;--i:' + i + '"><span class="sve" aria-hidden="true">' + CFG[k].emoji + '</span><span class="grow"><b>' + T(k, "new") + "</b><small>" + t("svd." + k) + "</small></span>" + I("chevR", 18) + "</a>"; }).join("") + "</div>"); };
+      return '<a class="svrowi" href="#' + CFG[k].base + '/new" data-act="closemodal" style="--sb:#F2F4F3;--i:' + i + '">' + SF.svVis(k) + '<span class="grow"><b>' + T(k, "new") + "</b><small>" + t("svd." + k) + "</small></span>" + I("chevR", 18) + "</a>"; }).join("") + "</div>"); };
 
   function draft() { return SF.state.adf; }
   function loadCfg() { return api().get("/ads/config").then(function (c) { SF.state.adcfg = c; return c; }); }

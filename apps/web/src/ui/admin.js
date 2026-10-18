@@ -417,11 +417,15 @@
     return Promise.all([api().get("/admin/services"), api().get("/admin/ads-settings")]).then(function (r) { var list = r[0], cfg = r[1];
       var em = {}; (SF.SERVICES || []).forEach(function (x) { em[x[0]] = x; });
       return '<p class="muted">' + t("asv.lead") + '</p><div class="card svadm">' + list.map(function (x) { var e = em[x.key] || ["", "✨", "#F2F4F3"];
-          return '<div class="svarow"><span class="sve" style="--sb:' + e[2] + '" aria-hidden="true">' + e[1] + '</span><span class="grow"><b>' + t("sv." + x.key) + ' <span class="pill ' + (x.on ? "p-ok" : x.ready ? "p-brand" : "p-mut") + '">' + t(x.on ? "sa.works" : x.ready ? "asv.ready" : "asv.soon") + "</span></b><small>" + t("svd." + x.key) + "</small>" +
+          return '<div class="svarow"><label class="svup" aria-label="' + t("asv.photo") + '">' + SF.svVis(x.key) + '<i class="avcam">' + I("camera", 13) + '</i><input type="file" accept="image/*" data-input="svphoto" data-k="' + x.key + '"></label><span class="grow"><b>' + t("sv." + x.key) + ' <span class="pill ' + (x.on ? "p-ok" : x.ready ? "p-brand" : "p-mut") + '">' + t(x.on ? "sa.works" : x.ready ? "asv.ready" : "asv.soon") + "</span></b><small>" + t("svd." + x.key) + "</small>" + (x.photo ? '<button type="button" class="link sm" data-act="asvphdel" data-k="' + x.key + '">' + t("asv.photoDel") + "</button>" : '<small class="muted">' + t("asv.photoHint") + "</small>") +
             (x.core ? '<small class="muted">' + t("asv.core") + "</small>" : !x.ready ? '<small class="muted">' + t("asv.notReady") + "</small>" : "") + "</span>" +
             (x.core || !x.ready ? '<button class="switch' + (x.on ? " on" : "") + '" role="switch" aria-checked="' + x.on + '" disabled aria-label="' + esc(t("sv." + x.key)) + '"></button>' : sw(x.on, "asvc", x.key, t("sv." + x.key))) + "</div>"; }).join("") + "</div>" +
         adsCfgCard(cfg);
     }); } });
+  SF.inputs.svphoto = function (v, el) { var f = el.files && el.files[0], k = el.dataset.k; if (!f) return;
+    return SF.shrinkImage(f, 700, 0.82).then(function (d) { return api().post("/admin/services/" + k + "/photo", { photo: d }); }, function () { SF.toast(t("tr.notImage"), "err"); })
+      .then(function (ph) { if (ph) { SF.state.pub.svcPhotos = ph; SF.toast(t("btn.saved")); SF.render({ quiet: true }); } }); };
+  SF.actions.asvphdel = function (el) { return api().post("/admin/services/" + el.dataset.k + "/photo", { photo: null }).then(function (ph) { SF.state.pub.svcPhotos = ph; SF.render({ quiet: true }); }); };
   SF.actions.asvc = function (el) { var on = el.getAttribute("aria-checked") !== "true";
     return api().patch("/admin/services/" + el.dataset.id, { on: on }).then(function (m) { SF.state.pub.services = m; SF.toast(t(on ? "asv.onDone" : "asv.offDone")); SF.render({ quiet: true }); }); };
   /* the «one button»: free ↔ paid classifieds, prices kept ready in advance */

@@ -8,16 +8,24 @@
   SF.SERVICES = [
     ["food", "🍔", "#FFF1E6", "/food"], ["taxi", "🚕", "#FFF7DB", null], ["shops", "🛒", "#E8F7EE", null], ["ads", "📢", "#E8F0FF", "/ads"],
     ["masters", "🛠️", "#F1EBFF", "/masters"], ["jobs", "💼", "#FFE9EF", "/jobs"], ["grocery", "🥦", "#EAF7E3", null], ["pharmacy", "💊", "#E6F4FB", null], ["realty", "🏠", "#FFECE8", "/realty"]];
+  /* the picture of a service: the admin's own photo when he uploaded one, otherwise a clean colour tile with a line icon (no cartoon emoji) */
+  var SV_LOOK = { food: ["#FF8A3D", "#D9480F", "bag"], taxi: ["#FFC93C", "#E09A00", "car"], shops: ["#2FBF71", "#0B7A3E", "cart"], ads: ["#4C8DFF", "#1E56C8", "megaphone"], masters: ["#9B6BFF", "#5F35C9", "wrench"],
+    jobs: ["#FF6B9A", "#C2255C", "briefcase"], grocery: ["#7BD35A", "#2F8A1F", "store"], pharmacy: ["#3EC5E8", "#0B7FA3", "heart"], realty: ["#FF8A6B", "#D0432A", "house"] };
+  SF.svVis = function (k, big) { var ph = ((SF.state.pub || {}).svcPhotos || {})[k] || (k === "food" && SF.PHOTO ? SF.PHOTO.burger : null), L = SV_LOOK[k] || ["#9AA6A1", "#5E6964", "grid"];
+    return ph ? '<span class="sve svph' + (big ? " big" : "") + '" aria-hidden="true"><img src="' + esc(ph) + '" alt="" loading="lazy"></span>'
+      : '<span class="sve svgr' + (big ? " big" : "") + '" style="--g1:' + L[0] + ";--g2:" + L[1] + '" aria-hidden="true">' + I(L[2], big ? 40 : 26) + "</span>"; };
+  /* «soon»: a small red flame badge that glows on and off */
+  SF.soonBadge = function (short) { return '<span class="soonb">' + I("fire", 12) + t(short ? "sv.soonS" : "sv.soon") + "</span>"; };
   SF.svcOn = function (k) { var s = (SF.state.pub || {}).services; return k === "food" ? !s || s.food !== false : !!(s && s[k]); };
   function svcTile(x, i) { var on = SF.svcOn(x[0]) && x[3];
     return (on ? '<a href="#' + x[3] + '"' : '<button type="button" data-act="soon" data-k="' + x[0] + '"') + ' class="svt' + (on ? " on" : "") + '" style="--sb:' + x[2] + ";--i:" + i + '">' +
-      '<span class="sve" aria-hidden="true">' + x[1] + "</span><b>" + t("svs." + x[0]) + '</b><small class="' + (on ? "ok" : "") + '">' + (on ? t("sa.live") : t("sv.soon")) + "</small>" + (on ? "</a>" : "</button>"); }
+      SF.svVis(x[0]) + "<b>" + t("svs." + x[0]) + "</b>" + (on ? '<small class="ok">' + t("sa.live") + "</small>" : SF.soonBadge(true)) + (on ? "</a>" : "</button>"); }
   SF.svcGrid = function (all) { var list = all ? SF.SERVICES : SF.SERVICES.slice(0, 7);
     return '<nav class="svgrid" aria-label="' + t("sv.title") + '">' + list.map(svcTile).join("") +
       (all ? "" : '<a href="#/services" class="svt more" style="--sb:#F2F4F3;--i:7"><span class="sve" aria-hidden="true">' + I("grid", 26) + "</span><b>" + t("sa.all") + "</b><small>" + t("sa.allSub", { n: SF.SERVICES.length }) + "</small></a>") + "</nav>"; };
 
   SF.actions.soon = function (el) { var k = el.dataset.k, x = SF.SERVICES.filter(function (s) { return s[0] === k; })[0] || ["", "✨"];
-    SF.modal('<button class="mx" data-act="closemodal" aria-label="' + t("btn.close") + '">' + I("x", 20) + '</button><div class="soonbox"><span class="sbig" aria-hidden="true">' + x[1] + '</span><h2 class="h2">' + t("sa.soonT") + '</h2><p class="muted">' + t("sa.soonSub") + "</p>" +
+    SF.modal('<button class="mx" data-act="closemodal" aria-label="' + t("btn.close") + '">' + I("x", 20) + '</button><div class="soonbox">' + SF.svVis(k, true) + '<h2 class="h2">' + t("sa.soonT") + '</h2><p class="muted">' + t("sa.soonSub") + "</p>" +
       (k ? '<span class="pill p-mut">' + t("sv." + k) + " · " + t("sv.soon") + "</span>" : "") + '<a class="btn primary block lg" href="#/food" data-act="closemodal">' + "🍔 " + t("sa.orderFood") + "</a></div>"); };
   /* «+» in the bottom bar is in ads.js: it posts into the listing services the admin switched on */
 
@@ -57,7 +65,7 @@
   SF.route("/services", { title: "sa.all", render: function () {
     return '<div class="svhead"><a class="svback" href="#/" aria-label="' + t("btn.back") + '">' + I("chevL", 20) + "</a><h1>" + t("sa.all") + "</h1></div>" +
       '<p class="muted svlead">' + t("sa.allLead") + '</p><div class="svlist">' + SF.SERVICES.map(function (x, i) { var on = SF.svcOn(x[0]) && x[3];
-        return (on ? '<a href="#' + x[3] + '"' : '<button type="button" data-act="soon" data-k="' + x[0] + '"') + ' class="svrowi" style="--sb:' + x[2] + ";--i:" + i + '"><span class="sve" aria-hidden="true">' + x[1] + '</span><span class="grow"><b>' + t("sv." + x[0]) + "</b><small>" + t("svd." + x[0]) + "</small></span>" +
-          '<span class="svstate' + (on ? " on" : "") + '">' + (on ? t("sa.works") : t("sv.soon")) + "</span>" + (on ? "</a>" : "</button>"); }).join("") + "</div>";
+        return (on ? '<a href="#' + x[3] + '"' : '<button type="button" data-act="soon" data-k="' + x[0] + '"') + ' class="svrowi" style="--sb:' + x[2] + ";--i:" + i + '">' + SF.svVis(x[0]) + '<span class="grow"><b>' + t("sv." + x[0]) + "</b><small>" + t("svd." + x[0]) + "</small></span>" +
+          (on ? '<span class="svstate on">' + t("sa.works") + "</span>" : SF.soonBadge()) + (on ? "</a>" : "</button>"); }).join("") + "</div>";
   } });
 })();

@@ -737,4 +737,7 @@ SF.I18N = {};
   K("e.TABLE_NOT_SERVED", "Ҳанӯз ҳама таом бурда нашудааст", "Ещё не всё подано", "Not everything is served yet"); K("e.BAD_ZONES", "Ошёнаҳо нодурустанд", "Неверные этажи", "Bad floors"); K("e.TABLE_NOT_FOUND", "Миз ёфт нашуд", "Стол не найден", "Table not found");
   K("a4.t1", "Таоми дӯстдоштаатон —", "Любимая еда —", "Your favourite food —"); K("a4.t2", "дар чанд дақиқа", "за считанные минуты", "in minutes");
   K("a4.p1", "Расонидани тез", "Быстрая доставка", "Fast delivery"); K("a4.p2", "Пардохти бехатар", "Безопасная оплата", "Safe payment"); K("a4.p3", "Ошхонаҳои беҳтарини шаҳр", "Лучшие рестораны города", "The best places in town");
+  K("asv.photo", "Сурати хизмат", "Фото сервиса", "Service photo"); K("asv.photoHint", "Ба расм пахш кунед — сурати воқеии худро гузоред", "Нажмите на картинку — поставьте своё настоящее фото", "Tap the picture to put your own real photo");
+  K("asv.photoDel", "Суратро нест кардан", "Убрать фото", "Remove photo");
+  K("sv.soonS", "Ба зудӣ", "Скоро", "Soon");
 })();

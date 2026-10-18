@@ -338,7 +338,7 @@
       .sort(function (a, b) { return (b.own ? 1 : 0) - (a.own ? 1 : 0) || (b.updatedAt || 0) - (a.updatedAt || 0); })
       /* a restaurant's ad shows its town (and its real menu link for the QR code) */
       .map(function (b) { var r = b.restaurantId && find(db.restaurants, b.restaurantId); return r ? Object.assign({}, b, { place: (cityOf(r.cityId) || {}).name || null, restName: r.name }) : b; }); });
-    route("GET", "/settings/public", null, function () { var s = db.settings; return { deliveryBase: s.deliveryBase, deliveryPerKm: s.deliveryPerKm, deliveryMin: s.deliveryMin, currency: s.currency, defaultCityId: s.defaultCityId, supportPhone: s.supportPhone, courierPct: s.courierPct, zoneKm: s.zoneKm || 5, handoffMin: setting("handoffMin"), verify: { channels: vChannels().map(function (c) { return { id: c.id, kind: c.kind }; }), required: verifyRequired() }, apk: !!(opts.apkAvailable && opts.apkAvailable()), cardEnabled: cardOn(), cashEnabled: payOn("cash"), services: svcMap(), adsPaid: adCfg().paid, transferEnabled: payOn("transfer"), demo: !PROD }; });
+    route("GET", "/settings/public", null, function () { var s = db.settings; return { deliveryBase: s.deliveryBase, deliveryPerKm: s.deliveryPerKm, deliveryMin: s.deliveryMin, currency: s.currency, defaultCityId: s.defaultCityId, supportPhone: s.supportPhone, courierPct: s.courierPct, zoneKm: s.zoneKm || 5, handoffMin: setting("handoffMin"), verify: { channels: vChannels().map(function (c) { return { id: c.id, kind: c.kind }; }), required: verifyRequired() }, apk: !!(opts.apkAvailable && opts.apkAvailable()), cardEnabled: cardOn(), cashEnabled: payOn("cash"), services: svcMap(), svcPhotos: db.settings.svcPhotos || {}, adsPaid: adCfg().paid, transferEnabled: payOn("transfer"), demo: !PROD }; });
     route("GET", "/restaurants", null, function (req, b, q) {
       var list = db.restaurants.filter(function (r) { return orderable(r) && (!q.cityId || r.cityId === q.cityId); });
       if (q.categoryId) list = list.filter(function (r) { return db.products.some(function (p) { return p.restaurantId === r.id && p.categoryId === q.categoryId && p.available; }); });
@@ -918,7 +918,10 @@
     function svcMap() { var s = db.settings.services || {}, o = {}; SERVICES.forEach(function (x) { o[x[0]] = x[0] === "food" ? s.food !== false : !!(x[1] && s[x[0]]); }); return o; }
     function svcOn(k) { return !!svcMap()[k]; }
     function needSvc(k, req) { if (!svcOn(k) && !(req && req.user && req.user.role === "admin")) E(403, "SERVICE_OFF", { service: k }); }
-    route("GET", "/admin/services", ["admin"], function () { var m = svcMap(); return SERVICES.map(function (x) { return { key: x[0], ready: !!x[1], on: m[x[0]], core: x[0] === "food" }; }); });
+    route("GET", "/admin/services", ["admin"], function () { var m = svcMap(), ph = db.settings.svcPhotos || {}; return SERVICES.map(function (x) { return { key: x[0], ready: !!x[1], on: m[x[0]], core: x[0] === "food", photo: ph[x[0]] || null }; }); });
+    /* the admin's own photo for a service tile (a real taxi, a real shop…) */
+    route("POST", "/admin/services/:key/photo", ["admin"], function (req, b, q, p) { if (!SERVICES.some(function (s) { return s[0] === p.key; })) E(404, "NOT_FOUND");
+      var ph = db.settings.svcPhotos = db.settings.svcPhotos || {}; ph[p.key] = photoField(b.photo, ph[p.key] || null, "sv"); if (!ph[p.key]) delete ph[p.key]; save(); return ph; });
     route("PATCH", "/admin/services/:key", ["admin"], function (req, b, q, p) { var x = SERVICES.filter(function (s) { return s[0] === p.key; })[0]; if (!x) E(404, "NOT_FOUND");
       if (x[0] === "food") E(409, "SERVICE_CORE"); if (!x[1] && b.on) E(409, "SERVICE_NOT_READY");
       db.settings.services = db.settings.services || {}; db.settings.services[x[0]] = !!b.on; save(); return svcMap(); });
