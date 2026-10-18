@@ -187,7 +187,7 @@ SF.I18N = {};
   /* admin */
   K("adm.dash", "Лавҳаи асосӣ", "Дашборд", "Dashboard"); K("adm.orders", "Ҳамаи фармоишҳо", "Все заказы", "All orders"); K("adm.restaurants", "Ошхонаҳо", "Рестораны", "Restaurants"); K("adm.couriers", "Курйерҳо", "Курьеры", "Couriers");
   K("adm.users", "Корбарон", "Пользователи", "Users"); K("adm.products", "Хӯрокҳо", "Блюда", "Dishes"); K("adm.categories", "Категорияҳо", "Категории", "Categories"); K("adm.payments", "Пардохтҳо", "Платежи", "Payments");
-  K("adm.promos", "Рамзҳои тахфиф", "Промокоды", "Promo codes"); K("adm.banners", "Эълонҳо", "Объявления", "Ads"); K("adm.cities", "Шаҳрҳо", "Города", "Cities"); K("adm.stats", "Омор ва даромад", "Статистика и доход", "Stats & revenue"); K("adm.settings", "Танзимот", "Настройки", "Settings");
+  K("adm.promos", "Рамзҳои тахфиф", "Промокоды", "Promo codes"); K("adm.banners", "Баннерҳо", "Баннеры", "Banners"); K("adm.cities", "Шаҳрҳо", "Города", "Cities"); K("adm.stats", "Омор ва даромад", "Статистика и доход", "Stats & revenue"); K("adm.settings", "Танзимот", "Настройки", "Settings");
   K("adm.all", "Ҳама", "Все", "All"); K("adm.active", "Фаъол", "Активные", "Active"); K("adm.searchOrders", "№ ё номи мизоҷ", "№ или имя клиента", "# or customer name"); K("adm.restaurant", "Ошхона", "Ресторан", "Restaurant");
   K("adm.noOrders", "Фармоиш ёфт нашуд", "Заказы не найдены", "No orders found"); K("adm.commission", "Комиссия", "Комиссия", "Commission"); K("adm.history", "Таърихи ҳолатҳо", "История статусов", "Status history");
   K("adm.changeStatus", "Иваз кардани ҳолат", "Сменить статус", "Change status"); K("adm.restCount", "{n} ошхона", "{n} ресторанов", "{n} restaurants"); K("adm.addRest", "Ошхонаи нав", "Новый ресторан", "New restaurant");

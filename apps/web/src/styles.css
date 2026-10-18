@@ -1592,13 +1592,15 @@ details.more[open] summary .ic:last-child{transform:rotate(180deg)}details.more>
 .aadtabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin-bottom:10px}.aadtabs::-webkit-scrollbar{display:none}.aadtabs .chip{flex:none;white-space:nowrap}.aadtabs .chip i{font-style:normal;opacity:.75}
 .note.warn{margin-bottom:12px}
 /* partner panels: dark side bar with a green active item (one look with the customer app) */
-.side{background:#121A17;border-right:0;color:#E6ECE9}
-.side .wm b{color:#fff}.side .wm i{color:rgba(255,255,255,.6)}
-.sidenav a,[data-role="restaurant"] .sidenav a{color:rgba(255,255,255,.74)}
-.sidenav a:hover{background:rgba(255,255,255,.07);color:#fff}
-.sidenav a.on{background:linear-gradient(135deg,#19A85C,#0B7A3E);color:#fff;box-shadow:0 10px 22px -12px rgba(14,138,74,.9)}
-.side .rolebadge{background:rgba(255,255,255,.1);color:#fff}
-.sideuser{color:#fff}.sideuser small{color:rgba(255,255,255,.6)}.sideuser .iconbtn{color:#fff}
+[data-role="admin"] .side{background:#121A17;border-right:0;color:#E6ECE9}
+[data-role="admin"] .side .wm b{color:#fff}[data-role="admin"] .side .wm i{color:rgba(255,255,255,.6)}
+[data-role="admin"] .sidenav a{color:rgba(255,255,255,.74)}
+[data-role="admin"] .sidenav a:hover{background:rgba(255,255,255,.07);color:#fff}
+[data-role="admin"] .sidenav a.on{background:linear-gradient(135deg,#19A85C,#0B7A3E);color:#fff;box-shadow:0 10px 22px -12px rgba(14,138,74,.9)}
+[data-role="admin"] .side .rolebadge{background:rgba(255,255,255,.1);color:#fff}
+[data-role="admin"] .sideuser{color:#fff}[data-role="admin"] .sideuser small{color:rgba(255,255,255,.6)}[data-role="admin"] .sideuser .iconbtn{color:#fff}
+/* restaurant panel stays light (easy to read in the kitchen); its wordmark keeps the dark «Тез» */
+[data-role="restaurant"] .side .wm b{color:#14261D}[data-role="restaurant"] .side .wm b em{color:var(--tzo)}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .adbar{background:rgba(23,29,27,.9)}:root:not([data-theme="light"]) .gbtn{background:rgba(23,29,27,.85);color:#EEF2EF}:root:not([data-theme="light"]) .wm b{color:#EEF2EF}
   :root:not([data-theme="light"]) .adrow.hl{background:linear-gradient(90deg,#33290F,var(--surface))}}
 @media (prefers-reduced-motion:reduce){.svt,.svrowi,.adrow,.cartfab{animation:none!important}}
@@ -1612,3 +1614,4 @@ details.more[open] summary .ic:last-child{transform:rotate(180deg)}details.more>
   .top .citybtn span{max-width:110px}}
 @media (max-width:400px){.top .wm{display:none}}
 @media (max-width:380px){.top .citybtn span{display:inline;max-width:96px}}
+[data-role="admin"] .sideuser{background:rgba(255,255,255,.07)}[data-role="admin"] .sideuser .iconbtn{background:rgba(255,255,255,.1)}
