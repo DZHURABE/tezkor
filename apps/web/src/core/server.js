@@ -874,35 +874,18 @@
       return l.map(function (u) { var x = pubUser(u); x.orderCount = db.orders.filter(function (o) { return o.customerId === u.id || o.courierId === u.id; }).length; return x; }); });
     route("DELETE", "/admin/users/:id", ["admin"], function (req, b, q, p) {
       var u = find(db.users, p.id); if (!u) E(404, "NOT_FOUND");
-      if (u.role === "admin") E(403, "ADMIN_DELETE_USE_ADMIN_PANEL");
       if (u.id === req.user.id) E(409, "CANNOT_DELETE_SELF");
+      if (u.role === "admin") mainOnly(req);
       if (u.role === "courier" && activeOf(u.id)) E(409, "HAS_ACTIVE_ORDER");
-      /* Remove account credentials and sessions so the same phone can register again. Keep historical orders for records. */
-      db.users.splice(db.users.indexOf(u), 1);
       Object.keys(db.sessions).forEach(function (k) { if (db.sessions[k].userId === u.id) delete db.sessions[k]; });
-      if (db.ads) db.ads = db.ads.filter(function (a) { if (a.userId !== u.id) return true; (a.photos || []).forEach(function (url) { media.del(url); }); return false; });
-      if (db.adPays) db.adPays = db.adPays.filter(function (x) { return x.userId !== u.id; });
-      db.notifications = db.notifications.filter(function (n) { return n.target !== "u:" + u.id; });
-      save(); return { ok: true, deletedId: u.id, phoneAvailable: u.phone };
+      db.users.splice(db.users.indexOf(u), 1);
+      save(); return { deleted: true, id: u.id, phone: u.phone };
     });
     route("PATCH", "/admin/users/:id", ["admin"], function (req, b, q, p) { var u = find(db.users, p.id); if (!u) E(404, "NOT_FOUND"); if (u.role === "admin" && u.id !== req.user.id) mainOnly(req);
       if (b.active != null) { if (u.id === req.user.id) E(409, "CANNOT_BLOCK_SELF"); if (!b.active && u.role === "courier" && activeOf(u.id)) E(409, "HAS_ACTIVE_ORDER");
         u.active = !!b.active; if (!u.active) { if (u.courier) u.courier.online = false; Object.keys(db.sessions).forEach(function (k) { if (db.sessions[k].userId === u.id) delete db.sessions[k]; }); } }
       /* there is one main admin (set on the server); nobody can be made an admin from the app */
       save(); return pubUser(u); });
-    // Permanently remove an account so its phone number can be used for registration again.
-    route("DELETE", "/admin/users/:id", ["admin"], function (req, b, q, p) {
-      var u = find(db.users, p.id);
-      if (!u) E(404, "NOT_FOUND");
-      if (u.id === req.user.id) E(409, "CANNOT_DELETE_SELF");
-      if (u.role === "admin") mainOnly(req);
-      if (u.role === "courier" && activeOf(u.id)) E(409, "HAS_ACTIVE_ORDER");
-      // Invalidate every session immediately; old credentials cannot keep using the deleted account.
-      Object.keys(db.sessions).forEach(function (k) { if (db.sessions[k].userId === u.id) delete db.sessions[k]; });
-      db.users.splice(db.users.indexOf(u), 1);
-      save();
-      return { deleted: true, id: u.id, phone: u.phone };
-    });
     function newCourier(b, city, restaurantId) { var name = str(b.name, 60), phone = Rules.normPhone(b.phone);
       if (name.length < 2) E(400, "BAD_NAME"); if (!phone) E(400, "BAD_PHONE"); if (db.users.some(function (u) { return u.phone === phone; })) E(409, "PHONE_TAKEN");
       var tmp = newPassword(), u = { id: id("u"), role: "courier", name: name, phone: phone, pass: hashPw(tmp), mustChange: true, active: true, cityId: city.id, createdAt: clock(), lang: "tg",
