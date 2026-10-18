@@ -8,11 +8,12 @@
       '</div><p class="fine">' + t("auth.demoPass") + "</p></div>";
   }
   function layout(form) {
-    /* modern sign-in: a living background (slow colour waves + floating dishes) and a frosted-glass card */
-    var arts = ["plov", "pizza", "samsa", "burger", "shashlik", "dessert", "sushi", "tea", "lagman", "shawarma", "mantu", "juice"];
-    return '<div class="auth2"><div class="abg" aria-hidden="true"><i class="blob bl1"></i><i class="blob bl2"></i><i class="blob bl3"></i>' +
-      arts.map(function (k, i) { return '<span class="fly" style="--i:' + i + ";--x:" + ((i * 37 + 7) % 92) + "%;--s:" + (44 + (i % 4) * 14) + 'px">' + SF.art(k, 64) + "</span>"; }).join("") + "</div>" +
-      '<div class="aglass"><div class="authtop"><a href="#/" class="link">' + I("chevL", 16) + t("auth.toShop") + "</a>" + SF.langSel() + '</div><div class="abrand">' + SF.mark(56) + '<div><b>' + esc(SF.brand()) + "</b><small>" + t("auth.heroSub") + "</small></div></div>" + form + "</div></div>";
+    /* sign-in: a real food photo slowly drifting under a dark shade, a soft warm light passing over it, and a clean glass card */
+    return '<div class="auth4"><div class="a4bg" style="background-image:url(' + SF.PHOTO.hero + ')" aria-hidden="true"></div><div class="a4shade" aria-hidden="true"></div><i class="a4glow" aria-hidden="true"></i>' +
+      '<div class="a4in"><section class="a4side"><div class="a4brand">' + SF.mark(52) + '<b class="a4word">' + esc(SF.brand().slice(0, 3)) + "<em>" + esc(SF.brand().slice(3)) + "</em></b></div>" +
+        '<h1 class="a4t">' + t("a4.t1") + " <em>" + t("a4.t2") + '</em></h1><p class="a4s">' + t("auth.heroSub") + "</p>" +
+        '<ul class="a4pts"><li>' + I("bolt", 16) + t("a4.p1") + "</li><li>" + I("shield", 16) + t("a4.p2") + "</li><li>" + I("users", 16) + t("a4.p3") + "</li></ul></section>" +
+      '<div class="aglass a4card"><div class="authtop"><a href="#/" class="link">' + I("chevL", 16) + t("auth.toShop") + "</a>" + SF.langSel() + "</div>" + form + "</div></div></div>";
   }
   SF.route("/login", { guest: true, shell: SF.shells.bare, title: "auth.login", render: function () {
     return layout('<form class="stack" data-form="login"><h2 class="h1">' + t("auth.welcome") + '</h2><p class="muted">' + t("auth.loginSub") + "</p>" +

@@ -73,8 +73,9 @@ var SF = (function () {
   /* mark: a map pin with a T cut out of it and a dot for the door, on a deep-green tile (logo «Манзил-Т») */
   SF.markInner = '<path d="M60 12C37 12 22 29 22 50C22 75 60 104 60 104C60 104 98 75 98 50C98 29 83 12 60 12Z" fill="#E8590C"/><rect x="40" y="35" width="40" height="11" rx="3" fill="#fff"/><rect x="54.5" y="35" width="11" height="34" rx="3" fill="#fff"/><circle cx="60" cy="110" r="4.5" fill="#E8590C"/>';
   /* the Tezkor sign: an orange disc with a white T and two speed lines — one sign for every Tezkor service */
-  SF.mark = function (s) { s = s || 36; return '<svg class="tzmark" width="' + s + '" height="' + s + '" viewBox="0 0 120 120" aria-hidden="true"><defs><linearGradient id="tzm" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FF8C3A"/><stop offset="1" stop-color="#E4570B"/></linearGradient></defs>' +
-    '<circle cx="60" cy="60" r="57" fill="url(#tzm)"/><path d="M42 36h50v14H74v40H59V50H42z" fill="#fff"/><path d="M16 62h20M22 76h16" stroke="#fff" stroke-width="7" stroke-linecap="round" opacity=".9"/></svg>'; };
+  SF.mark = function (s) { s = s || 36; var g = "tzm" + (SF._mk = (SF._mk || 0) + 1); /* own gradient id: a gradient inside a hidden copy would not paint */
+    return '<svg class="tzmark" width="' + s + '" height="' + s + '" viewBox="0 0 120 120" aria-hidden="true"><defs><linearGradient id="' + g + '" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FF8C3A"/><stop offset="1" stop-color="#E4570B"/></linearGradient></defs>' +
+    '<circle cx="60" cy="60" r="57" fill="#F06A1F"/><circle cx="60" cy="60" r="57" fill="url(#' + g + ')"/><path d="M42 36h50v14H74v40H59V50H42z" fill="#fff"/><path d="M16 62h20M22 76h16" stroke="#fff" stroke-width="7" stroke-linecap="round" opacity=".9"/></svg>'; };
   SF.logo = function () { var b = SF.brand(); return '<span class="logo">' + SF.mark(34) + '<span class="wm"><b>' + SF.esc(b.slice(0, 3)) + "<em>" + SF.esc(b.slice(3)) + "</em></b><i>" + SF.esc(SF.t("brand.sub")) + "</i></span></span>"; };
 
   /* ---------- food art (original illustrations) ---------- */
@@ -159,7 +160,8 @@ var SF = (function () {
     var touch = root.matchMedia && root.matchMedia("(pointer: coarse)").matches;
     var f = !touch && m.querySelector("input,button:not(.mx)"); if (f) setTimeout(function () { f.focus({ preventScroll: true }); }, 60); };
   SF.closeModal = function () { var m = document.getElementById("modal"); if (m) { m.hidden = true; m.innerHTML = ""; } };
-  SF.actions.closemodal = SF.closeModal;
+  /* a link inside a sheet closes it and still opens its page */
+  SF.actions.closemodal = function (el) { SF.closeModal(); var h = el && el.tagName === "A" && el.getAttribute("href"); if (h && h.charAt(0) === "#") SF.go(h.slice(1)); };
 
   SF.beep = function () { try { SF._ac = SF._ac || new (root.AudioContext || root.webkitAudioContext)(); var ac = SF._ac;
     [0, 0.16].forEach(function (d) { var o = ac.createOscillator(), g = ac.createGain(); o.frequency.value = d ? 1175 : 880; o.connect(g); g.connect(ac.destination);

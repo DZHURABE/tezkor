@@ -500,21 +500,66 @@
     var TABLE_MAX = 100;
     function tablesOf(r) { return r.tables || (r.tables = []); }
     function tableCode() { var c; do { c = String(newToken()).replace(/[^A-Za-z0-9]/g, "").slice(1, 11); } while (c.length < 8 || db.restaurants.some(function (r) { return tablesOf(r).some(function (x) { return x.code === c; }); })); return c; }
-    function pubTable(x) { return { id: x.id, name: x.name, code: x.code, active: x.active !== false, createdAt: x.createdAt }; }
+    function pubTable(x) { return { id: x.id, name: x.name, code: x.code, active: x.active !== false, zone: x.zone || null, kind: tableKind(x.kind), seats: x.seats || null, createdAt: x.createdAt }; }
     function myTable(req, tid) { var r = boss(req), x = tablesOf(r).filter(function (y) { return y.id === tid; })[0]; if (!x) E(404, "NOT_FOUND"); return { r: r, t: x }; }
     function byCode(code) { code = str(code, 40); for (var i = 0; i < db.restaurants.length; i++) { var r = db.restaurants[i], x = tablesOf(r).filter(function (y) { return y.code === code; })[0];
         if (x) { if (x.active === false || !live(r)) E(404, "TABLE_OFF"); return { r: r, t: x }; } } E(404, "TABLE_NOT_FOUND"); }
     route("GET", "/restaurant/tables", ["restaurant"], function (req) { return tablesOf(myRest(req)).map(pubTable); });
     route("POST", "/restaurant/tables", ["restaurant"], function (req, b) { var r = boss(req), list = tablesOf(r), n = Math.max(1, Math.min(int(b.count) || 1, 50)), name = str(b.name, 30);
       if (list.length + n > TABLE_MAX) E(409, "TABLE_LIMIT", { max: TABLE_MAX });
-      var nums = list.map(function (x) { return parseInt(x.name, 10) || 0; }), next = Math.max.apply(null, [0].concat(nums)) + 1, made = [];
-      for (var i = 0; i < n; i++) { var x = { id: id("tb"), name: n === 1 && name ? name : String(next + i), code: tableCode(), active: true, createdAt: clock() }; list.push(x); made.push(pubTable(x)); }
+      var zone = str(b.zone, 24) || null, kind = tableKind(b.kind), made = [];
+      var nums = list.filter(function (x) { return tableKind(x.kind) === kind; }).map(function (x) { return parseInt(String(x.name).replace(/\D/g, ""), 10) || 0; }), next = Math.max.apply(null, [0].concat(nums)) + 1; if (zone && (r.zones || []).indexOf(zone) < 0) { r.zones = (r.zones || []).concat([zone]).slice(0, 12); }
+      for (var i = 0; i < n; i++) { var x = { id: id("tb"), name: n === 1 && name ? name : (kind === "cabin" ? "K" : "") + String(next + i), code: tableCode(), active: true, zone: zone, kind: kind, createdAt: clock() }; list.push(x); made.push(pubTable(x)); }
       save(); return made; });
     route("PATCH", "/restaurant/tables/:id", ["restaurant"], function (req, b, q, p) { var m = myTable(req, p.id);
-      if (b.name != null) { var nm = str(b.name, 30); if (!nm) E(400, "BAD_NAME"); m.t.name = nm; } if (b.active != null) m.t.active = !!b.active; save(); return pubTable(m.t); });
+      if (b.name != null) { var nm = str(b.name, 30); if (!nm) E(400, "BAD_NAME"); m.t.name = nm; } if (b.active != null) m.t.active = !!b.active;
+      if (b.kind != null) m.t.kind = tableKind(b.kind); if (b.seats != null) { var se = int(b.seats); m.t.seats = se >= 1 && se <= 50 ? se : null; }
+      if (b.zone !== undefined) { var zn = str(b.zone, 24) || null; if (zn && (m.r.zones || []).indexOf(zn) < 0) m.r.zones = (m.r.zones || []).concat([zn]).slice(0, 12); m.t.zone = zn; } save(); return pubTable(m.t); });
     /* the sticker was copied or photographed: a new code, the old QR stops working */
     route("POST", "/restaurant/tables/:id/newcode", ["restaurant"], function (req, b, q, p) { var m = myTable(req, p.id); m.t.code = tableCode(); save(); return pubTable(m.t); });
     route("DELETE", "/restaurant/tables/:id", ["restaurant"], function (req, b, q, p) { var m = myTable(req, p.id), l = tablesOf(m.r); l.splice(l.indexOf(m.t), 1); save(); return true; });
+    /* ---------- the hall: tables by floor / room, free (green) or busy (red), waiter orders, the cash desk ----------
+       a table is busy while it has an open bill: orders not cancelled and not yet closed (paid);
+       served orders nobody closed stop counting after 4 hours so a forgotten table does not stay red */
+    var OPEN_MS = 4 * 3600000;
+    function tableKind(v) { return v === "cabin" ? "cabin" : "table"; }
+    function tableBill(r, x) { var t = clock();
+      return db.orders.filter(function (o) { return o.dineIn && o.restaurantId === r.id && o.tableId === x.id && !o.closedAt && ["cancelled", "rejected"].indexOf(o.status) < 0 &&
+        (o.status !== "delivered" || t - (o.updatedAt || o.createdAt) < OPEN_MS); }); }
+    route("GET", "/restaurant/hall", ["restaurant"], function (req) { var r = myRest(req), t = clock();
+      return { zones: (r.zones || []).slice(), tables: tablesOf(r).filter(function (x) { return x.active !== false; }).map(function (x) { var bill = tableBill(r, x);
+        return Object.assign(pubTable(x), { busy: bill.length > 0, sum: bill.reduce(function (s, o) { return s + o.subtotal; }, 0), since: bill.length ? Math.min.apply(null, bill.map(function (o) { return o.createdAt; })) : null,
+          cooking: bill.some(function (o) { return ["pending", "cooking", "ready", "picked_up"].indexOf(o.status) >= 0; }), called: !!(x.calledAt && t - x.calledAt < 10 * 60000),
+          orders: bill.map(function (o) { return { id: o.id, number: o.number, status: o.status, subtotal: o.subtotal, createdAt: o.createdAt, by: o.byStaff || (o.guestName ? null : null), guestName: o.guestName || null, items: o.items.map(function (i) { return { name: i.name, qty: i.qty, price: i.price }; }) }; }) }); }) }; });
+    /* floors / rooms of the hall: «1-ошёна», «2-ошёна», «Айвон»… */
+    route("PATCH", "/restaurant/zones", ["restaurant"], function (req, b) { var r = boss(req); if (!Array.isArray(b.zones)) E(400, "BAD_ZONES");
+      var z = []; b.zones.forEach(function (v) { v = str(v, 24); if (v && z.indexOf(v) < 0) z.push(v); }); if (z.length > 12) E(400, "BAD_ZONES"); r.zones = z;
+      tablesOf(r).forEach(function (x) { if (x.zone && z.indexOf(x.zone) < 0) x.zone = z[0] || null; }); save(); return z; });
+    /* the waiter writes the order of a guest without a phone; the cashier sells at the counter.
+       Products in stock only; works whenever the place is open in real life (not tied to the app's opening hours) */
+    function posItems(r, list) { if (!Array.isArray(list) || !list.length) E(400, "CART_EMPTY"); if (list.length > 60) E(400, "BAD_QTY");
+      return list.map(function (it) { var p = find(db.products, it.productId), q = int(it.qty);
+        if (!p || p.restaurantId !== r.id) E(400, "PRODUCT_NOT_FOUND"); if (!p.available) E(409, "PRODUCT_UNAVAILABLE", { name: p.name });
+        if (!(q >= 1 && q <= 99)) E(400, "BAD_QTY"); return { productId: p.id, name: p.name, price: p.price, qty: q, kind: p.kind, photo: p.photo && p.photo.charAt(0) === "/" ? p.photo : null }; }); }
+    route("POST", "/restaurant/pos", ["restaurant"], function (req, b) { var r = myRest(req), u = req.user, t = clock(), items = posItems(r, b.items), sub = items.reduce(function (s, i) { return s + i.price * i.qty; }, 0);
+      var x = b.tableId ? tablesOf(r).filter(function (y) { return y.id === b.tableId; })[0] : null; if (b.tableId && !x) E(404, "TABLE_NOT_FOUND");
+      var method = b.method === "card" ? "card" : b.method === "transfer" ? "transfer" : "cash", now = !x || !!b.payNow;
+      db.meta.seq++; var o = { id: "o" + db.meta.seq, number: db.meta.seq, customerId: null, guestName: str(b.name, 40) || null, restaurantId: r.id, courierId: null, cityId: r.cityId,
+        dineIn: true, tableId: x ? x.id : null, tableName: x ? x.name : null, pos: true, byStaff: { id: u.id, name: u.name }, guestKey: null,
+        items: items, subtotal: sub, deliveryFee: 0, discount: 0, total: sub, km: 0, promoCode: null, address: { text: x ? x.name : "", landmark: "", lat: r.lat, lng: r.lng }, phone: null, comment: str(b.comment, 200),
+        payment: { method: method, status: "none", provider: method }, delivery: x ? "table" : "counter", status: "pending", prepMin: 15, createdAt: t, updatedAt: t, history: [{ status: "pending", at: t, by: u.id }] };
+      db.orders.unshift(o); setStatus(o, "cooking", u); o.acceptedBy = { id: u.id, name: u.name }; o.waiterId = u.id;
+      /* a counter sale (tea, bread…) is done at once: handed over and paid */
+      if (!x) { setStatus(o, "ready", u); setStatus(o, "picked_up", u); setStatus(o, "delivered", u); o.servedBy = { id: u.id, name: u.name }; }
+      if (now) { o.payment.status = "paid"; o.payment.confirmedAt = t; if (!x) o.closedAt = t; }
+      save(); return pubOrder(o, u); });
+    /* the bill is paid, the guests left: the table turns green */
+    route("POST", "/restaurant/tables/:id/close", ["restaurant"], function (req, b, q, p) { var r = myRest(req), x = tablesOf(r).filter(function (y) { return y.id === p.id; })[0]; if (!x) E(404, "NOT_FOUND");
+      var bill = tableBill(r, x), t = clock(), method = b.method === "card" ? "card" : b.method === "transfer" ? "transfer" : "cash"; if (!bill.length) return { closed: 0, sum: 0 };
+      if (bill.some(function (o) { return ["pending", "cooking", "ready", "picked_up"].indexOf(o.status) >= 0; }) && !b.force) E(409, "TABLE_NOT_SERVED");
+      bill.forEach(function (o) { if (o.status !== "delivered") { if (o.status === "pending") setStatus(o, "cancelled", req.user); else { ["ready", "picked_up", "delivered"].forEach(function (s) { if (Rules.canTransition(o.status, s, "restaurant")) setStatus(o, s, req.user); }); } }
+        o.closedAt = t; o.closedBy = { id: req.user.id, name: req.user.name }; if (o.status === "delivered") { o.payment.status = "paid"; o.payment.method = o.payment.method === "cash" ? method : o.payment.method; o.payment.confirmedAt = t; } });
+      x.calledAt = null; save(); return { closed: bill.length, sum: bill.filter(function (o) { return o.status === "delivered"; }).reduce(function (s, o) { return s + o.subtotal; }, 0) }; });
     /* the guest's side (no account): the menu of this table, orders, "call the waiter" */
     function guestOrder(o) { var x = pubOrder(o, null); delete x.guestKey; delete x.sig; return x; }
     route("GET", "/dine/:key", null, function (req, b, q, p) { var k = str(p.key, 60), o = k.length >= 16 && db.orders.filter(function (x) { return x.dineIn && x.guestKey === k; })[0]; if (!o) E(404, "NOT_FOUND"); return guestOrder(o); });
@@ -869,7 +914,7 @@
       Object.assign(s, next); save(); return s; });
     /* ---------- Tezkor services: one account, many services. Only the ones with a ready module can be switched on;
        the admin switches them on and off himself, the apps read the switches from /settings/public ---------- */
-    var SERVICES = [["food", true], ["taxi"], ["shops"], ["ads", true], ["masters"], ["jobs"], ["grocery"], ["pharmacy"], ["realty"]];
+    var SERVICES = [["food", true], ["taxi"], ["shops"], ["ads", true], ["masters", true], ["jobs", true], ["grocery"], ["pharmacy"], ["realty", true]];
     function svcMap() { var s = db.settings.services || {}, o = {}; SERVICES.forEach(function (x) { o[x[0]] = x[0] === "food" ? s.food !== false : !!(x[1] && s[x[0]]); }); return o; }
     function svcOn(k) { return !!svcMap()[k]; }
     function needSvc(k, req) { if (!svcOn(k) && !(req && req.user && req.user.role === "admin")) E(403, "SERVICE_OFF", { service: k }); }
@@ -884,6 +929,11 @@
        and promotions (top / colour / VIP) appear. Money is never taken here — the customer pays the admin,
        the admin confirms the payment in his panel, only then the ad or promotion goes live. */
     var AD_CATS = ["auto", "realty", "phones", "electronics", "furniture", "clothes", "jobs", "services", "other"];
+    /* the same listing engine runs four services: classifieds, pros & services, jobs, real estate — each with its own categories */
+    var LIST_SVC = { ads: AD_CATS, masters: ["m_repair", "m_plumb", "m_electric", "m_clean", "m_beauty", "m_auto", "m_tutor", "m_move", "m_it", "m_other"],
+      jobs: ["j_sales", "j_food", "j_driver", "j_build", "j_office", "j_it", "j_edu", "j_med", "j_other"], realty: ["r_flatsale", "r_flatrent", "r_housesale", "r_houserent", "r_land", "r_commerce", "r_other"] };
+    function svcOfAd(a) { return a.svc || "ads"; }
+    function listSvc(v) { return LIST_SVC[v] ? v : "ads"; }
     var AD_ST = ["draft", "pending", "active", "rejected", "archived", "blocked"], DAY_MS = 86400000;
     function adCfg() { var a = db.settings.ads || {}; return { paid: !!a.paid, moderation: a.moderation !== false, days: a.days || 30, fee: a.fee || 0, top: a.top == null ? 5 : a.top, color: a.color == null ? 10 : a.color, vip: a.vip == null ? 20 : a.vip }; }
     function adList() { return db.ads || (db.ads = []); }
@@ -891,7 +941,7 @@
     function adSweep() { var t = clock(), ch = false; adList().forEach(function (a) { if (a.status === "active" && a.until && a.until < t) { a.status = "archived"; a.archivedAt = t; ch = true; } }); if (ch) save(); }
     function adRank(a) { var t = clock(); return (a.vipUntil > t ? 2e13 : 0) + Math.max(a.bumpAt && a.topUntil > t ? a.bumpAt : 0, a.publishedAt || a.createdAt); }
     function pubAd(a, viewer) { var c = cityOf(a.cityId), u = find(db.users, a.userId), t = clock(), own = viewer && (viewer.id === a.userId || viewer.role === "admin");
-      var o = { id: a.id, cat: a.cat, title: a.title, desc: a.desc, price: a.price, cityId: a.cityId, city: c ? c.name : null, phone: a.phone, photos: a.photos || [], status: a.status, views: a.views || 0,
+      var o = { id: a.id, svc: svcOfAd(a), cat: a.cat, title: a.title, desc: a.desc, price: a.price, cityId: a.cityId, city: c ? c.name : null, phone: a.phone, photos: a.photos || [], status: a.status, views: a.views || 0,
         createdAt: a.createdAt, publishedAt: a.publishedAt || null, until: a.until || null, seller: u ? u.name : "", vip: a.vipUntil > t, color: a.colorUntil > t, top: a.topUntil > t };
       if (own) { o.reason = a.reason || null; o.mine = viewer.id === a.userId; o.updatedAt = a.updatedAt; var pp = adPays().filter(function (x) { return x.adId === a.id && x.status === "awaiting"; }); if (pp.length) o.awaiting = pp.map(function (x) { return { id: x.id, kind: x.kind, amount: x.amount }; });
         if (viewer.role === "admin") { o.userId = a.userId; o.userPhone = u ? u.phone : null; o.feeDue = !!a.feeDue; } }
@@ -901,7 +951,7 @@
       var keep = (cur || []).filter(function (u) { return v.indexOf(u) >= 0; }); (cur || []).forEach(function (u) { if (keep.indexOf(u) < 0) media.del(u); });
       return v.map(function (x) { return (cur || []).indexOf(x) >= 0 ? x : image(x, "ad"); }); }
     function adFields(a, b) {
-      if (b.cat !== undefined) { if (AD_CATS.indexOf(b.cat) < 0) E(400, "BAD_AD_CAT"); a.cat = b.cat; }
+      if (b.cat !== undefined) { if (LIST_SVC[svcOfAd(a)].indexOf(b.cat) < 0) E(400, "BAD_AD_CAT"); a.cat = b.cat; }
       if (b.title !== undefined) { var ti = str(b.title, 80); if (ti.length < 3) E(400, "BAD_AD_TITLE"); a.title = ti; }
       if (b.desc !== undefined) a.desc = str(b.desc, 3000);
       if (b.price !== undefined) { var pr = b.price === "" || b.price == null ? null : Number(b.price); if (pr != null && !(pr >= 0 && pr <= 1e8)) E(400, "BAD_PRICE"); a.price = pr == null ? null : Math.round(pr); }
@@ -914,19 +964,19 @@
         a.feeDue = true; adPays().unshift({ id: id("ap"), adId: a.id, userId: a.userId, kind: "place", amount: cfg.fee, status: "awaiting", at: t }); }
       if (!cfg.moderation && !a.feeDue) { a.status = "active"; a.publishedAt = t; a.until = t + cfg.days * DAY_MS; }
       else { a.status = "pending"; notify("admins", "n.adNew", { title: a.title }); } }
-    route("GET", "/ads", null, function (req, b, q) { needSvc("ads", req); adSweep(); var s = str(q.q, 60).toLowerCase();
-      var l = adList().filter(function (a) { return a.status === "active" && (!q.cat || a.cat === q.cat) && (!q.cityId || a.cityId === q.cityId) && (!s || (a.title + " " + a.desc).toLowerCase().indexOf(s) >= 0); });
+    route("GET", "/ads", null, function (req, b, q) { var sv = listSvc(q.svc); needSvc(sv, req); adSweep(); var s = str(q.q, 60).toLowerCase();
+      var l = adList().filter(function (a) { return a.status === "active" && svcOfAd(a) === sv && (!q.cat || a.cat === q.cat) && (!q.cityId || a.cityId === q.cityId) && (!s || (a.title + " " + a.desc).toLowerCase().indexOf(s) >= 0); });
       l.sort(q.sort === "cheap" ? function (x, y) { return (x.price == null ? 1e9 : x.price) - (y.price == null ? 1e9 : y.price); } : q.sort === "dear" ? function (x, y) { return (y.price || 0) - (x.price || 0); } : function (x, y) { return adRank(y) - adRank(x); });
       return l.slice(0, 200).map(function (a) { return pubAd(a, req.user); }); });
-    route("GET", "/ads/my", ["customer"], function (req) { adSweep(); return adList().filter(function (a) { return a.userId === req.user.id; }).sort(function (x, y) { return (y.updatedAt || y.createdAt) - (x.updatedAt || x.createdAt); }).map(function (a) { return pubAd(a, req.user); }); });
+    route("GET", "/ads/my", ["customer"], function (req, b, q) { adSweep(); return adList().filter(function (a) { return a.userId === req.user.id && (!q.svc || svcOfAd(a) === q.svc); }).sort(function (x, y) { return (y.updatedAt || y.createdAt) - (x.updatedAt || x.createdAt); }).map(function (a) { return pubAd(a, req.user); }); });
     route("GET", "/ads/config", null, function () { var c = adCfg(); return c.paid ? c : { paid: false, days: c.days, moderation: c.moderation }; });
     route("GET", "/ads/:id", null, function (req, b, q, p) { adSweep(); var a = find(adList(), p.id), me = req.user;
       if (!a || (a.status !== "active" && !(me && (me.id === a.userId || me.role === "admin")))) E(404, "NOT_FOUND");
-      if (a.status === "active") needSvc("ads", req); if (!me || me.id !== a.userId) { a.views = (a.views || 0) + 1; save(); } return pubAd(a, me); });
-    route("POST", "/ads", ["customer"], function (req, b) { needSvc("ads", req); var u = req.user, t = clock();
+      if (a.status === "active") needSvc(svcOfAd(a), req); if (!me || me.id !== a.userId) { a.views = (a.views || 0) + 1; save(); } return pubAd(a, me); });
+    route("POST", "/ads", ["customer"], function (req, b) { var sv = listSvc(b.svc); needSvc(sv, req); var u = req.user, t = clock();
       if (adList().filter(function (a) { return a.userId === u.id && a.status !== "archived"; }).length >= 50) E(409, "AD_LIMIT");
       if (adList().filter(function (a) { return a.userId === u.id && t - a.createdAt < DAY_MS; }).length >= 10) E(429, "AD_DAY_LIMIT");
-      var a = { id: id("ad"), userId: u.id, cat: "other", title: "", desc: "", price: null, cityId: u.cityId || db.settings.defaultCityId, phone: u.phone, photos: [], status: "draft", views: 0, createdAt: t, updatedAt: t };
+      var a = { id: id("ad"), svc: sv, userId: u.id, cat: LIST_SVC[sv][LIST_SVC[sv].length - 1], title: "", desc: "", price: null, cityId: u.cityId || db.settings.defaultCityId, phone: u.phone, photos: [], status: "draft", views: 0, createdAt: t, updatedAt: t };
       adFields(a, Object.assign({ cat: b.cat, title: b.title }, b)); if (!a.title) E(400, "BAD_AD_TITLE");
       adList().unshift(a); if (!b.draft) adSubmit(a); save(); return pubAd(a, u); });
     route("PATCH", "/ads/:id", ["customer"], function (req, b, q, p) { var a = adOf(req, p.id); if (a.status === "blocked") E(409, "AD_BLOCKED");
@@ -936,7 +986,7 @@
       else if (!b.draft && a.status === "draft") adSubmit(a);
       save(); return pubAd(a, req.user); });
     route("POST", "/ads/:id/archive", ["customer"], function (req, b, q, p) { var a = adOf(req, p.id); if (a.status === "blocked") E(409, "AD_BLOCKED"); a.status = "archived"; a.archivedAt = clock(); a.updatedAt = clock(); save(); return pubAd(a, req.user); });
-    route("POST", "/ads/:id/restore", ["customer"], function (req, b, q, p) { needSvc("ads", req); var a = adOf(req, p.id); if (a.status !== "archived") E(409, "BAD_STATUS"); a.updatedAt = clock(); a.until = null; adSubmit(a); save(); return pubAd(a, req.user); });
+    route("POST", "/ads/:id/restore", ["customer"], function (req, b, q, p) { var a = adOf(req, p.id); needSvc(svcOfAd(a), req); if (a.status !== "archived") E(409, "BAD_STATUS"); a.updatedAt = clock(); a.until = null; adSubmit(a); save(); return pubAd(a, req.user); });
     route("DELETE", "/ads/:id", ["customer"], function (req, b, q, p) { var a = adOf(req, p.id); (a.photos || []).forEach(function (u) { media.del(u); });
       db.ads = adList().filter(function (x) { return x !== a; }); db.adPays = adPays().filter(function (x) { return x.adId !== a.id || x.status !== "awaiting"; }); save(); return true; });
     /* promotion — only when the admin switched paid ads on; waits for the admin to confirm the payment */
@@ -946,7 +996,7 @@
       var x = { id: id("ap"), adId: a.id, userId: req.user.id, kind: b.kind, amount: cfg[b.kind], status: "awaiting", at: clock() }; adPays().unshift(x);
       notify("admins", "n.adPay", { title: a.title, sum: x.amount }); save(); return x; });
     /* admin: check, block, confirm payments, settings */
-    route("GET", "/admin/ads", ["admin"], function (req, b, q) { adSweep(); var s = str(q.q, 60).toLowerCase(), all = adList(), cnt = { all: all.length };
+    route("GET", "/admin/ads", ["admin"], function (req, b, q) { adSweep(); var s = str(q.q, 60).toLowerCase(), all = adList().filter(function (a) { return !q.svc || svcOfAd(a) === q.svc; }), cnt = { all: all.length };
       AD_ST.forEach(function (k) { cnt[k] = 0; }); all.forEach(function (a) { cnt[a.status]++; });
       var l = all.filter(function (a) { return (!q.status || a.status === q.status) && (!q.cat || a.cat === q.cat) && (!q.cityId || a.cityId === q.cityId) && (!s || (a.title + " " + a.desc + " " + a.phone).toLowerCase().indexOf(s) >= 0); });
       l.sort(function (x, y) { return (y.status === "pending") - (x.status === "pending") || (y.updatedAt || y.createdAt) - (x.updatedAt || x.createdAt); });

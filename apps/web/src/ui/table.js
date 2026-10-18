@@ -22,6 +22,16 @@
         : '<button type="button" class="tadd" data-act="tq" data-id="' + p.id + '" data-d="1">' + I("plus", 16) + t("tb.add") + "</button>") + "</div></div></article>";
   }
 
+  /* a square tile: photo on top, name, price, «+» — the menu reads like a picture grid, one category at a time */
+  function tile(p, q) {
+    var pic = p.photo ? '<img src="' + esc(p.photo) + '" alt="" loading="lazy">' : SF.art(p.kind, 78);
+    return '<article class="tsq' + (p.available ? "" : " off") + (q ? " in" : "") + '"><span class="tsqimg" style="--tone:' + esc(M.restaurant.tone || "#F2EFEA") + '">' + pic + (q ? '<i class="tsqn num">' + q + "</i>" : "") + "</span>" +
+      '<b class="tsqname">' + esc(tx(p.name)) + "</b>" + '<div class="tsqrow"><span class="price num">' + money(p.price) + "</span>" +
+      (!p.available ? '<span class="pill p-mut">' + t("prod.soldout") + "</span>" : q ? '<span class="tstep"><button type="button" data-act="tq" data-id="' + p.id + '" data-d="-1" aria-label="−">' + I("minus", 14) + '</button><b class="num">' + q + '</b><button type="button" data-act="tq" data-id="' + p.id + '" data-d="1" aria-label="+">' + I("plus", 14) + "</button></span>"
+        : '<button type="button" class="tsqadd" data-act="tq" data-id="' + p.id + '" data-d="1" aria-label="' + t("tb.add") + " " + esc(tx(p.name)) + '">' + I("plus", 18) + "</button>") + "</div></article>";
+  }
+  SF.actions.tcatset = function (el) { SF.state.tcat = el.dataset.v; SF.render({ quiet: true }).then(function () { var n = document.querySelector(".tcats"); if (n) { var y = n.getBoundingClientRect().top + window.scrollY - 8; if (window.scrollY > y) window.scrollTo({ top: y }); } }); };
+
   function statusLine(o) {
     var k = { pending: "tb.s.pending", cooking: "tb.s.cooking", ready: "tb.s.cooking", picked_up: "tb.s.cooking", delivered: "tb.s.served", rejected: "tb.s.rejected", cancelled: "tb.s.cancelled" }[o.status] || "tb.s.pending";
     var left = o.status === "cooking" && o.prepMin ? Math.max(1, o.prepMin - Math.round((Date.now() - o.history[o.history.length - 1].at) / 60000)) : null;
@@ -53,8 +63,10 @@
           (m.open ? "" : '<div class="msg warn">' + I("clock", 16) + t("tb.closed") + "</div>") +
           (os.length ? '<section class="card tords"><h2>' + t("tb.yours") + "</h2>" + os.map(statusLine).join("") + "</section>" : '<p class="thint">' + I("info", 16) + t("tb.hint") + "</p>") +
           (function () { var d = os.filter(function (o) { return o.status === "delivered" && !o.review; })[0]; if (!d) return ""; SF.state.tRev = d._key; return SF.reviewForm(d, "trev"); })() +
-          '<nav class="ctabs tcats">' + groups.map(function (g, i) { return '<button class="' + (i ? "" : "on") + '" data-act="jump" data-v="' + g.id + '">' + esc(g.name) + "</button>"; }).join("") + "</nav>" +
-          groups.map(function (g) { return '<section class="msec" id="sec-' + g.id + '" data-sec="' + g.id + '"><h2>' + esc(g.name) + '</h2><div class="tlist">' + g.list.map(function (x) { return card(x, s.cart[x.id] || 0); }).join("") + "</div></section>"; }).join("") +
+          (function () { var cur = groups.filter(function (g) { return g.id === SF.state.tcat; })[0] || groups[0]; if (!cur) return "";
+            return '<nav class="ctabs tcats" aria-label="' + t("rest.menu") + '">' + groups.map(function (g) { var on = g === cur, inCart = g.list.reduce(function (n, x) { return n + (s.cart[x.id] || 0); }, 0);
+                return '<button type="button" class="' + (on ? "on" : "") + '" aria-pressed="' + on + '" data-act="tcatset" data-v="' + g.id + '">' + esc(g.name) + ' <i class="num">' + (inCart ? "✓" + inCart : g.list.length) + "</i></button>"; }).join("") + "</nav>" +
+              '<section class="msec" id="sec-' + cur.id + '"><h2>' + esc(cur.name) + '</h2><div class="tgrid">' + cur.list.map(function (x) { return tile(x, s.cart[x.id] || 0); }).join("") + "</div></section>"; })() +
           '<div class="twaiter"><button type="button" class="btn ghost" data-act="tcall" data-why="help">' + I("bell", 16) + t("tb.callWaiter") + '</button><button type="button" class="btn ghost" data-act="tcall" data-why="bill">' + I("receipt", 16) + t("tb.bill") + "</button></div>" +
           '<a class="tpromo" href="#/">' + SF.mark(28) + "<span><b>" + t("tb.promoT") + "</b><small>" + t("tb.promoS") + "</small></span>" + I("chevR", 16) + "</a>" +
           (n ? '<button type="button" class="floatcart tbar" data-act="tcart"><span>' + I("bag", 18) + '<i class="num">' + n + "</i></span><b>" + t("tb.review") + '</b><span class="num">' + money(total) + "</span></button>" : "") +

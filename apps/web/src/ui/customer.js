@@ -471,7 +471,7 @@
         '<nav class="plist card">' +
           prow("pin", t("pf.addresses"), 'href="#/addresses"', (u.addresses || []).length ? '<em class="num">' + u.addresses.length + "</em>" : "") +
           prow("receipt", t("pf.orders"), 'href="#/orders"') +
-          (SF.svcOn && SF.svcOn("ads") ? prow("megaphone", t("ads.my"), 'href="#/ads/my"') : "") +
+          (SF.LISTINGS ? Object.keys(SF.LISTINGS).filter(function (k) { return SF.svcOn(k); }).map(function (k) { return prow(SF.LISTINGS[k].icon, t("L.my." + k), 'href="#' + SF.LISTINGS[k].base + '/my"'); }).join("") : "") +
           prow("heart", t("pf.favs"), 'href="#/favorites"', nf ? '<em class="num">' + nf + "</em>" : "") +
           prow("ticket", t("pf.promos"), 'href="#/promos"') +
           prow("bell", t("n.title"), 'data-act="notes"', (SF.state.notes || []).length ? '<em class="num">' + SF.state.notes.length + "</em>" : "") +

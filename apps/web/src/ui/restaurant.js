@@ -176,31 +176,39 @@
   /* ---------- tables in the hall: QR stickers, the guest orders without signing up ---------- */
   function tableUrl(code) { var o = location.protocol.indexOf("http") === 0 ? location.origin : "https://tezkor.pro"; return o + "/t/" + code; }
   function tableCard(x) {
-    return '<article class="card tbcard' + (x.active ? "" : " off") + '"><div class="tbqr">' + SF.qrSvg(tableUrl(x.code)) + '</div><div class="tbinfo"><b>' + t("tb.table", { n: esc(x.name) }) + "</b>" +
+    return '<article class="card tbcard' + (x.active ? "" : " off") + '"><div class="tbqr">' + SF.qrSvg(tableUrl(x.code)) + '</div><div class="tbinfo"><b>' + t(x.kind === "cabin" ? "hl.cabin" : "tb.table", { n: esc(x.name) }) + "</b>" + (x.zone ? '<small class="pill p-mut">' + esc(x.zone) + "</small>" : "") +
       '<small class="muted tburl">' + esc(tableUrl(x.code).replace(/^https?:\/\//, "")) + "</small>" + (x.active ? "" : '<span class="pill p-mut">' + t("tb.offP") + "</span>") +
       '<div class="tbacts"><button type="button" class="btn sm ghost" data-act="tbprint" data-id="' + x.id + '">' + I("download", 14) + t("tb.print") + '</button>' +
       '<a class="btn sm ghost" href="#/t/' + esc(x.code) + '">' + I("eye", 14) + t("tb.try") + "</a>" +
       '<button type="button" class="iconbtn sm" data-act="tbmenu" data-id="' + x.id + '" aria-label="' + t("tb.more") + '">' + I("cog", 16) + "</button></div></div></article>";
   }
   R("/rest/tables", { title: "tb.nav", render: function () {
-    return api().get("/restaurant/tables").then(function (list) { SF.state.tables = list;
+    return Promise.all([api().get("/restaurant/tables"), api().get("/restaurant/hall")]).then(function (rr) { var list = rr[0]; SF.state.tables = list; SF.state.zones = rr[1].zones;
       return '<section class="card sfhero"><span class="kic">' + I("grid", 22) + '</span><div class="grow"><b>' + t("tb.hT") + "</b><p>" + t("tb.hS") + "</p></div></section>" +
-        '<form class="toolbar tbadd" data-form="tbadd"><p class="muted">' + t("tb.count", { n: list.length }) + '</p><div class="tbaddin"><input name="count" type="number" min="1" max="50" value="' + (list.length ? 1 : 10) + '" aria-label="' + t("tb.howMany") + '"><button class="btn primary">' + I("plus", 18) + t("tb.addN") + "</button></div></form>" +
+        '<form class="card stack tbzones" data-form="tbzones"><h3>' + I("grid", 18) + " " + t("hl.zonesT") + '</h3><p class="muted sm">' + t("hl.zonesS") + '</p><div class="tbaddin"><input name="zones" value="' + esc((SF.state.zones || []).join(", ")) + '" placeholder="' + t("hl.zonesPh") + '" aria-label="' + t("hl.zonesT") + '"><button class="btn ghost">' + t("btn.save") + "</button></div></form>" +
+        '<form class="toolbar tbadd" data-form="tbadd"><p class="muted">' + t("tb.count", { n: list.length }) + '</p><div class="tbaddin"><input name="count" type="number" min="1" max="50" value="' + (list.length ? 1 : 10) + '" aria-label="' + t("tb.howMany") + '">' +
+          ((SF.state.zones || []).length ? '<select name="zone" aria-label="' + t("hl.zone") + '">' + SF.state.zones.map(function (z) { return '<option value="' + esc(z) + '">' + esc(z) + "</option>"; }).join("") + "</select>" : "") +
+          '<select name="kind" aria-label="' + t("hl.kind") + '"><option value="table">' + t("hl.kTable") + '</option><option value="cabin">' + t("hl.kCabin") + "</option></select>" +
+          '<button class="btn primary">' + I("plus", 18) + t("tb.addN") + "</button></div></form>" +
         (list.length ? '<div class="toolbar"><span></span><button type="button" class="btn ghost" data-act="tbprint">' + I("download", 16) + t("tb.printAll") + "</button></div>" +
           '<div class="tbgrid">' + list.map(tableCard).join("") + "</div>"
           : SF.empty(SF.art("plate", 90), t("tb.emptyT"), t("tb.emptyS"))) +
         '<section class="card tbhow"><h3>' + t("tb.howT") + "</h3><ol><li>" + t("tb.how1") + "</li><li>" + t("tb.how2") + "</li><li>" + t("tb.how3") + "</li><li>" + t("tb.how4") + "</li></ol></section>";
     });
   } });
-  SF.forms.tbadd = function (fd) { return api().post("/restaurant/tables", { count: +fd.count || 1 }).then(function (m) { SF.toast(t("tb.added", { n: m.length })); SF.render({ quiet: true }); }); };
+  SF.forms.tbzones = function (fd) { return api().patch("/restaurant/zones", { zones: String(fd.zones || "").split(",").map(function (z) { return z.trim(); }).filter(Boolean) }).then(function () { SF.toast(t("btn.saved")); SF.render({ quiet: true }); }); };
+  SF.forms.tbadd = function (fd) { return api().post("/restaurant/tables", { count: +fd.count || 1, zone: fd.zone || "", kind: fd.kind || "table" }).then(function (m) { SF.toast(t("tb.added", { n: m.length })); SF.render({ quiet: true }); }); };
   function tbById(id) { return (SF.state.tables || []).filter(function (x) { return x.id === id; })[0]; }
   SF.actions.tbmenu = function (el) { var x = tbById(el.dataset.id); if (!x) return;
     SF.modal('<button class="mx" data-act="closemodal" aria-label="' + t("btn.close") + '">' + I("x", 20) + '</button><form class="stack" data-form="tbname"><h2 class="h2">' + t("tb.table", { n: esc(x.name) }) + "</h2>" +
-      '<input type="hidden" name="id" value="' + x.id + '"><label class="f">' + t("tb.nameL") + '<input name="name" maxlength="30" value="' + esc(x.name) + '" required></label><button class="btn primary block">' + t("btn.save") + "</button></form>" +
+      '<input type="hidden" name="id" value="' + x.id + '"><label class="f">' + t("tb.nameL") + '<input name="name" maxlength="30" value="' + esc(x.name) + '" required></label>' +
+      '<div class="grid2"><label class="f">' + t("hl.zone") + '<select name="zone"><option value="">' + t("hl.noZone") + "</option>" + (SF.state.zones || []).map(function (z) { return '<option' + (z === x.zone ? " selected" : "") + ">" + esc(z) + "</option>"; }).join("") + "</select></label>" +
+      '<label class="f">' + t("hl.kind") + '<select name="kind"><option value="table">' + t("hl.kTable") + '</option><option value="cabin"' + (x.kind === "cabin" ? " selected" : "") + ">" + t("hl.kCabin") + "</option></select></label></div>" +
+      '<button class="btn primary block">' + t("btn.save") + "</button></form>" +
       '<div class="stack tbmore"><button type="button" class="btn ghost block" data-act="tbtoggle" data-id="' + x.id + '">' + t(x.active ? "tb.turnOff" : "tb.turnOn") + "</button>" +
       '<button type="button" class="btn ghost block" data-act="tbcode" data-id="' + x.id + '">' + t("tb.newCode") + '</button><p class="fine">' + t("tb.newCodeHint") + "</p>" +
       '<button type="button" class="btn ghost block danger" data-act="tbdel" data-id="' + x.id + '">' + I("trash", 16) + t("tb.del") + "</button></div>"); };
-  SF.forms.tbname = function (fd) { return api().patch("/restaurant/tables/" + fd.id, { name: fd.name }).then(function () { SF.closeModal(); SF.render({ quiet: true }); }); };
+  SF.forms.tbname = function (fd) { return api().patch("/restaurant/tables/" + fd.id, { name: fd.name, zone: fd.zone || "", kind: fd.kind }).then(function () { SF.closeModal(); SF.render({ quiet: true }); }); };
   SF.actions.tbtoggle = function (el) { var x = tbById(el.dataset.id); return api().patch("/restaurant/tables/" + x.id, { active: !x.active }).then(function () { SF.closeModal(); SF.render({ quiet: true }); }); };
   SF.actions.tbcode = function (el) { return api().post("/restaurant/tables/" + el.dataset.id + "/newcode").then(function () { SF.closeModal(); SF.toast(t("tb.codeDone")); SF.render({ quiet: true }); }); };
   SF.actions.tbdel = function (el) { return api().del("/restaurant/tables/" + el.dataset.id).then(function () { SF.closeModal(); SF.render({ quiet: true }); }); };
@@ -384,4 +392,73 @@
   SF.actions.rcpt = function (el) { return api().get("/orders/" + el.dataset.id + "/receipt").then(function (r) {
     SF.modal('<button class="mx" data-act="closemodal" aria-label="' + t("btn.close") + '">' + I("x", 20) + '</button><div class="stack"><h2 class="h2">' + t("tr.receipt") + '</h2><img class="rcptimg" src="' + r.image + '" alt="' + t("tr.receipt") + '"><p class="fine">' + t("tr.verify") + "</p></div>", "wide"); }); };
   SF.forms.rcard = function (fd) { return api().patch("/restaurant/me", { payCard: { number: fd.number, holder: fd.holder, bank: fd.bank } }).then(function () { SF.toast(t("btn.saved")); SF.render({ quiet: true }); }); };
+
+  /* ---------- Hall: floors / rooms, every table a square — green free, red busy, orange «waiter called» ---------- */
+  function mins(ms) { return Math.max(1, Math.round((Date.now() - ms) / 60000)); }
+  R("/rest/hall", { title: "hl.nav", live: true, render: function (p, q) {
+    return api().get("/restaurant/hall").then(function (h) { SF.state.hall = h; var u = SF.state.user, boss = !u.staff || u.staffRole === "manager";
+      var zones = h.zones.slice(); if (h.tables.some(function (x) { return !x.zone || zones.indexOf(x.zone) < 0; })) zones.push("");
+      var z = q.z != null ? q.z : (SF.state.hallZ != null ? SF.state.hallZ : (zones.length > 1 ? zones[0] : "*")); SF.state.hallZ = z;
+      var list = h.tables.filter(function (x) { return z === "*" || (z === "" ? !x.zone || h.zones.indexOf(x.zone) < 0 : x.zone === z); });
+      var busy = h.tables.filter(function (x) { return x.busy; }).length;
+      return '<div class="hlbar"><div class="hlstat"><span class="hlk free"></span>' + t("hl.free") + ' <b class="num">' + (h.tables.length - busy) + '</b><span class="hlk busy"></span>' + t("hl.busy") + ' <b class="num">' + busy + "</b></div>" +
+          '<a class="btn primary" href="#/rest/pos">' + I("cash", 18) + t("pos.nav") + "</a></div>" +
+        (zones.length > 1 ? '<div class="chips hlzones" role="tablist">' + zones.map(function (zz) { var n = h.tables.filter(function (x) { return zz === "" ? !x.zone || h.zones.indexOf(x.zone) < 0 : x.zone === zz; }), nb = n.filter(function (x) { return x.busy; }).length;
+            return '<a role="tab" class="chip' + (zz === z ? " on" : "") + '" href="#/rest/hall?z=' + encodeURIComponent(zz) + '">' + esc(zz || t("hl.noZone")) + ' <i class="num">' + nb + "/" + n.length + "</i></a>"; }).join("") +
+            '<a role="tab" class="chip' + (z === "*" ? " on" : "") + '" href="#/rest/hall?z=*">' + t("home.all") + "</a></div>" : "") +
+        (list.length ? '<div class="hlgrid">' + list.map(function (x) {
+            return '<button type="button" class="hlt ' + (x.called ? "hcall" : x.busy ? "hbusy" : "hfree") + (x.kind === "cabin" ? " cabin" : "") + '" data-act="hlopen" data-id="' + x.id + '"><span class="hlic">' + I(x.kind === "cabin" ? "store" : "grid", 16) + "</span><b>" + esc(x.name) + "</b>" +
+              (x.busy ? '<span class="num">' + money(x.sum) + "</span><small>" + (x.cooking ? I("fire", 12) : I("check", 12)) + t("hl.min", { n: mins(x.since) }) + "</small>" : "<small>" + t(x.called ? "hl.called" : "hl.freeS") + "</small>") + (x.called && x.busy ? '<em class="hlbell">' + I("bell", 12) + "</em>" : "") + "</button>"; }).join("") + "</div>"
+          : SF.empty("grid", t("hl.none"), boss ? t("hl.noneSub") : "", boss ? '<a class="btn primary" href="#/rest/tables">' + I("plus", 16) + t("hl.setup") + "</a>" : "")) +
+        (boss && h.tables.length ? '<p class="fine">' + I("info", 14) + t("hl.hint") + ' <a class="link" href="#/rest/tables">' + t("hl.setup") + "</a></p>" : "");
+    });
+  } });
+  function hlt(id) { return ((SF.state.hall || {}).tables || []).filter(function (x) { return x.id === id; })[0]; }
+  SF.actions.hlopen = function (el) { var x = hlt(el.dataset.id); if (!x) return;
+    SF.modal('<button class="mx" data-act="closemodal" aria-label="' + t("btn.close") + '">' + I("x", 20) + '</button><div class="stack"><h2 class="h2">' + t(x.kind === "cabin" ? "hl.cabin" : "tb.table", { n: esc(x.name) }) + (x.zone ? ' <small class="muted">· ' + esc(x.zone) + "</small>" : "") + "</h2>" +
+      (x.busy ? '<div class="hlorders">' + x.orders.map(function (o) { return '<div class="hlo"><div class="row between"><b>№' + o.number + "</b>" + SF.statusPill(o.status === "delivered" ? "delivered" : o.status) + "</div>" +
+          '<ul class="hlitems">' + o.items.map(function (i) { return "<li><span>" + i.qty + " × " + esc(tx(i.name)) + '</span><b class="num">' + money(i.price * i.qty) + "</b></li>"; }).join("") + "</ul></div>"; }).join("") +
+        '<div class="hltotal"><span>' + t("hl.total") + '</span><b class="num">' + money(x.sum) + "</b></div></div>" : '<p class="muted">' + t("hl.freeLong") + "</p>") +
+      '<a class="btn primary block lg" href="#/rest/pos?table=' + x.id + '" data-act="closemodal">' + I("plus", 18) + t("hl.add") + "</a>" +
+      (x.busy ? '<div class="row2"><button class="btn ok" data-act="hlclose" data-id="' + x.id + '" data-m="cash">' + I("cash", 16) + t("hl.paidCash") + '</button><button class="btn ghost" data-act="hlclose" data-id="' + x.id + '" data-m="card">' + I("card", 16) + t("hl.paidCard") + "</button></div>" : "") + "</div>"); };
+  SF.actions.hlclose = function (el) { var force = !!el.dataset.force;
+    return api().post("/restaurant/tables/" + el.dataset.id + "/close", { method: el.dataset.m, force: force }).then(function (r) { SF.closeModal(); SF.toast(t("hl.closed", { sum: money(r.sum) })); SF.render({ quiet: true }); }, function (e) {
+      if (e && e.code === "TABLE_NOT_SERVED") { SF.modal('<div class="confirm"><span class="cic">' + I("fire", 26) + '</span><h2 class="h2">' + t("hl.notServedT") + '</h2><p class="muted">' + t("hl.notServed") + '</p><div class="row2"><button class="btn ghost" data-act="closemodal">' + t("btn.cancel") + '</button><button class="btn ok" data-act="hlclose" data-force="1" data-id="' + el.dataset.id + '" data-m="' + el.dataset.m + '">' + t("hl.closeAnyway") + "</button></div></div>"); return; }
+      throw e; }); };
+
+  /* ---------- Cash desk / waiter order: type «чой» → it shows, tap to add; to a table (goes to the kitchen) or a counter sale (paid now) ---------- */
+  function pos() { return SF.state.pos || (SF.state.pos = { items: {}, method: "cash", q: "" }); }
+  R("/rest/pos", { title: "pos.nav", render: function (p, q) {
+    return Promise.all([api().get("/restaurant/products"), api().get("/restaurant/hall")]).then(function (r) { var prods = r[0].filter(function (x) { return x.available; }), h = r[1], st = pos();
+      if (q.table !== undefined) st.table = q.table || ""; SF.state.posProds = prods; SF.state.hall = h;
+      var tb = (h.tables.filter(function (x) { return x.id === st.table; })[0]) || null; if (!tb) st.table = "";
+      return '<div class="posw"><section class="card posl"><label class="posfind">' + I("search", 20) + '<input id="posq" data-input="posq" value="' + esc(st.q) + '" placeholder="' + t("pos.findPh") + '" aria-label="' + t("pos.findPh") + '" autocomplete="off" enterkeyhint="search"></label>' +
+          '<div class="poslist" id="poslist">' + posList(prods, st.q) + "</div></section>" +
+        '<section class="card posr"><label class="f">' + t("pos.where") + '<select data-input="postable"><option value="">' + t("pos.counter") + "</option>" +
+          h.tables.map(function (x) { return '<option value="' + x.id + '"' + (x.id === st.table ? " selected" : "") + ">" + esc((x.zone ? x.zone + " · " : "") + t(x.kind === "cabin" ? "hl.cabin" : "tb.table", { n: x.name })) + (x.busy ? " ● " + money(x.sum) : "") + "</option>"; }).join("") + "</select></label>" +
+          '<div id="posticket">' + posTicket() + "</div></section></div>";
+    });
+  } });
+  function posList(prods, s) { s = String(s || "").trim().toLowerCase();
+    var l = prods.filter(function (x) { return !s || [x.name.tg, x.name.ru, x.name.en].join(" ").toLowerCase().indexOf(s) >= 0; }).slice(0, 60);
+    return l.length ? l.map(function (x) { var n = pos().items[x.id] || 0;
+      return '<button type="button" class="posp' + (n ? " in" : "") + '" data-act="posadd" data-id="' + x.id + '">' + (x.photo ? '<img src="' + esc(x.photo) + '" alt="">' : '<span class="pospa">' + SF.art(x.kind, 34) + "</span>") + '<span class="grow"><b>' + esc(tx(x.name)) + '</b><small class="num">' + money(x.price) + "</small></span>" + (n ? '<i class="num">' + n + "</i>" : I("plus", 18)) + "</button>"; }).join("")
+      : '<p class="muted">' + t("pos.none") + "</p>"; }
+  function posTicket() { var st = pos(), prods = SF.state.posProds || [], ids = Object.keys(st.items).filter(function (k) { return st.items[k] > 0; }), sum = 0;
+    var rows = ids.map(function (k) { var x = prods.filter(function (y) { return y.id === k; })[0]; if (!x) return ""; sum += x.price * st.items[k];
+      return '<li><span class="grow">' + esc(tx(x.name)) + '</span><span class="stepper"><button type="button" data-act="posdec" data-id="' + k + '" aria-label="' + t("a.less") + '">' + I("minus", 14) + '</button><b class="num">' + st.items[k] + '</b><button type="button" data-act="posadd" data-id="' + k + '" aria-label="' + t("a.more") + '">' + I("plus", 14) + '</button></span><b class="num">' + money(x.price * st.items[k]) + "</b></li>"; }).join("");
+    return (ids.length ? '<ul class="postk">' + rows + "</ul>" : '<p class="muted postk0">' + t("pos.empty") + "</p>") +
+      '<div class="hltotal"><span>' + t("hl.total") + '</span><b class="num">' + money(sum) + "</b></div>" +
+      (st.table ? '<button type="button" class="btn primary block lg" data-act="possend"' + (ids.length ? "" : " disabled") + ">" + I("fire", 18) + t("pos.toKitchen") + "</button>"
+        : '<div class="seg posm">' + ["cash", "card"].map(function (m) { return '<button type="button" class="' + (st.method === m ? "on" : "") + '" data-act="posm" data-v="' + m + '">' + I(m, 16) + t("pos." + m) + "</button>"; }).join("") + "</div>" +
+          '<button type="button" class="btn ok block lg" data-act="possend"' + (ids.length ? "" : " disabled") + ">" + I("check", 18) + t("pos.sell", { sum: money(sum) }) + "</button>"); }
+  function posRefresh() { var a = document.getElementById("posticket"), b = document.getElementById("poslist"); if (a) a.innerHTML = posTicket(); if (b) b.innerHTML = posList(SF.state.posProds || [], pos().q); }
+  SF.inputs.posq = function (v) { pos().q = v; var b = document.getElementById("poslist"); if (b) b.innerHTML = posList(SF.state.posProds || [], v); };
+  SF.inputs.postable = function (v) { pos().table = v; posRefresh(); };
+  SF.actions.posadd = function (el) { var st = pos(); st.items[el.dataset.id] = (st.items[el.dataset.id] || 0) + 1; posRefresh(); };
+  SF.actions.posdec = function (el) { var st = pos(); st.items[el.dataset.id] = Math.max(0, (st.items[el.dataset.id] || 0) - 1); posRefresh(); };
+  SF.actions.posm = function (el) { pos().method = el.dataset.v; posRefresh(); };
+  SF.actions.possend = function () { var st = pos(), items = Object.keys(st.items).filter(function (k) { return st.items[k] > 0; }).map(function (k) { return { productId: k, qty: st.items[k] }; }); if (!items.length) return;
+    return api().post("/restaurant/pos", { items: items, tableId: st.table || null, method: st.method }).then(function (o) { var tbl = st.table; SF.state.pos = { items: {}, method: st.method, q: "", table: "" };
+      SF.toast(tbl ? t("pos.sent", { n: o.number }) : t("pos.sold", { sum: money(o.subtotal) })); if (tbl) SF.go("/rest/hall"); else SF.render({ quiet: true }); }); };
 })();

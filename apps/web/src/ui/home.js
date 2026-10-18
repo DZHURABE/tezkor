@@ -7,7 +7,7 @@
   /* key, picture, tile colour, where it opens when switched on */
   SF.SERVICES = [
     ["food", "🍔", "#FFF1E6", "/food"], ["taxi", "🚕", "#FFF7DB", null], ["shops", "🛒", "#E8F7EE", null], ["ads", "📢", "#E8F0FF", "/ads"],
-    ["masters", "🛠️", "#F1EBFF", null], ["jobs", "💼", "#FFE9EF", null], ["grocery", "🥦", "#EAF7E3", null], ["pharmacy", "💊", "#E6F4FB", null], ["realty", "🏠", "#FFECE8", null]];
+    ["masters", "🛠️", "#F1EBFF", "/masters"], ["jobs", "💼", "#FFE9EF", "/jobs"], ["grocery", "🥦", "#EAF7E3", null], ["pharmacy", "💊", "#E6F4FB", null], ["realty", "🏠", "#FFECE8", "/realty"]];
   SF.svcOn = function (k) { var s = (SF.state.pub || {}).services; return k === "food" ? !s || s.food !== false : !!(s && s[k]); };
   function svcTile(x, i) { var on = SF.svcOn(x[0]) && x[3];
     return (on ? '<a href="#' + x[3] + '"' : '<button type="button" data-act="soon" data-k="' + x[0] + '"') + ' class="svt' + (on ? " on" : "") + '" style="--sb:' + x[2] + ";--i:" + i + '">' +
@@ -19,8 +19,7 @@
   SF.actions.soon = function (el) { var k = el.dataset.k, x = SF.SERVICES.filter(function (s) { return s[0] === k; })[0] || ["", "✨"];
     SF.modal('<button class="mx" data-act="closemodal" aria-label="' + t("btn.close") + '">' + I("x", 20) + '</button><div class="soonbox"><span class="sbig" aria-hidden="true">' + x[1] + '</span><h2 class="h2">' + t("sa.soonT") + '</h2><p class="muted">' + t("sa.soonSub") + "</p>" +
       (k ? '<span class="pill p-mut">' + t("sv." + k) + " · " + t("sv.soon") + "</span>" : "") + '<a class="btn primary block lg" href="#/food" data-act="closemodal">' + "🍔 " + t("sa.orderFood") + "</a></div>"); };
-  /* «+» in the bottom bar: a new classified ad (when the admin has switched classifieds on) */
-  SF.actions.create = function () { if (SF.svcOn("ads")) { SF.go("/ads/new"); return; } SF.actions.soon({ dataset: { k: "ads" } }); };
+  /* «+» in the bottom bar is in ads.js: it posts into the listing services the admin switched on */
 
   /* ---------- Home ---------- */
   function etaMin(r) { return parseInt(String(r.eta || "").split(/[–-]/)[0], 10) || 99; }
