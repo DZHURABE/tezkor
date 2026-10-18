@@ -872,15 +872,6 @@
     route("GET", "/admin/users", ["admin"], function (req, b, q) { var l = db.users; if (q.role) l = l.filter(function (u) { return u.role === q.role; });
       if (q.q) { var s = str(q.q).toLowerCase(); l = l.filter(function (u) { return u.name.toLowerCase().indexOf(s) >= 0 || u.phone.indexOf(s.replace(/\D/g, "") || "~") >= 0; }); }
       return l.map(function (u) { var x = pubUser(u); x.orderCount = db.orders.filter(function (o) { return o.customerId === u.id || o.courierId === u.id; }).length; return x; }); });
-    route("DELETE", "/admin/users/:id", ["admin"], function (req, b, q, p) {
-      var u = find(db.users, p.id); if (!u) E(404, "NOT_FOUND");
-      if (u.id === req.user.id) E(409, "CANNOT_DELETE_SELF");
-      if (u.role === "admin") mainOnly(req);
-      if (u.role === "courier" && activeOf(u.id)) E(409, "HAS_ACTIVE_ORDER");
-      Object.keys(db.sessions).forEach(function (k) { if (db.sessions[k].userId === u.id) delete db.sessions[k]; });
-      db.users.splice(db.users.indexOf(u), 1);
-      save(); return { deleted: true, id: u.id, phone: u.phone };
-    });
     route("PATCH", "/admin/users/:id", ["admin"], function (req, b, q, p) { var u = find(db.users, p.id); if (!u) E(404, "NOT_FOUND"); if (u.role === "admin" && u.id !== req.user.id) mainOnly(req);
       if (b.active != null) { if (u.id === req.user.id) E(409, "CANNOT_BLOCK_SELF"); if (!b.active && u.role === "courier" && activeOf(u.id)) E(409, "HAS_ACTIVE_ORDER");
         u.active = !!b.active; if (!u.active) { if (u.courier) u.courier.online = false; Object.keys(db.sessions).forEach(function (k) { if (db.sessions[k].userId === u.id) delete db.sessions[k]; }); } }
