@@ -872,6 +872,19 @@
     route("GET", "/admin/users", ["admin"], function (req, b, q) { var l = db.users; if (q.role) l = l.filter(function (u) { return u.role === q.role; });
       if (q.q) { var s = str(q.q).toLowerCase(); l = l.filter(function (u) { return u.name.toLowerCase().indexOf(s) >= 0 || u.phone.indexOf(s.replace(/\D/g, "") || "~") >= 0; }); }
       return l.map(function (u) { var x = pubUser(u); x.orderCount = db.orders.filter(function (o) { return o.customerId === u.id || o.courierId === u.id; }).length; return x; }); });
+    route("DELETE", "/admin/users/:id", ["admin"], function (req, b, q, p) {
+      var u = find(db.users, p.id); if (!u) E(404, "NOT_FOUND");
+      if (u.role === "admin") E(403, "ADMIN_DELETE_USE_ADMIN_PANEL");
+      if (u.id === req.user.id) E(409, "CANNOT_DELETE_SELF");
+      if (u.role === "courier" && activeOf(u.id)) E(409, "HAS_ACTIVE_ORDER");
+      /* Remove account credentials and sessions so the same phone can register again. Keep historical orders for records. */
+      db.users.splice(db.users.indexOf(u), 1);
+      Object.keys(db.sessions).forEach(function (k) { if (db.sessions[k].userId === u.id) delete db.sessions[k]; });
+      if (db.ads) db.ads = db.ads.filter(function (a) { if (a.userId !== u.id) return true; (a.photos || []).forEach(function (url) { media.del(url); }); return false; });
+      if (db.adPays) db.adPays = db.adPays.filter(function (x) { return x.userId !== u.id; });
+      db.notifications = db.notifications.filter(function (n) { return n.target !== "u:" + u.id; });
+      save(); return { ok: true, deletedId: u.id, phoneAvailable: u.phone };
+    });
     route("PATCH", "/admin/users/:id", ["admin"], function (req, b, q, p) { var u = find(db.users, p.id); if (!u) E(404, "NOT_FOUND"); if (u.role === "admin" && u.id !== req.user.id) mainOnly(req);
       if (b.active != null) { if (u.id === req.user.id) E(409, "CANNOT_BLOCK_SELF"); if (!b.active && u.role === "courier" && activeOf(u.id)) E(409, "HAS_ACTIVE_ORDER");
         u.active = !!b.active; if (!u.active) { if (u.courier) u.courier.online = false; Object.keys(db.sessions).forEach(function (k) { if (db.sessions[k].userId === u.id) delete db.sessions[k]; }); } }
