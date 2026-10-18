@@ -780,7 +780,7 @@
         couriers: by(db.users, "role", "courier").length, restaurants: db.restaurants.filter(function (r) { return r.active; }).length, byRest: byRest, byCity: byCity, byStatus: byStatus,
         subs: (function () { var m0s = clock() - 30 * DAY, l = (db.subs || []).filter(function (s) { return s.kind === "paid" && s.at >= m0s; });
           return { month: l.reduce(function (x, s) { return x + s.amount; }, 0), count: l.length, soon: db.restaurants.filter(function (r) { return r.active && subOf(r).state === "soon"; }).length, expired: db.restaurants.filter(function (r) { return r.active && subOf(r).state === "expired"; }).length }; })(),
-        payMix: { card: month.filter(function (o) { return o.payment && o.payment.method === "card"; }).length, cash: month.filter(function (o) { return o.payment && o.payment.method === "cash"; }).length } });
+        payMix: { card: month.filter(function (o) { return o.payment.method === "card"; }).length, cash: month.filter(function (o) { return o.payment.method === "cash"; }).length } });
     });
     route("GET", "/admin/orders", ["admin"], function (req, b, q) { var l = db.orders;
       if (q.status) l = l.filter(function (o) { return q.status === "active" ? Rules.ACTIVE.indexOf(o.status) >= 0 : o.status === q.status; });
@@ -890,6 +890,19 @@
         u.active = !!b.active; if (!u.active) { if (u.courier) u.courier.online = false; Object.keys(db.sessions).forEach(function (k) { if (db.sessions[k].userId === u.id) delete db.sessions[k]; }); } }
       /* there is one main admin (set on the server); nobody can be made an admin from the app */
       save(); return pubUser(u); });
+    // Permanently remove an account so its phone number can be used for registration again.
+    route("DELETE", "/admin/users/:id", ["admin"], function (req, b, q, p) {
+      var u = find(db.users, p.id);
+      if (!u) E(404, "NOT_FOUND");
+      if (u.id === req.user.id) E(409, "CANNOT_DELETE_SELF");
+      if (u.role === "admin") mainOnly(req);
+      if (u.role === "courier" && activeOf(u.id)) E(409, "HAS_ACTIVE_ORDER");
+      // Invalidate every session immediately; old credentials cannot keep using the deleted account.
+      Object.keys(db.sessions).forEach(function (k) { if (db.sessions[k].userId === u.id) delete db.sessions[k]; });
+      db.users.splice(db.users.indexOf(u), 1);
+      save();
+      return { deleted: true, id: u.id, phone: u.phone };
+    });
     function newCourier(b, city, restaurantId) { var name = str(b.name, 60), phone = Rules.normPhone(b.phone);
       if (name.length < 2) E(400, "BAD_NAME"); if (!phone) E(400, "BAD_PHONE"); if (db.users.some(function (u) { return u.phone === phone; })) E(409, "PHONE_TAKEN");
       var tmp = newPassword(), u = { id: id("u"), role: "courier", name: name, phone: phone, pass: hashPw(tmp), mustChange: true, active: true, cityId: city.id, createdAt: clock(), lang: "tg",
