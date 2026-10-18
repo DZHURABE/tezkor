@@ -24,7 +24,14 @@
         '<div class="two"><section class="card"><h3>' + t("k.gmv14") + "</h3>" + SF.bars(d.series, money, t("k.gmv14")) + "</section>" +
         '<section class="card"><h3>' + t("k.byStatus") + "</h3>" + hbars(st.map(function (s) { return { l: SF.statusPill(s), v: d.byStatus[s] || 0 }; }), String) + "</section></div>" +
         '<div class="two"><section class="card"><div class="rowhead"><h3>' + t("k.topRest") + '</h3><a class="link" href="#/admin/restaurants">' + t("btn.all") + "</a></div>" + hbars(d.byRest.slice(0, 6).map(function (r) { return { l: esc(tx(r.name)), v: r.sum }; }), money) + "</section>" +
-        '<section class="card"><h3>' + t("k.byCity") + "</h3>" + hbars(d.byCity.map(function (c) { return { l: esc(tx(c.name)), v: c.sum }; }), money) + '<div class="line"><span>' + I("card", 14) + t("pay.card") + '</span><b class="num">' + d.payMix.card + '</b></div><div class="line"><span>' + I("cash", 14) + t("pay.cash") + '</span><b class="num">' + d.payMix.cash + "</b></div></section></div>";
+        '<section class="card"><h3>' + t("k.byCity") + "</h3>" + hbars(d.byCity.map(function (c) { return { l: esc(tx(c.name)), v: c.sum }; }), money) + '<div class="line"><span>' + I("card", 14) + t("pay.card") + '</span><b class="num">' + d.payMix.card + '</b></div><div class="line"><span>' + I("cash", 14) + t("pay.cash") + '</span><b class="num">' + d.payMix.cash + "</b></div></section></div>" +
+        /* every restaurant on its own line */
+        '<section class="card"><div class="rowhead"><h3>' + I("store", 18) + " " + t("rs2.title") + '</h3><a class="link" href="#/admin/restaurants">' + t("btn.all") + "</a></div>" +
+          (d.byRest.length ? '<div class="tscroll"><table class="tbl cardtbl rsum"><thead><tr><th>' + t("rs2.rest") + "</th><th>" + t("rs2.today") + "</th><th>" + t("rs2.month") + "</th><th>" + t("rs2.orders") + "</th><th>" + t("rs2.platform") + "</th><th>" + t("rs2.open") + "</th></tr></thead><tbody>" +
+            d.byRest.map(function (r) { var H = [t("rs2.rest"), t("rs2.today"), t("rs2.month"), t("rs2.orders"), t("rs2.platform"), t("rs2.open")];
+              return SF.labelCells(H, "<tr" + (r.active ? "" : ' class="muted"') + "><td><b>" + esc(tx(r.name)) + "</b>" + (r.ratingCount ? ' <small class="muted">★ ' + r.rating + "</small>" : "") + '</td><td class="num">' + money(r.today) + ' <small class="muted">(' + r.todayCount + ')</small></td><td class="num">' + money(r.sum) + '</td><td class="num">' + r.count + '</td><td class="num">' + money(r.platform) + '</td><td class="num">' + (r.open ? '<span class="pill p-warn">' + r.open + "</span>" : "0") + "</td></tr>"); }).join("") + "</tbody></table></div>" : '<p class="muted">' + t("rs2.none") + "</p>") + "</section>" +
+        /* launch day: start every number from 0 (main admin only) */
+        (d.isMain ? '<section class="card launch"><div class="grow"><b>' + I("bolt", 18) + " " + t("rz.title") + '</b><p class="muted">' + t("rz.sub") + "</p>" + (d.statsResetAt ? '<small class="muted">' + t("rz.last", { d: SF.dt(d.statsResetAt) }) + "</small>" : "") + '</div><button type="button" class="btn danger" data-act="rzopen">' + I("trash", 16) + t("rz.btn") + "</button></section>" : "");
     });
   } });
 
@@ -486,4 +493,13 @@
   SF.actions.aaddel = function (el) { SF.modal('<div class="confirm"><span class="cic bad">' + I("trash", 26) + '</span><h2 class="h2">' + t("ads.delQ") + '</h2><div class="row2"><button class="btn ghost" data-act="closemodal">' + t("btn.cancel") + '</button><button class="btn danger" data-act="aaddelok" data-id="' + el.dataset.id + '">' + t("ads.delete") + "</button></div></div>"); };
   SF.actions.aaddelok = function (el) { return api().del("/admin/ads/" + el.dataset.id).then(function () { SF.closeModal(); SF.toast(t("ads.deleted")); SF.render({ quiet: true }); }); };
   SF.actions.apay = function (el) { return api().post("/admin/ad-pays/" + el.dataset.id, { ok: !!el.dataset.ok }).then(function () { SF.toast(t("btn.saved")); SF.render({ quiet: true }); }); };
+  SF.actions.rzopen = function () {
+    SF.modal('<button class="mx" data-act="closemodal" aria-label="' + t("btn.close") + '">' + I("x", 20) + '</button><form class="stack" data-form="rzgo"><h2 class="h2">' + t("rz.title") + '</h2><p class="muted">' + t("rz.what") + "</p>" +
+      '<ul class="rzlist"><li>' + I("check", 14) + t("rz.keep") + "</li><li>" + I("trash", 14) + t("rz.del") + "</li></ul>" +
+      '<label class="checkrow"><input type="checkbox" name="customers"><span>' + t("rz.cust") + '<small class="muted">' + t("rz.custHint") + "</small></span></label>" +
+      '<label class="checkrow"><input type="checkbox" name="ratings" checked><span>' + t("rz.rat") + '<small class="muted">' + t("rz.ratHint") + "</small></span></label>" +
+      '<label class="f">' + t("rz.type") + '<input name="confirm" inputmode="numeric" maxlength="1" autocomplete="off" required></label>' +
+      '<button class="btn danger block lg">' + I("trash", 18) + t("rz.go") + "</button></form>"); };
+  SF.forms.rzgo = function (fd) { if (String(fd.confirm).trim() !== "0") { SF.toast(t("e.CONFIRM_ZERO"), "err"); return; }
+    return api().post("/admin/reset-stats", { confirm: "0", customers: !!fd.customers, ratings: !!fd.ratings }).then(function (n) { SF.closeModal(); SF.toast(t("rz.done", { n: n.orders })); SF.render({ quiet: true }); }); };
 })();

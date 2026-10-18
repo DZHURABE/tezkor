@@ -741,12 +741,17 @@
         rating: rated.length ? Math.round(rated.reduce(function (s, o) { return s + o.review.rating; }, 0) / rated.length * 10) / 10 : null,
         series: series, topProducts: Object.keys(tops).map(function (k) { return tops[k]; }).sort(function (a, b) { return b.qty - a.qty; }).slice(0, 5) };
     }
-    route("GET", "/admin/dashboard", ["admin"], function () {
+    route("GET", "/admin/dashboard", ["admin"], function (req) {
       var s = statsFor(db.orders), m0 = startOfDay(clock()) - 29 * 86400000, month = db.orders.filter(function (o) { return o.status === "delivered" && o.createdAt >= m0; });
-      var byRest = db.restaurants.map(function (r) { var l = month.filter(function (o) { return o.restaurantId === r.id; }); return { id: r.id, name: r.name, count: l.length, sum: l.reduce(function (x, o) { return x + o.subtotal; }, 0), rating: r.rating }; }).sort(function (a, b) { return b.sum - a.sum; });
+      var d0 = startOfDay(clock()), sumOf = function (l) { return l.reduce(function (x, o) { return x + o.subtotal; }, 0); };
+      /* every restaurant on its own line: today, 30 days, platform's share, open orders */
+      var byRest = db.restaurants.map(function (r) { var l = month.filter(function (o) { return o.restaurantId === r.id; }), td = l.filter(function (o) { return o.createdAt >= d0; });
+        return { id: r.id, name: r.name, active: r.active, count: l.length, sum: sumOf(l), today: sumOf(td), todayCount: td.length, platform: l.reduce(function (x, o) { return x + (o.platform || 0); }, 0),
+          open: db.orders.filter(function (o) { return o.restaurantId === r.id && ["pending", "cooking", "ready", "picked_up"].indexOf(o.status) >= 0; }).length, rating: r.rating, ratingCount: r.ratingCount || 0 }; }).sort(function (a, b) { return b.sum - a.sum; });
       var byCity = db.cities.map(function (c) { var l = month.filter(function (o) { return o.cityId === c.id; }); return { id: c.id, name: c.name, count: l.length, sum: l.reduce(function (x, o) { return x + o.subtotal; }, 0) }; });
       var byStatus = {}; db.orders.forEach(function (o) { byStatus[o.status] = (byStatus[o.status] || 0) + 1; });
       return Object.assign(s, { platformMonth: month.reduce(function (x, o) { return x + (o.platform || 0); }, 0), courierMonth: month.reduce(function (x, o) { return x + (o.courierPay || 0); }, 0),
+        statsResetAt: db.meta.statsResetAt || null, isMain: isMain(req.user),
         customers: by(db.users, "role", "customer").length, couriersOnline: db.users.filter(function (u) { return u.role === "courier" && u.active && u.courier.online; }).length,
         couriers: by(db.users, "role", "courier").length, restaurants: db.restaurants.filter(function (r) { return r.active; }).length, byRest: byRest, byCity: byCity, byStatus: byStatus,
         subs: (function () { var m0s = clock() - 30 * DAY, l = (db.subs || []).filter(function (s) { return s.kind === "paid" && s.at >= m0s; });
@@ -818,6 +823,19 @@
     function isMain(u) { var m = mainAdmin(); return !!(m && u && m.id === u.id); }
     function mainOnly(req) { if (!isMain(req.user)) E(403, "MAIN_ADMIN_ONLY"); }
     function pubAdmin(u) { return { id: u.id, name: u.name, phone: u.phone, active: u.active, main: isMain(u), mustChange: !!u.mustChange, createdAt: u.createdAt, lastSeenAt: u.lastSeenAt || null }; }
+    /* launch day: wipe the test orders so every number starts from 0. Restaurants, menus, couriers, staff and settings stay.
+       Only the main admin; he types 0 to confirm. Optionally also test customer accounts and ratings. */
+    route("POST", "/admin/reset-stats", ["admin"], function (req, b) { mainOnly(req); if (String(b.confirm) !== "0") E(400, "CONFIRM_ZERO");
+      var n = { orders: db.orders.length, customers: 0, ratings: false }, gone = {};
+      db.orders = []; db.payments = []; db.notifications = db.notifications.filter(function (x) { return !x.orderId; });
+      db.products.forEach(function (p) { p.sold = 0; }); db.restaurants.forEach(function (r) { tablesOf(r).forEach(function (x) { x.calledAt = null; }); });
+      if (b.ratings) { n.ratings = true; db.restaurants.forEach(function (r) { r.rating = null; r.ratingCount = 0; }); db.products.forEach(function (p) { p.likes = 0; p.dislikes = 0; });
+        db.users.forEach(function (u) { if (u.courier) { u.courier.rating = null; u.courier.ratingCount = 0; } if (u.wRating) { u.wRating = null; u.wRatingCount = 0; } }); }
+      if (b.customers) { db.users = db.users.filter(function (u) { if (u.role !== "customer") return true; gone[u.id] = 1; n.customers++; return false; });
+        Object.keys(db.sessions).forEach(function (k) { if (gone[db.sessions[k].userId]) delete db.sessions[k]; });
+        if (db.ads) db.ads = db.ads.filter(function (a) { if (!gone[a.userId]) return true; (a.photos || []).forEach(function (u) { media.del(u); }); return false; });
+        if (db.adPays) db.adPays = db.adPays.filter(function (x) { return !gone[x.userId]; }); db.notifications = db.notifications.filter(function (x) { return !/^u:/.test(x.target) || !gone[x.target.slice(2)]; }); }
+      db.meta.statsResetAt = clock(); save(); return n; });
     route("GET", "/admin/admins", ["admin"], function (req) { return { me: isMain(req.user), max: ADMIN_MAX, list: db.users.filter(function (u) { return u.role === "admin"; }).map(pubAdmin) }; });
     route("POST", "/admin/admins", ["admin"], function (req, b) { mainOnly(req); var name = str(b.name, 60), phone = Rules.normPhone(b.phone);
       if (name.length < 2) E(400, "BAD_NAME"); if (!phone) E(400, "BAD_PHONE"); if (db.users.some(function (u) { return u.phone === phone; })) E(409, "PHONE_TAKEN");
