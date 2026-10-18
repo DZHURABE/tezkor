@@ -44,7 +44,9 @@
     var u = SF.state.user, path = SF.path().split("?")[0], worker = u.staff && u.staffRole !== "manager";
     /* waiter: orders + his own page; worker: + menu (in stock) and history; owner / manager: everything (his own page only for staff) */
     var WORK = u.staffRole === "waiter" ? ["/rest/orders", "/rest/hall", "/rest/pos", "/rest/me"] : ["/rest", "/rest/orders", "/rest/hall", "/rest/pos", "/rest/menu", "/rest/history", "/rest/me"];
-    var nav = (SF.panelNav[u.role] || []).filter(function (n) { if (n[0] === "/rest/me") return !!u.staff; return !worker || WORK.indexOf(n[0]) >= 0; });
+    var nav = (SF.panelNav[u.role] || []).filter(function (n) { if (n[0] === "/rest/me") return !!u.staff; if (u.restKind === "shop" && (n[0] === "/rest/hall" || n[0] === "/rest/tables")) return false; return !worker || WORK.indexOf(n[0]) >= 0; });
+    /* a shop: «Goods» instead of «Menu» */
+    if (u.restKind === "shop") nav = nav.map(function (n) { return n[0] === "/rest/menu" ? [n[0], "box", "sh.goods"] : n; });
     if (worker && u.role === "restaurant" && WORK.indexOf(path) < 0) setTimeout(function () { SF.go("/rest/orders"); }, 0);
     var cur = nav.filter(function (n) { return n[0] === path; })[0] || nav.filter(function (n) { return path.indexOf(n[0]) === 0 && n[0] !== "/rest" && n[0] !== "/admin"; })[0] || nav[0];
     return '<div class="panel' + (SF.state.drawer ? " open" : "") + '"><aside class="side"><div class="sidehead">' + SF.logo() + '<span class="rolebadge">' + t("role." + u.role) + "</span></div>" +

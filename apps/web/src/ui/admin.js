@@ -67,7 +67,8 @@
       return '<div class="toolbar"><p class="muted">' + t("adm.restCount", { n: list.length }) + '</p><button class="btn primary" data-act="arestnew">' + I("plus", 18) + t("adm.addRest") + "</button></div>" +
         (due.length ? '<section class="card subdue"><h3>' + I("clock", 18) + t("sub.dueTitle", { n: due.length }) + "</h3>" + due.map(function (r) { return '<div class="line"><span><b>' + esc(tx(r.name)) + "</b> " + subPill(r.sub) + '</span><button class="btn sm primary" data-act="asub" data-id="' + r.id + '">' + I("wallet", 14) + t("sub.extend") + "</button></div>"; }).join("") + "</section>" : "") +
         table([t("adm.restaurant"), t("sub.title"), t("dl.who"), t("k.rating"), t("adm.ordersN"), t("adm.commission"), t("adm.status"), t("adm.activeL")], list.map(function (r) {
-          return '<tr><td><div class="tcell"><span class="cim" style="--tone:' + esc(r.tone) + '">' + SF.art("plate", 30) + "</span><div><b>" + esc(tx(r.name)) + '</b><small class="muted num">' + esc(r.owner ? SF.phone(r.owner.phone) : "") + '</small><button type="button" class="link sm" data-act="arestedit" data-id="' + r.id + '">' + I("edit", 14) + " " + t("btn.edit") + "</button></div></div></td><td><div class=\"subcell\">" + subPill(r.sub) + '<button class="btn sm ghost" data-act="asub" data-id="' + r.id + '">' + I("wallet", 14) + t("sub.extend") + "</button></div></td><td>" + '<select class="dsel" data-input="adeliv" data-id="' + r.id + '" aria-label="' + t("dl.who") + '">' + ["platform", "own", "mixed"].map(function (m) { return '<option value="' + m + '"' + ((r.delivery || "platform") === m ? " selected" : "") + ">" + t("dl.m." + m) + "</option>"; }).join("") + "</select></td><td>" + SF.stars(r.rating) + '</td><td class="num">' + r.orderCount + "</td>" +
+          return '<tr><td><div class="tcell"><span class="cim" style="--tone:' + esc(r.tone) + '">' + SF.art(r.kind === "shop" ? "box" : "plate", 30) + "</span><div><b>" + esc(tx(r.name)) + "</b>" + (r.kind === "shop" ? ' <span class="pill p-info">' + t("sh.kShop") + "</span>" : "") +
+            '<label class="pinsw"><span>' + t("sh.first") + "</span>" + sw(!!r.pinned, "apin", r.id, t("sh.pinned")) + "</label>" + '<small class="muted num">' + esc(r.owner ? SF.phone(r.owner.phone) : "") + '</small><button type="button" class="link sm" data-act="arestedit" data-id="' + r.id + '">' + I("edit", 14) + " " + t("btn.edit") + "</button></div></div></td><td><div class=\"subcell\">" + subPill(r.sub) + '<button class="btn sm ghost" data-act="asub" data-id="' + r.id + '">' + I("wallet", 14) + t("sub.extend") + "</button></div></td><td>" + '<select class="dsel" data-input="adeliv" data-id="' + r.id + '" aria-label="' + t("dl.who") + '">' + ["platform", "own", "mixed"].map(function (m) { return '<option value="' + m + '"' + ((r.delivery || "platform") === m ? " selected" : "") + ">" + t("dl.m." + m) + "</option>"; }).join("") + "</select></td><td>" + SF.stars(r.rating) + '</td><td class="num">' + r.orderCount + "</td>" +
             '<td><form class="inl" data-form="acom" data-id="' + r.id + '"><input name="v" inputmode="numeric" value="' + r.commissionPct + '" aria-label="' + t("adm.commission") + '"><span>%</span><button class="iconbtn" aria-label="' + t("btn.save") + '">' + I("check", 16) + "</button></form></td>" +
             "<td>" + (r.isOpenNow ? '<span class="pill p-ok">' + t("rest.openNow") + "</span>" : '<span class="pill p-mut">' + t("rest.closedShort") + "</span>") + "</td><td>" + sw(r.active, "arest", r.id, t("adm.activeL")) + "</td></tr>"; }));
     });
@@ -132,16 +133,20 @@
   SF.actions.arest = function (el) { return api().patch("/admin/restaurants/" + el.dataset.id, { active: el.getAttribute("aria-checked") !== "true" }).then(function () { SF.render({ quiet: true }); }); };
   /* ---------- new restaurant: one page — name, town, manager, place on the map, delivery area, access ---------- */
   var ACCESS = [["t7", 7, 0], ["t14", 14, 0], ["m1", 0, 1], ["m2", 0, 2], ["m3", 0, 3], ["m6", 0, 6], ["m12", 0, 12]];
-  function nr() { return SF.state.nr || (SF.state.nr = { mode: "pin", pin: null, pts: [], marks: [], access: "m1", cityId: SF.state.cityId || ((SF.state.cities || [])[0] || {}).id, f: {} }); }
+  function nr() { return SF.state.nr || (SF.state.nr = { mode: "pin", kind: "food", pin: null, pts: [], marks: [], access: "m1", cityId: SF.state.cityId || ((SF.state.cities || [])[0] || {}).id, f: {} }); }
   R("/admin/restaurants/new", { title: "adm.addRest", render: function () {
     var x = nr(), c = (SF.state.cities || []).filter(function (y) { return y.id === x.cityId; })[0] || (SF.state.cities || [])[0], f = x.f, acc = ACCESS.filter(function (a) { return a[0] === x.access; })[0];
     x.marks.length = 0; if (x.pin) x.marks.push({ lat: x.pin.lat, lng: x.pin.lng, type: "rest", label: "R" });
     var inp = function (n, label, extra) { return '<label class="f">' + label + '<input name="' + n + '" data-input="nrf" value="' + esc(f[n] || "") + '"' + (extra || "") + "></label>"; };
     return '<a class="backlink" href="#/admin/restaurants">' + I("chevL", 18) + t("adm.restaurants") + "</a>" +
       '<form class="nrform stack" data-form="nrsave">' +
-      '<section class="card stack"><h3><span class="num stepn">1</span>' + t("nr.place") + "</h3>" + inp("name", t("adm.restName"), " required") +
+      '<section class="card stack"><h3><span class="num stepn">1</span>' + t("nr.place") + "</h3>" +
+        '<div class="seg nrkind" role="group">' + [["food", "store", "sh.kFood"], ["shop", "bag", "sh.kShop"]].map(function (k) { return '<button type="button" class="' + (x.kind === k[0] ? "on" : "") + '" aria-pressed="' + (x.kind === k[0]) + '" data-act="nrkind" data-v="' + k[0] + '">' + I(k[1], 16) + " " + t(k[2]) + "</button>"; }).join("") + "</div>" +
+        inp("name", t(x.kind === "shop" ? "sh.name" : "adm.restName"), " required") +
         '<div class="grid2"><label class="f">' + t("profile.city") + '<select name="cityId" data-input="nrcity">' + (SF.state.cities || []).map(function (y) { return '<option value="' + y.id + '"' + (y.id === x.cityId ? " selected" : "") + ">" + esc(tx(y.name)) + "</option>"; }).join("") + "</select></label>" + inp("cuisine", t("adm.cuisine"), ' placeholder="' + t("adm.cuisinePh") + '"') + "</div>" +
-        inp("address", t("adm.addrL"), ' placeholder="' + t("nr.addrPh") + '"') + "</section>" +
+        inp("address", t("adm.addrL"), ' placeholder="' + t("nr.addrPh") + '"') +
+        '<label class="checkrow"><input type="checkbox" name="pinned"' + (x.f.pinned ? " checked" : "") + "><span>" + t("sh.pinned") + '<small class="muted">' + t("sh.pinnedHint") + "</small></span></label>" +
+        '<label class="checkrow"><input type="checkbox" name="pickup"' + (x.f.pickup != null ? (x.f.pickup ? " checked" : "") : x.kind === "shop" ? " checked" : "") + "><span>" + t("sh.pickupSet") + '<small class="muted">' + t("sh.pickupSetSub") + "</small></span></label></section>" +
       '<section class="card stack"><h3><span class="num stepn">2</span>' + t("nr.manager") + '</h3><div class="grid2">' + inp("ownerName", t("nr.mName")) +
         '<label class="f">' + t("nr.mPhone") + '<span class="phonein"><i>+992</i><input name="ownerPhone" data-input="nrf" inputmode="tel" value="' + esc(f.ownerPhone || "") + '" required></span></label></div><p class="fine">' + t("nr.mNote") + "</p></section>" +
       '<section class="card stack"><h3><span class="num stepn">3</span>' + t("nr.map") + "</h3>" +
@@ -165,9 +170,11 @@
   SF.actions.nracc = function (el) { nr().access = el.dataset.v; SF.render({ quiet: true }); };
   SF.actions.nrundo = function () { var s = nr(); s.pts.pop(); SF.redrawMap("nrmap"); nrInfo(); };
   SF.actions.nrclear = function () { nr().pts = []; SF.redrawMap("nrmap"); nrInfo(); };
+  SF.actions.apin = function (el) { var on = el.getAttribute("aria-checked") !== "true"; return api().patch("/admin/restaurants/" + el.dataset.id, { pinned: on }).then(function () { SF.toast(t("btn.saved")); SF.render({ quiet: true }); }); };
+  SF.actions.nrkind = function (el) { nr().kind = el.dataset.v; SF.render({ quiet: true }); };
   SF.forms.nrsave = function (fd) { var s = nr(), a = ACCESS.filter(function (x) { return x[0] === s.access; })[0];
     if (s.pts.length && s.pts.length < 3) { SF.toast(t("zn.need", { n: s.pts.length }), "err"); return; }
-    var body = { name: fd.name, cityId: fd.cityId, cuisine: fd.cuisine, address: fd.address, ownerName: fd.ownerName, ownerPhone: fd.ownerPhone, commissionPct: fd.commissionPct ? Number(fd.commissionPct) : 0,
+    var body = { kind: s.kind || "food", pinned: !!fd.pinned, pickup: !!fd.pickup, name: fd.name, cityId: fd.cityId, cuisine: fd.cuisine, address: fd.address, ownerName: fd.ownerName, ownerPhone: fd.ownerPhone, commissionPct: fd.commissionPct ? Number(fd.commissionPct) : 0,
       lat: s.pin ? s.pin.lat : null, lng: s.pin ? s.pin.lng : null, zone: s.pts.length >= 3 ? s.pts : [] };
     if (a[2]) { body.months = a[2]; body.amount = Number(fd.amount || 0); } else body.trialDays = a[1];
     return api().post("/admin/restaurants", body).then(function (r) { SF.state.nr = null; SF.go("/admin/restaurants"); setTimeout(function () { creds(tx(r.name), r.login); }, 300); }); };

@@ -1733,3 +1733,29 @@ details.more[open] summary .ic:last-child{transform:rotate(180deg)}details.more>
 .m-me{fill:#1E6FE8;stroke:#fff;stroke-width:3}.m-acc{fill:rgba(30,111,232,.14);stroke:rgba(30,111,232,.45);stroke-width:1.5}
 .tm-layer{position:absolute;left:10px;bottom:28px;z-index:3;display:inline-flex;align-items:center;gap:6px;min-height:38px;padding:0 12px;border:0;border-radius:12px;background:rgba(255,255,255,.95);color:#1D2321;font:inherit;font-size:13px;font-weight:700;box-shadow:0 6px 16px -8px rgba(0,0,0,.5);cursor:pointer}
 .tm-layer.on{background:#14261D;color:#fff}
+/* ---------- shops ---------- */
+.shbig{display:block;margin:0 0 12px;border-radius:24px;overflow:hidden;background:var(--surface);box-shadow:0 14px 30px -18px rgba(0,0,0,.45);color:var(--ink);animation:v3in .4s both}
+.shcov{position:relative;display:flex;align-items:flex-end;height:120px;padding:12px 14px;color:#fff;background:linear-gradient(120deg,#0E1A2B,#1E3A6B 60%,#3366CC);background-size:cover;background-position:center}
+.shcov::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.05),rgba(0,0,0,.45))}
+.shcov>*{position:relative;z-index:1}.shcov b{font-size:24px;font-weight:900;letter-spacing:.5px}
+.shpin{position:absolute!important;top:10px;left:10px;font-style:normal;font-size:11px;font-weight:800;color:#4a3500;background:#F7C948;border-radius:999px;padding:3px 9px}
+.shopen{position:absolute!important;top:10px;right:10px;font-style:normal;font-size:11px;font-weight:700;color:#fff;background:rgba(0,0,0,.45);border-radius:999px;padding:3px 9px}.shopen.on{background:#0E8A4A}
+.shbody{display:flex;align-items:center;gap:12px;padding:10px 14px 12px}.shbody b{display:block;font-size:16px}
+.shlogo{flex:none;display:grid;place-items:center;width:52px;height:52px;border-radius:16px;overflow:hidden;background:var(--tone,#E3ECFF);margin-top:-30px;border:3px solid var(--surface);box-shadow:0 8px 18px -10px rgba(0,0,0,.5)}
+.shlogo img{width:100%;height:100%;object-fit:cover}.shlogo b{font-weight:900;font-size:15px;color:#14261D}
+.shlogo.sm{width:48px;height:48px;margin-top:0;border-width:0;box-shadow:none}
+.shfacts{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12.5px;color:var(--muted)}.shfacts span{display:inline-flex;align-items:center;gap:4px}
+.shlist{display:flex;flex-direction:column;gap:10px}
+.shrow{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:18px;background:var(--surface);box-shadow:var(--sh1);color:var(--ink)}.shrow b{display:block;font-size:15px}.shrow.closed{opacity:.6}
+.stockl{display:inline-block;font-size:11px;font-weight:800;color:#B5410A;background:#FDEBDD;border-radius:999px;padding:1px 7px;margin:2px 0}
+.cowho{margin:0 0 10px}.cowho button{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:42px;font-size:14px}
+.pickbox{display:flex;align-items:center;gap:12px;padding:12px;border-radius:16px;background:var(--green-soft);color:var(--green-text);margin-bottom:10px}.pickbox div{flex:1;display:flex;flex-direction:column;gap:2px}.pickbox span{color:var(--ink);font-size:14px}.pickbox small{color:var(--muted)}
+.pickcard.ready{box-shadow:0 0 0 2px #19A85C,var(--sh1)}
+.pinsw{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin:4px 0}.pinsw .switch{transform:scale(.8)}
+.nrkind{max-width:360px}.nrkind button{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:42px}
+.shhero{height:150px;border-radius:24px;margin:8px 0 12px}.shhero b{font-size:30px}
+.shhero{height:150px;border-radius:24px;margin:8px 0 12px}.shhero b{font-size:30px}
+/* shop goods without a photo + brand */
+.shic{display:grid;place-items:center;width:100%;height:100%;min-height:64px;color:#3B5BA9;background:linear-gradient(145deg,#EEF3FF,#DCE6FF)}
+.pbrand{display:block;font-size:11px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:#3B5BA9}
+.brandf{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:6px 0 2px}.brandf::-webkit-scrollbar{display:none}.brandf .fchip{flex:none}

@@ -6,7 +6,7 @@
 
   /* key, picture, tile colour, where it opens when switched on */
   SF.SERVICES = [
-    ["food", "🍔", "#FFF1E6", "/food"], ["taxi", "🚕", "#FFF7DB", null], ["shops", "🛒", "#E8F7EE", null], ["ads", "📢", "#E8F0FF", "/ads"],
+    ["food", "🍔", "#FFF1E6", "/food"], ["taxi", "🚕", "#FFF7DB", null], ["shops", "🛒", "#E8F7EE", "/shops"], ["ads", "📢", "#E8F0FF", "/ads"],
     ["masters", "🛠️", "#F1EBFF", "/masters"], ["jobs", "💼", "#FFE9EF", "/jobs"], ["grocery", "🥦", "#EAF7E3", null], ["pharmacy", "💊", "#E6F4FB", null], ["realty", "🏠", "#FFECE8", "/realty"]];
   /* the picture of a service: the admin's own photo when he uploaded one, otherwise a clean colour tile with a line icon (no cartoon emoji) */
   var SV_LOOK = { food: ["#FF8A3D", "#D9480F", "bag"], taxi: ["#FFC93C", "#E09A00", "car"], shops: ["#2FBF71", "#0B7A3E", "cart"], ads: ["#4C8DFF", "#1E56C8", "megaphone"], masters: ["#9B6BFF", "#5F35C9", "wrench"],
@@ -68,4 +68,22 @@
         return (on ? '<a href="#' + x[3] + '"' : '<button type="button" data-act="soon" data-k="' + x[0] + '"') + ' class="svrowi" style="--sb:' + x[2] + ";--i:" + i + '">' + SF.svVis(x[0]) + '<span class="grow"><b>' + t("sv." + x[0]) + "</b><small>" + t("svd." + x[0]) + "</small></span>" +
           (on ? '<span class="svstate on">' + t("sa.works") + "</span>" : SF.soonBadge()) + (on ? "</a>" : "</button>"); }).join("") + "</div>";
   } });
+
+  /* ---------- Shops: same engine as restaurants; the admin's «show first» shop on top in a big card ---------- */
+  function shopLogo(r, cls) { return r.logo ? '<span class="' + cls + '"><img src="' + esc(r.logo) + '" alt=""></span>' : '<span class="' + cls + '" style="--tone:' + esc(r.tone || "#E3ECFF") + '"><b>' + esc(tx(r.name).slice(0, 2).toUpperCase()) + "</b></span>"; }
+  function shopFacts(r) { return '<span class="shfacts"><span>' + esc(tx(r.cuisine)) + "</span>" + (r.rating ? "<span>" + I("star", 13) + Number(r.rating).toFixed(1) + "</span>" : "") + "</span>" +
+    '<span class="shfacts"><span>' + I("scooter", 13) + esc(r.eta) + " " + t("u.min") + "</span>" + (r.pickup ? "<span>" + I("store", 13) + t("sh.pickupOk") + "</span>" : "") + "</span>"; }
+  SF.route("/shops", { title: "sv.shops", render: function (p, q) {
+    if (!SF.svcOn("shops") && !(SF.state.user && SF.state.user.role === "admin")) { setTimeout(function () { SF.actions.soon({ dataset: { k: "shops" } }); }, 0); SF.go("/"); return ""; }
+    return api().get("/restaurants?kind=shop&cityId=" + encodeURIComponent(SF.state.cityId)).then(function (list) { var s = String(q.q || "").toLowerCase();
+      var l = list.filter(function (r) { return !s || (tx(r.name) + " " + tx(r.cuisine)).toLowerCase().indexOf(s) >= 0; }), top = l.filter(function (r) { return r.pinned; }), rest = l.filter(function (r) { return !r.pinned; });
+      return '<div class="svhead"><a class="svback" href="#/" aria-label="' + t("btn.back") + '">' + I("chevL", 20) + "</a><h1>" + t("sv.shops") + '</h1><span class="muted">' + t("sh.count", { n: list.length }) + "</span></div>" +
+        '<form class="sasearch slim" data-form="shsearch" role="search">' + I("search", 20) + '<input name="q" value="' + esc(q.q || "") + '" placeholder="' + t("sh.searchPh") + '" aria-label="' + t("sh.searchPh") + '"><button class="sago" aria-label="' + t("btn.find") + '">' + I("chevR", 18) + "</button></form>" +
+        top.map(function (r) { return '<a class="shbig" href="#/r/' + r.id + '"><span class="shcov" style="' + (r.cover ? "background-image:url(" + esc(r.cover) + ")" : "") + '"><em class="shpin">★ ' + t("sh.first") + '</em><em class="shopen ' + (r.isOpenNow ? "on" : "") + '">' + (r.isOpenNow ? t("rc.openTill", { to: r.hours.to }) : t("rest.closedUntil", { from: r.hours.from })) + "</em><b>" + esc(tx(r.name)) + "</b></span>" +
+          '<span class="shbody">' + shopLogo(r, "shlogo") + '<span class="grow"><b>' + esc(tx(r.name)) + "</b>" + shopFacts(r) + "</span>" + I("chevR", 18) + "</span></a>"; }).join("") +
+        (rest.length ? '<div class="shlist">' + rest.map(function (r) { return '<a class="shrow' + (r.isOpenNow ? "" : " closed") + '" href="#/r/' + r.id + '">' + shopLogo(r, "shlogo sm") + '<span class="grow"><b>' + esc(tx(r.name)) + "</b>" + shopFacts(r) + "</span>" + I("chevR", 18) + "</a>"; }).join("") + "</div>" : "") +
+        (!l.length ? SF.empty("store", t(s ? "ads.noneFound" : "sh.none"), t("sh.noneSub")) : "");
+    });
+  } });
+  SF.forms.shsearch = function (fd) { SF.go("/shops?q=" + encodeURIComponent(fd.q || "")); };
 })();

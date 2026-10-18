@@ -223,20 +223,26 @@
   SF.actions.mcat = function (el) { SF.state.mcat = el.dataset.v; SF.render({ quiet: true }); };
   SF.actions.rtpl = function () { SF.modal('<div class="confirm"><span class="cic">' + I("grid", 26) + '</span><h2 class="h2">' + t("tpl.q") + '</h2><p class="muted">' + t("tpl.sub") + '</p><div class="row2"><button class="btn ghost" data-act="closemodal">' + t("btn.cancel") + '</button><button class="btn primary" data-act="rtplok">' + t("tpl.go") + "</button></div></div>"); };
   SF.actions.rtplok = function () { return api().post("/restaurant/menu/template", { key: "tj-uz" }).then(function (r) { SF.closeModal(); SF.toast(t("tpl.done", { n: r.added })); SF.render({ quiet: true }); }); };
+  SF.actions.rpickup = function (el) { var on = el.getAttribute("aria-checked") !== "true"; return api().patch("/restaurant/me", { pickup: on }).then(function () { SF.toast(t("btn.saved")); SF.render({ quiet: true }); }); };
+  SF.actions.given = function (el) { return api().post("/restaurant/orders/" + el.dataset.id + "/given").then(function () { SF.toast(t("sh.givenDone")); SF.render({ quiet: true }); }); };
   function worker() { var u = SF.state.user; return !!(u && u.staff && u.staffRole !== "manager"); }
   function ticket(o) {
     var acts = "";
-    if (o.dineIn && (o.status === "cooking" || o.status === "ready")) acts = '<button class="btn ok block" data-act="served" data-id="' + o.id + '">' + I("check", 16) + t("tb.served") + "</button>";
+    /* «I pick it up myself»: ready → the customer comes and takes it */
+    if (o.pickup && ["cooking", "ready", "picked_up"].indexOf(o.status) >= 0) acts = '<div class="msg info">' + I("store", 16) + t("sh.custComes") + "</div>" + (o.status === "cooking" ? '<button class="btn ghost block" data-act="ready" data-id="' + o.id + '">' + I("bag", 16) + t("rest.markReady") + "</button>" : "") +
+      '<button class="btn ok block" data-act="given" data-id="' + o.id + '">' + I("check", 16) + t("sh.given") + "</button>";
+    else if (o.dineIn && (o.status === "cooking" || o.status === "ready")) acts = '<button class="btn ok block" data-act="served" data-id="' + o.id + '">' + I("check", 16) + t("tb.served") + "</button>";
     else if (o.status === "pending") acts = (!o.dineIn && (o.delivery || "platform") !== "platform" ? '<p class="lbl">' + t("dl.who") + '</p><div class="ic-dl">' + SF.dlChoice((SF.state.tDeliv || {})[o.id] || "own", "tdeliv", o.id) + "</div>" : "") + '<div class="seg" role="group" aria-label="' + t("rest.prep") + '">' + [10, 15, 20, 30, 45].map(function (m) { var on = (SF.state.prep[o.id] || 20) === m; return '<button class="' + (on ? "on" : "") + '" aria-pressed="' + on + '" data-act="prep" data-id="' + o.id + '" data-v="' + m + '">' + m + "</button>"; }).join("") + "</div>" +
       '<div class="row2"><button class="btn ghost" data-act="reject" data-id="' + o.id + '">' + t("rest.reject") + '</button><button class="btn primary" data-act="accept" data-id="' + o.id + '">' + I("check", 16) + t(o.payment.method === "transfer" ? "tr.acceptPaid" : "rest.accept") + "</button></div>";
     else if (o.status === "cooking") acts = '<button class="btn ok block" data-act="ready" data-id="' + o.id + '">' + I("bag", 16) + t("rest.markReady") + "</button>" + selfBtn(o);
     else if (o.selfDelivery) acts = '<div class="msg ok">' + I("store", 16) + t("dl.selfIs", { name: o.selfDelivery.name || t("dl.selfTitle") }) + "</div>" + (o.status === "picked_up" ? '<button class="btn ok block" data-act="selfdone" data-id="' + o.id + '">' + I("check", 16) + t("dl.delivered") + "</button>" : "");
     else acts = '<div class="msg ' + (o.status === "ready" ? "info" : "ok") + '">' + I("scooter", 16) + (o.courier ? t("rest.courierIs", { name: o.courier.name }) : t("rest.waitCourier")) + "</div>" + selfBtn(o);
-    if (o.status !== "pending" && !o.dineIn) acts = dlNote(o) + acts;
+    if (o.status !== "pending" && !o.dineIn && !o.pickup) acts = dlNote(o) + acts;
     return '<article class="ticket t-' + o.status + '"><header><b class="num">№' + o.number + "</b>" + SF.statusPill(o.status) + '<small class="muted">' + ago(o.history[o.history.length - 1].at) + "</small></header>" +
       '<ul class="items">' + o.items.map(function (it) { return '<li><b class="num">' + it.qty + "×</b><span>" + esc(tx(it.name)) + "</span></li>"; }).join("") + "</ul>" +
       (o.comment ? '<div class="note">' + I("info", 14) + esc(o.comment) + "</div>" : "") +
       (o.acceptedBy && o.status !== "pending" ? '<div class="tacc">' + I("check", 12) + t("sl.acceptedBy", { name: esc(o.acceptedBy.name) }) + "</div>" : "") +
+      (o.pickup ? '<div class="tcust tdine">' + I("store", 14) + "<b>" + t("sh.pickup") + '</b><span class="grow"></span></div>' : "") +
       (o.dineIn ? '<div class="tcust tdine">' + I("grid", 14) + "<b>" + t("tb.table", { n: esc(o.tableName) }) + "</b>" + (o.guestName ? '<span class="grow muted">' + esc(o.guestName) + "</span>" : '<span class="grow"></span>') + '<span class="cmark new">' + t("tb.inHall") + "</span></div>" : "") +
       (o.customer ? '<div class="tcust">' + I("user", 14) + '<b class="grow">' + esc(o.customer.name) + "</b>" + SF.custMark(o.customer) + "</div>" : "") +
       '<div class="tmeta"><span>' + I(o.payment.method === "cash" ? "cash" : "card", 14) + (o.dineIn ? t("tb.payTable") : t("pay." + o.payment.method)) + '</span><b class="num">' + money(o.subtotal) + "</b></div>" +
@@ -265,7 +271,7 @@
   R("/rest/menu", { title: "rest.menu", render: function () {
     return Promise.all([api().get("/restaurant/products"), api().get("/restaurant/me")]).then(function (a) {
       var list = a[0], r = a[1]; SF.state.myProducts = list; SF.state.tone = r.tone;
-      var cats = SF.state.categories.filter(function (c) { return list.some(function (p) { return p.categoryId === c.id; }); }).map(function (c) { return { id: c.id, name: tx(c.name) }; });
+      var cats = SF.state.categories.concat(SF.state.shopCats || []).filter(function (c) { return list.some(function (p) { return p.categoryId === c.id; }); }).map(function (c) { return { id: c.id, name: tx(c.name) }; });
       if (list.some(function (p) { return !cats.some(function (c) { return c.id === p.categoryId; }); })) cats.push({ id: "_", name: t("tb.other") });
       var inCat = function (p, c) { return c.id === "_" ? !cats.some(function (k) { return k.id === p.categoryId; }) : p.categoryId === c.id; };
       /* one category at a time (tabs with counts), compact rows */
@@ -278,19 +284,26 @@
             '<button class="switch' + (p.available ? " on" : "") + '" role="switch" aria-checked="' + p.available + '" aria-label="' + t("menu.inStock") + '" data-act="pavail" data-id="' + p.id + '"></button>' +
             (worker() ? "</div>" : '<button class="iconbtn" data-act="prodedit" data-id="' + p.id + '" aria-label="' + t("btn.edit") + '">' + I("edit", 18) + '</button><button class="iconbtn" data-act="proddel" data-id="' + p.id + '" aria-label="' + t("btn.delete") + '">' + I("trash", 18) + "</button></div>"); }).join("") + "</div></section>"; }).join("")
           : SF.empty("grid", t("menu.empty"), t("menu.emptySub"))) +
-        (worker() ? "" : '<section class="card tplcard"><span class="kic">' + I("grid", 22) + '</span><div class="grow"><b>' + t("tpl.btn") + "</b><p>" + t("tpl.sub") + '</p></div><button class="btn ghost" data-act="rtpl">' + t("tpl.go") + "</button></section>");
+        (worker() || isShopU() ? "" : '<section class="card tplcard"><span class="kic">' + I("grid", 22) + '</span><div class="grow"><b>' + t("tpl.btn") + "</b><p>" + t("tpl.sub") + '</p></div><button class="btn ghost" data-act="rtpl">' + t("tpl.go") + "</button></section>");
     });
   } });
+  var BRANDS = ["Apple", "Samsung", "Xiaomi", "Redmi", "POCO", "Honor", "Huawei", "Realme", "Tecno", "Infinix", "Vivo", "OPPO", "Nokia", "Google Pixel", "OnePlus", "Itel", "JBL", "Anker", "Baseus", "Hoco", "Borofone", "Lenovo", "HP", "Asus", "Acer", "LG", "Artel", "Sony"];
+  function isShopU() { var u = SF.state.user; return !!(u && u.restKind === "shop"); }
+  function myCats() { return isShopU() ? (SF.state.shopCats || []) : SF.state.categories; }
+  SF.isShopU = isShopU;
   function prodForm(p) {
-    p = p || { name: { tg: "" }, desc: { tg: "" }, price: "", weight: "", categoryId: SF.state.categories[0].id, kind: "plate", popular: false, photo: null, oldPrice: null };
+    var shop = isShopU();
+    p = p || { name: { tg: "" }, desc: { tg: "" }, price: "", weight: "", categoryId: myCats()[0].id, kind: shop ? "box" : "plate", popular: false, photo: null, oldPrice: null, stock: null };
     SF.state.pk = p.kind; SF.state.pphoto = p.photo || null;
     SF.modal('<button class="mx" data-act="closemodal" aria-label="' + t("btn.close") + '">' + I("x", 20) + '</button><form class="stack pform' + (p.photo ? " hasphoto" : "") + '" data-form="prod" data-id="' + (p.id || "") + '"><h2 class="h2">' + t(p.id ? "menu.edit" : "menu.add") + "</h2>" +
       '<div class="photoup">' + photoBox() + '</div><p class="fine pkfine">' + t("menu.photoOr") + "</p>" +
-      '<div class="pkind"><span class="pkprev" id="pkprev" style="--tone:' + esc(SF.state.tone) + '">' + SF.art(p.kind, 96) + '</span><div class="pkgrid" role="radiogroup" aria-label="' + t("menu.picture") + '">' + SF.KINDS.map(function (k) { return '<button type="button" role="radio" aria-checked="' + (k === p.kind) + '" class="' + (k === p.kind ? "on" : "") + '" data-act="pkind" data-v="' + k + '" aria-label="' + k + '">' + SF.art(k, 30) + "</button>"; }).join("") + "</div></div>" +
-      '<label class="f">' + t("menu.name") + '<input name="name" required maxlength="60" value="' + esc(tx(p.name)) + '"></label><label class="f">' + t("menu.desc") + '<input name="desc" maxlength="140" value="' + esc(tx(p.desc)) + '"></label>' +
-      '<div class="grid3"><label class="f">' + t("menu.price") + '<input name="price" inputmode="numeric" required value="' + esc(p.price) + '"></label><label class="f">' + t("menu.oldPrice") + '<input name="oldPrice" inputmode="numeric" placeholder="' + t("menu.oldPriceHint") + '" value="' + esc(p.oldPrice || "") + '"></label><label class="f">' + t("menu.weight") + '<input name="weight" maxlength="20" value="' + esc(p.weight) + '" placeholder="350 г"></label>' +
-      '<label class="f">' + t("menu.category") + '<select name="categoryId">' + SF.state.categories.map(function (c) { return '<option value="' + c.id + '"' + (c.id === p.categoryId ? " selected" : "") + ">" + esc(tx(c.name)) + "</option>"; }).join("") + "</select></label></div>" +
-      '<p class="lbl">' + t("ml.label") + '</p><div class="mealpick">' + ["b", "l", "d", "n"].map(function (m) { return '<label><input type="checkbox" name="meal_' + m + '"' + ((p.meals || []).indexOf(m) >= 0 ? " checked" : "") + "><span>" + t("ml." + m) + "</span></label>"; }).join("") + '</div><p class="fine">' + t("ml.hint") + "</p>" +
+      (shop ? '<input type="hidden" name="_" value="">' : "") + (shop ? "" : '<div class="pkind"><span class="pkprev" id="pkprev" style="--tone:' + esc(SF.state.tone) + '">' + SF.art(p.kind, 96) + '</span><div class="pkgrid" role="radiogroup" aria-label="' + t("menu.picture") + '">' + SF.KINDS.map(function (k) { return '<button type="button" role="radio" aria-checked="' + (k === p.kind) + '" class="' + (k === p.kind ? "on" : "") + '" data-act="pkind" data-v="' + k + '" aria-label="' + k + '">' + SF.art(k, 30) + "</button>"; }).join("") + "</div></div>") +
+      (shop ? '<label class="f">' + t("sh.brand") + '<input name="brand" list="brands" maxlength="40" value="' + esc(p.brand || "") + '" placeholder="' + t("sh.brandPh") + '"></label><datalist id="brands">' + BRANDS.map(function (b) { return '<option value="' + b + '">'; }).join("") + "</datalist>" : "") +
+      '<label class="f">' + t("menu.name") + '<input name="name" required maxlength="60" value="' + esc(tx(p.name)) + '" placeholder="' + (shop ? "iPhone 15 128GB" : "") + '"></label><label class="f">' + t("menu.desc") + '<input name="desc" maxlength="140" value="' + esc(tx(p.desc)) + '"></label>' +
+      '<div class="grid3"><label class="f">' + t("menu.price") + '<input name="price" inputmode="numeric" required value="' + esc(p.price) + '"></label><label class="f">' + t("menu.oldPrice") + '<input name="oldPrice" inputmode="numeric" placeholder="' + t("menu.oldPriceHint") + '" value="' + esc(p.oldPrice || "") + '"></label><label class="f">' + t(shop ? "sh.spec" : "menu.weight") + '<input name="weight" maxlength="20" value="' + esc(p.weight) + '" placeholder="' + (shop ? "128 GB · кабуд" : "350 г") + '"></label>' +
+      (shop ? '<label class="f">' + t("sh.stock") + '<input name="stock" inputmode="numeric" value="' + esc(p.stock == null ? "" : p.stock) + '" placeholder="' + t("sh.stockPh") + '"></label>' : "") +
+      '<label class="f">' + t("menu.category") + '<select name="categoryId">' + myCats().map(function (c) { return '<option value="' + c.id + '"' + (c.id === p.categoryId ? " selected" : "") + ">" + esc(tx(c.name)) + "</option>"; }).join("") + "</select></label></div>" +
+      (shop ? "" : '<p class="lbl">' + t("ml.label") + '</p><div class="mealpick">' + ["b", "l", "d", "n"].map(function (m) { return '<label><input type="checkbox" name="meal_' + m + '"' + ((p.meals || []).indexOf(m) >= 0 ? " checked" : "") + "><span>" + t("ml." + m) + "</span></label>"; }).join("") + '</div><p class="fine">' + t("ml.hint") + "</p>") +
       '<label class="check"><input type="checkbox" name="popular"' + (p.popular ? " checked" : "") + "><span>" + t("menu.popular") + '</span></label><input type="hidden" name="kind" id="pkind" value="' + esc(p.kind) + '"><button class="btn primary block lg">' + t("btn.save") + "</button></form>", "wide");
   }
   function photoBox() { var ph = SF.state.pphoto;
@@ -306,6 +319,7 @@
     Array.prototype.forEach.call(el.parentNode.children, function (b) { var on = b === el; b.classList.toggle("on", on); b.setAttribute("aria-checked", on); }); };
   SF.forms.prod = function (fd, f) { var body = { name: fd.name, desc: fd.desc, price: Number(fd.price), weight: fd.weight, categoryId: fd.categoryId, kind: fd.kind, popular: !!fd.popular,
       oldPrice: fd.oldPrice ? Number(fd.oldPrice) : null, photo: SF.state.pphoto || null, meals: ["b", "l", "d", "n"].filter(function (m) { return fd["meal_" + m]; }) };
+    if (isShopU()) { body.kind = "box"; body.brand = fd.brand || ""; body.stock = String(fd.stock || "").trim() === "" ? null : Number(String(fd.stock).replace(/\D/g, "")); }
     var req = f.dataset.id ? api().patch("/restaurant/products/" + f.dataset.id, body) : api().post("/restaurant/products", body);
     return req.then(function () { SF.closeModal(); SF.toast(t("btn.saved")); SF.render({ quiet: true }); }); };
   SF.actions.pavail = function (el) { return api().patch("/restaurant/products/" + el.dataset.id, { available: el.getAttribute("aria-checked") !== "true" }).then(function () { SF.render({ quiet: true }); }); };
@@ -386,6 +400,7 @@
         '<div class="grid2"><label class="f">' + t("rest.eta") + '<input name="eta" value="' + esc(r.eta) + '" placeholder="25–35"></label><label class="f">' + t("rest.minOrderL") + '<input name="minOrder" inputmode="numeric" value="' + r.minOrder + '"></label></div>' +
         '<label class="f">' + t("auth.phone") + '<input name="phone" inputmode="tel" value="' + esc(SF.phone(r.phone)) + '"></label><label class="f">' + t("rest.addressL") + '<input name="address" value="' + esc(tx(r.address)) + '"></label><button class="btn primary">' + t("btn.save") + "</button></form>" +
         (SF.state.user.staff ? "" : payAccForm(r)) +
+        '<section class="card"><label class="switchrow"><span><b>' + t("sh.pickupSet") + '</b><small class="muted"> ' + t("sh.pickupSetSub") + '</small></span><button type="button" class="switch' + (r.pickup ? " on" : "") + '" role="switch" aria-checked="' + !!r.pickup + '" data-act="rpickup" aria-label="' + t("sh.pickupSet") + '"></button></label></section>' +
         '<section class="card stack"><h3>' + t("rest.where") + '</h3><p class="muted sm">' + t("rest.whereSub") + "</p>" + SF.tmap({ key: "rloc", center: { lat: r.lat, lng: r.lng }, zoom: 15, zone: SF.restZone(r), markers: [{ lat: r.lat, lng: r.lng, type: "rest", label: "R" }], label: t("rest.where") }) +
         '<p class="fine">' + I("info", 14) + " " + t("rest.placeAdmin") + "</p></section>" + SF.pwForm() +
         subCard(r) + '<section class="card stack"><h3>' + t("rest.profile") + '</h3><div class="rprof" style="--tone:' + esc(r.tone) + '">' + SF.art("plov", 72) + "<div><b class=\"h2\">" + esc(tx(r.name)) + '</b><span class="muted">' + esc(tx(r.cuisine)) + "</span></div></div>" +
@@ -459,7 +474,7 @@
       if (q.table !== undefined) st.table = q.table || ""; SF.state.posProds = prods; SF.state.hall = h;
       var tb = (h.tables.filter(function (x) { return x.id === st.table; })[0]) || null; if (!tb) st.table = "";
       /* the categories that have something in stock: «Чой», «Нӯшокӣ», «Таомҳо»… */
-      var cats = (SF.state.categories || []).filter(function (c) { return prods.some(function (x) { return x.categoryId === c.id; }); }).map(function (c) { return { id: c.id, name: tx(c.name) }; });
+      var cats = (SF.state.categories || []).concat(SF.state.shopCats || []).filter(function (c) { return prods.some(function (x) { return x.categoryId === c.id; }); }).map(function (c) { return { id: c.id, name: tx(c.name) }; });
       if (prods.some(function (x) { return !cats.some(function (c) { return c.id === x.categoryId; }); })) cats.push({ id: "_", name: t("tb.other") });
       SF.state.posCats = cats; if (!st.cat || (st.cat !== "*" && !cats.some(function (c) { return c.id === st.cat; }))) st.cat = (cats[0] || {}).id || "*";
       return '<div class="posw"><section class="posl"><label class="posfind">' + I("search", 20) + '<input id="posq" data-input="posq" value="' + esc(st.q) + '" placeholder="' + t("pos.findPh") + '" aria-label="' + t("pos.findPh") + '" autocomplete="off" enterkeyhint="search">' +

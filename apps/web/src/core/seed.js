@@ -87,7 +87,7 @@
       ["k9", L("Чойи кабуд", "Зелёный чай", "Green tea"), L("Чойник", "Чайник", "Teapot"), 5, "500 мл", "tea", false]]]
   ];
 
-  var SCHEMA = 7;     // bump when demo data changes shape; old saved data is then replaced
+  var SCHEMA = 8;     // bump when demo data changes shape; old saved data is then replaced
   var HOME = "c5";   // launch city: Shahrituz. Other cities are kept for later expansion (inactive).
   var STREETS = ["кӯчаи Ленин", "кӯчаи Рӯдакӣ", "кӯчаи Сомонӣ", "кӯчаи Айнӣ", "кӯчаи Фирдавсӣ", "кӯчаи Истиқлол", "маҳаллаи Навобод", "маҳаллаи Гулистон"];
   function build(nowMs, opts) {
@@ -165,6 +165,15 @@
       ["ad3", "u_c4", "realty", "Квартираи 2-хона", "Маркази шаҳр, ошёнаи 3, таъмири нав. Иҷора — моҳона.", 3500, [AP.flat], 20],
       ["ad4", "u_c5", "electronics", "Ноутбук Lenovo", "Core i5, 8 GB RAM, SSD 256 GB. Барои кор ва таҳсил.", 4000, [AP.lap], 30]].map(function (x) {
         var at = now - x[7] * 3600000; return { id: x[0], userId: x[1], cat: x[2], title: x[3], desc: x[4], price: x[5], cityId: HOME, phone: (db.users.filter(function (u) { return u.id === x[1]; })[0] || {}).phone || "+992900000300", photos: x[6], status: "active", views: 40 + x[7] * 7, createdAt: at, updatedAt: at, publishedAt: at, until: at + 30 * D }; });
+    /* an example shop (the «Мағозаҳо» section): phones and accessories */
+    var SH = "r_shop1", sOwner = { id: "u_shop1", role: "restaurant", name: "Соҳиби мағоза", phone: "+992900000111", pass: hash("1234"), active: true, cityId: HOME, restaurantId: SH, createdAt: now, lang: "tg" };
+    db.users.push(sOwner); var hc = db.cities.filter(function (c) { return c.id === HOME; })[0];
+    db.restaurants.push({ id: SH, kind: "shop", pinned: true, pickup: true, name: L("Мағозаи намуна"), cityId: HOME, ownerId: sOwner.id, cuisine: L("Телефон ва аксессуар"), tone: "#E3ECFF", eta: "30–45", rating: 4.9, ratingCount: 31,
+      hours: { from: "09:00", to: "20:00" }, open: true, active: true, commissionPct: 10, minOrder: 20, lat: hc.lat + 0.002, lng: hc.lng + 0.003, address: L("Бозори марказӣ"), phone: sOwner.phone, createdAt: now, paidUntil: now + 365 * 864e5,
+      payCard: { number: "4444555566667777", holder: "NAMUNA", bank: "Алиф Бонк" } });
+    [["iPhone 15 128GB", 9450, "s1", "Кафолат 1 сол", 3, DEMO_AD_PH.iph], ["Samsung Galaxy A55 8/256", 4290, "s1", "Ранг: кабуд", 5], ["Redmi Note 13 8/256", 2350, "s1", "Нав, қуттӣ", 7], ["AirPods Pro 2", 2100, "s3", "Асл", 4],
+      ["Зарядкаи тез 25W", 180, "s4", "USB-C", 20], ["Кабели USB-C 1 м", 45, "s4", "", 40], ["Ғилофи iPhone 15", 95, "s5", "Силикон", 15], ["Шишаи муҳофизатӣ", 40, "s5", "9H", 50]].forEach(function (x, i) {
+      db.products.push({ id: SH + "p" + (i + 1), restaurantId: SH, brand: ["Apple", "Samsung", "Redmi", "Apple", "Baseus", "Hoco", "Apple", null][i] || null, name: L(x[0]), desc: L(x[3]), price: x[1], categoryId: x[2], kind: "box", available: true, popular: i < 2, stock: x[4], photo: x[5] || null, createdAt: now }); });
     return db;
   }
   /* ready-made menu to start from: Tajik and Uzbek dishes. Prices are a starting point — the restaurant corrects them.

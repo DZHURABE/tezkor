@@ -80,8 +80,8 @@
   /* ---------- boot ---------- */
   var tok = SF.ls.get("token", null);
   if (tok) SF.api.setToken(tok);
-  Promise.all([SF.api.get("/cities"), SF.api.get("/categories"), SF.api.get("/settings/public"), tok ? SF.api.get("/auth/me").catch(function () { SF.api.setToken(null); SF.ls.set("token", null); return null; }) : null]).then(function (a) {
-    SF.state.cities = a[0]; SF.state.categories = a[1]; SF.state.pub = a[2]; SF.state.user = a[3];
+  Promise.all([SF.api.get("/cities"), SF.api.get("/categories"), SF.api.get("/settings/public"), SF.api.get("/categories?shop=1").catch(function () { return []; }), tok ? SF.api.get("/auth/me").catch(function () { SF.api.setToken(null); SF.ls.set("token", null); return null; }) : null]).then(function (a) {
+    SF.state.cities = a[0]; SF.state.categories = a[1]; SF.state.pub = a[2]; SF.state.shopCats = a[3]; SF.state.user = a[4];
     var saved = SF.ls.get("city", null); SF.state.cityId = a[0].some(function (c) { return c.id === saved; }) ? saved : a[2].defaultCityId;
     if (SF.state.user) { SF.poll(true); }
     if (SF.state.pub.demo) { var fab = document.createElement("button"); fab.className = "demofab"; fab.setAttribute("data-act", "demo"); fab.innerHTML = I("users", 18) + "<span>Demo</span>"; document.body.appendChild(fab); }

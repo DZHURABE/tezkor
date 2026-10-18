@@ -12,7 +12,8 @@ var SF = (function () {
   /* ---------- text ---------- */
   SF.esc = function (v) { return String(v == null ? "" : v).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); };
   SF.t = function (key, p) {
-    var row = SF.I18N[key], s = row ? (row[SF.state.lang] || row.tg) : "⟦" + key + "⟧";
+    /* inside a shop the same screens speak of goods, not dishes: «key.sh» wins when it exists */
+    var row = (SF.state.ctxShop && SF.I18N[key + ".sh"]) || SF.I18N[key], s = row ? (row[SF.state.lang] || row.tg) : "⟦" + key + "⟧";
     if (p) s = s.replace(/\{(\w+)\}/g, function (_, k) { var v = p[k]; return v == null ? "" : typeof v === "object" ? SF.tx(v) : v; });
     return s;
   };
@@ -26,6 +27,7 @@ var SF = (function () {
 
   /* ---------- icons (24px line set) ---------- */
   var P = {
+    headset: '<path d="M4 14v-2a8 8 0 0 1 16 0v2"/><rect x="3" y="14" width="5" height="7" rx="2"/><rect x="16" y="14" width="5" height="7" rx="2"/>',
     car: '<path d="M4 16V12l2.2-5.2A2 2 0 0 1 8 5.6h8a2 2 0 0 1 1.8 1.2L20 12v4"/><path d="M3 12h18v4.5a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><circle cx="7.5" cy="14.8" r="1.2" fill="currentColor"/><circle cx="16.5" cy="14.8" r="1.2" fill="currentColor"/><path d="M5.5 17.5V20M18.5 17.5V20"/>',
     house: '<path d="M3 11l9-7 9 7"/><path d="M5 9.5V20h14V9.5"/><path d="M10 20v-5.5h4V20"/>', mobile: '<rect x="6.5" y="2.5" width="11" height="19" rx="2.6"/><path d="M11 18.3h2"/>',
     laptop: '<rect x="4.5" y="5" width="15" height="10.5" rx="1.6"/><path d="M2.5 19h19"/>', sofa: '<path d="M5.5 11V8.5a3 3 0 0 1 3-3h7a3 3 0 0 1 3 3V11"/><path d="M3 12.5a2 2 0 0 1 4 0V14h10v-1.5a2 2 0 0 1 4 0V18H3z"/><path d="M5 18v2M19 18v2"/>',
@@ -115,7 +117,10 @@ var SF = (function () {
   SF.actions = SF.actions || {};
   SF.actions.pweye = function (el) { var i = el.parentNode.querySelector("input"), show = i.type === "password"; i.type = show ? "text" : "password"; el.setAttribute("aria-pressed", show); el.classList.toggle("on", show); el.setAttribute("aria-label", SF.t(show ? "pw.hide" : "pw.show")); i.focus(); };
   /* a dish: its real photo when the restaurant uploaded one, otherwise the drawn picture */
-  SF.pic = function (p, s) { return p && p.photo ? '<img class="ph" src="' + SF.esc(p.photo) + '" alt="" loading="lazy" decoding="async">' : SF.art(p && p.kind, s); };
+  /* goods without a photo: a clean icon of their kind (phone, laptop, headphones…) instead of a box */
+  SF.SHOP_IC = { s1: "mobile", s2: "laptop", s3: "headset", s4: "bolt", s5: "shield", s6: "tag", s7: "home", s8: "shirt", s9: "heart", s10: "bag" };
+  SF.pic = function (p, s) { if (p && p.photo) return '<img class="ph" src="' + SF.esc(p.photo) + '" alt="" loading="lazy" decoding="async">';
+    if (p && SF.SHOP_IC[p.categoryId]) return '<span class="shic">' + SF.icon(SF.SHOP_IC[p.categoryId], Math.round((s || 90) * 0.5)) + "</span>"; return SF.art(p && p.kind, s); };
   SF.sale = function (p) { return p && p.oldPrice > p.price ? Math.round((1 - p.price / p.oldPrice) * 100) : 0; };
   /* shrink a picked photo in the phone before upload: long side `max` px, JPEG */
   SF.shrinkImage = function (file, max, q) { return new Promise(function (ok, no) {
@@ -177,6 +182,7 @@ var SF = (function () {
     return null; };
   SF.renderSeq = 0;
   SF.render = function (opts) {
+    SF.state.ctxShop = !!(SF.state.user && SF.state.user.restKind === "shop");
     opts = opts || {}; var path = SF.path(), m = SF.match(path), u = SF.state.user, seq = ++SF.renderSeq;
     if (!m) { SF.go(SF.homeOf(u)); return Promise.resolve(); }
     var r = m.route;

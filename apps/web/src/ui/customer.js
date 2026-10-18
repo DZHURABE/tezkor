@@ -30,9 +30,10 @@
     var q = SF.cart.qty(p.id), off = SF.sale(p);
     return '<div class="pcard' + (p.available ? "" : " off") + (compact ? " mini" : "") + '">' + favBtn("p", p.id) + '<button class="pimg' + (p.photo ? " hasph" : "") + '" style="--tone:' + esc(p.restaurant ? p.restaurant.tone : SF.state.tone || "#F2EFEA") + '" data-act="prod" data-id="' + p.id + '" aria-label="' + esc(tx(p.name)) + '">' + SF.pic(p, compact ? 92 : 118) +
       (off ? '<span class="chip sale">−' + off + "%</span>" : p.popular ? '<span class="chip hot">' + I("fire", 12) + t("prod.hit") + "</span>" : "") + "</button>" +
-      '<div class="pbody"><b class="pname">' + esc(tx(p.name)) + likeChip(p) + "</b>" + (compact && p.restaurant ? '<span class="pdesc">' + esc(tx(p.restaurant.name)) + "</span>" : '<span class="pdesc">' + esc(tx(p.desc)) + "</span>") +
+      '<div class="pbody">' + (p.brand ? '<small class="pbrand">' + esc(p.brand) + "</small>" : "") + '<b class="pname">' + esc(tx(p.name)) + likeChip(p) + "</b>" + (p.stock != null && p.available && p.stock <= 5 ? '<span class="stockl">' + t("sh.left", { n: p.stock }) + "</span>" : "") + (compact && p.restaurant ? '<span class="pdesc">' + esc(tx(p.restaurant.name)) + "</span>" : '<span class="pdesc">' + esc(tx(p.desc)) + "</span>") +
       '<div class="prow"><span class="price num">' + money(p.price) + (off ? "<s>" + money(p.oldPrice) + "</s>" : "") + (p.weight ? '<small>' + esc(p.weight) + "</small>" : "") + "</span>" + (p.available ? stepper(p, q) : '<span class="pill p-mut">' + t("prod.soldout") + "</span>") + "</div></div></div>";
   }
+  SF.actions.brandf = function (el) { SF.state.brandF = { r: el.dataset.r, b: el.dataset.v }; SF.render({ quiet: true }); };
   SF.actions.fav = function (el) { var u = SF.state.user; if (!u || u.role !== "customer") { SF.toast(t("fav.login"), "info"); SF.state.after = SF.path(); SF.go("/login"); return; }
     var on = !isFav(el.dataset.t, el.dataset.id); el.classList.toggle("on", on); el.setAttribute("aria-pressed", on);
     return api().post("/auth/me/favorites", { type: el.dataset.t, id: el.dataset.id, on: on }).then(function (nu) { SF.state.user = nu; SF.toast(t(on ? "fav.added" : "fav.removed")); }); };
@@ -174,16 +175,20 @@
   /* ---------- Restaurant ---------- */
   SF.route("/r/:id", { title: "home.restaurants", render: function (p) {
     return api().get("/restaurants/" + p.id).then(function (r) {
-      remember(r.products); SF.state.rest = r; SF.state.tone = r.tone; withArt([r]);
-      var cats = (SF.state.categories || []).filter(function (c) { return r.products.some(function (x) { return x.categoryId === c.id; }); });
+      remember(r.products); SF.state.rest = r; SF.state.tone = r.tone; withArt([r]); SF.state.ctxShop = r.kind === "shop";
+      var shop = r.kind === "shop", cats = (SF.state.categories || []).concat(SF.state.shopCats || []).filter(function (c) { return r.products.some(function (x) { return x.categoryId === c.id; }); });
       var c = SF.cart.get(), mine = c.restaurantId === r.id && SF.cart.count();
-      return '<a class="backlink" href="#/food">' + I("chevL", 18) + t("btn.back") + "</a>" +
-        '<section class="rhero' + (r.cover ? " hasph" : "") + '" style="--tone:' + esc(r.tone) + '">' + (r.cover ? '<img class="cover" src="' + esc(r.cover) + '" alt="">' : '<span class="a2">' + SF.art(r.art2, 130) + '</span><span class="a1">' + SF.art(r.art1, 210) + '</span><i class="ornament" aria-hidden="true"></i>') + "</section>" +
+      return '<a class="backlink" href="#' + (shop ? "/shops" : "/food") + '">' + I("chevL", 18) + t("btn.back") + "</a>" +
+        (shop && !r.cover ? '<section class="shcov shhero"><em class="shopen ' + (r.isOpenNow ? "on" : "") + '">' + (r.isOpenNow ? t("rc.openTill", { to: r.hours.to }) : t("rest.closedUntil", { from: r.hours.from })) + "</em><b>" + esc(tx(r.name)) + "</b></section>" : '<section class="rhero' + (r.cover ? " hasph" : "") + '" style="--tone:' + esc(r.tone) + '">' + (r.cover ? '<img class="cover" src="' + esc(r.cover) + '" alt="">' : '<span class="a2">' + SF.art(r.art2, 130) + '</span><span class="a1">' + SF.art(r.art1, 210) + '</span><i class="ornament" aria-hidden="true"></i>') + "</section>") +
         '<section class="rinfo"><div class="rtitle"><h1 class="h1">' + esc(tx(r.name)) + '</h1><span class="muted">' + esc(tx(r.cuisine)) + "</span>" + (r.about && tx(r.about) ? '<p class="about">' + esc(tx(r.about)) + "</p>" : "") + "</div>" +
-        '<div class="facts"><span>' + SF.stars(r.rating) + '<small class="num">' + r.ratingCount + "</small></span><span>" + I("clock", 16) + esc(r.eta) + " " + t("u.min") + "</span><span>" + I("scooter", 16) + t("rest.deliveryFrom", { sum: money(r.deliveryFrom) }) + '</span></div><p class="factsub num">' + t("rest.minOrder", { sum: money(r.minOrder) }) + " · " + esc(r.hours.from) + "–" + esc(r.hours.to) + "</p>" +
+        '<div class="facts"><span>' + SF.stars(r.rating) + '<small class="num">' + r.ratingCount + "</small></span><span>" + I("clock", 16) + esc(r.eta) + " " + t("u.min") + "</span><span>" + I("scooter", 16) + t("rest.deliveryFrom", { sum: money(r.deliveryFrom) }) + "</span>" + (r.pickup ? "<span>" + I("store", 16) + t("sh.pickupFree") + "</span>" : "") + (shop && r.address && tx(r.address) ? "<span>" + I("pin", 16) + esc(tx(r.address)) + "</span>" : "") + '</div><p class="factsub num">' + t("rest.minOrder", { sum: money(r.minOrder) }) + " · " + esc(r.hours.from) + "–" + esc(r.hours.to) + "</p>" +
         (r.isOpenNow ? "" : '<div class="msg warn">' + I("clock", 16) + t("rest.closedNow", { from: r.hours.from }) + "</div>") + "</section>" +
         '<div class="rlayout"><div><nav class="ctabs" id="ctabs" aria-label="' + t("rest.menu") + '">' + cats.map(function (k, i) { return '<button class="' + (i ? "" : "on") + '" data-act="jump" data-v="' + k.id + '">' + esc(tx(k.name)) + "</button>"; }).join("") + "</nav>" +
-        cats.map(function (k) { return '<section class="msec" id="sec-' + k.id + '" data-sec="' + k.id + '"><h2>' + esc(tx(k.name)) + '</h2><div class="pgrid">' + r.products.filter(function (x) { return x.categoryId === k.id; }).map(function (x) { return prodCard(x); }).join("") + "</div></section>"; }).join("") + "</div>" +
+        (function () { if (!shop) return ""; var bs = []; r.products.forEach(function (x) { if (x.brand && bs.indexOf(x.brand) < 0) bs.push(x.brand); }); if (bs.length < 2) return "";
+          var cur = SF.state.brandF && SF.state.brandF.r === r.id ? SF.state.brandF.b : "";
+          return '<div class="chips brandf" role="group" aria-label="' + t("sh.brand") + '"><button type="button" class="fchip' + (cur ? "" : " on") + '" data-act="brandf" data-r="' + r.id + '" data-v="">' + t("sh.allBrands") + "</button>" + bs.sort().map(function (b) { return '<button type="button" class="fchip' + (cur === b ? " on" : "") + '" data-act="brandf" data-r="' + r.id + '" data-v="' + esc(b) + '">' + esc(b) + "</button>"; }).join("") + "</div>"; })() +
+        cats.map(function (k) { var bf = shop && SF.state.brandF && SF.state.brandF.r === r.id ? SF.state.brandF.b : ""; var list = r.products.filter(function (x) { return x.categoryId === k.id && (!bf || x.brand === bf); }); if (!list.length) return "";
+          return '<section class="msec" id="sec-' + k.id + '" data-sec="' + k.id + '"><h2>' + esc(tx(k.name)) + '</h2><div class="pgrid">' + list.map(function (x) { return prodCard(x); }).join("") + "</div></section>"; }).join("") + "</div>" +
         '<aside class="sidecart">' + miniCart(r) + "</aside></div>" +
         (mine ? '<a class="floatcart" href="#/cart"><span>' + I("cart", 18) + '<i class="num">' + SF.cart.count() + "</i></span><b>" + t("cart.go") + '</b><span class="num">' + money(cartSum()) + "</span></a>" : "");
     });
@@ -230,9 +235,9 @@
     var c = SF.cart.get(), ids = Object.keys(c.items);
     if (!ids.length) return '<h1 class="h2 pt">' + t("nav.cart") + "</h1>" + SF.empty(SF.art("plate", 110), t("cart.empty"), t("cart.emptySub"), '<a class="btn primary" href="#/food">' + t("cart.browse") + "</a>");
     return api().get("/restaurants/" + c.restaurantId).then(function (r) {
-      remember(r.products); var sum = cartSum(), promo = SF.state.promo, disc = promo ? promo.discount : 0;
+      remember(r.products); SF.state.ctxShop = r.kind === "shop"; var sum = cartSum(), promo = SF.state.promo, disc = promo ? promo.discount : 0;
       ids.forEach(function (k) { if (!cache[k] || !cache[k].available) { SF.cart.dec(k); } });
-      return '<h1 class="h2 pt">' + t("nav.cart") + '</h1><div class="two"><div class="card"><div class="rowhead"><a href="#/r/' + r.id + '" class="rlink"><span class="rav" style="--tone:' + esc(r.tone) + '">' + SF.art(r.products[0] ? r.products[0].kind : "plate", 36) + "</span><b>" + esc(tx(r.name)) + "</b></a>" +
+      return '<h1 class="h2 pt">' + t("nav.cart") + '</h1><div class="two"><div class="card"><div class="rowhead"><a href="#/r/' + r.id + '" class="rlink"><span class="rav" style="--tone:' + esc(r.tone) + '">' + (r.kind === "shop" ? (r.logo ? '<img src="' + esc(r.logo) + '" alt="">' : I("store", 22)) : SF.art(r.products[0] ? r.products[0].kind : "plate", 36)) + "</span><b>" + esc(tx(r.name)) + "</b></a>" +
         '<button class="link" data-act="clearcart">' + t("cart.clear") + "</button></div>" +
         ids.filter(function (k) { return cache[k]; }).map(function (k) { var p = cache[k]; return '<div class="cline"><span class="cim" style="--tone:' + esc(r.tone) + '">' + SF.pic(p, 52) + '</span><div class="cinfo"><b>' + esc(tx(p.name)) + '</b><span class="muted num">' + money(p.price) + "</span></div>" + stepper(p, c.items[k]) + '<b class="num csum">' + money(p.price * c.items[k]) + '</b><button class="iconbtn rmline" data-act="rmline" data-id="' + p.id + '" aria-label="' + t("cart.remove") + '">' + I("trash", 16) + "</button></div>"; }).join("") +
         '<a class="addmore" href="#/r/' + r.id + '">' + I("plus", 16) + t("cart.addMoreItems") + "</a>" +
@@ -284,17 +289,23 @@
     return api().get("/restaurants/" + c.restaurantId).then(function (r) {
       remember(r.products); var city = (SF.state.cities || []).filter(function (z) { return z.id === r.cityId; })[0] || { lat: r.lat, lng: r.lng };
       var body = { restaurantId: r.id, items: Object.keys(c.items).map(function (k) { return { productId: k, qty: c.items[k] }; }), promoCode: SF.state.promo ? SF.state.promo.code : null, address: x.lat != null && inZone(x, r.cityId) ? { lat: x.lat, lng: x.lng } : {} };
+      if (!r.pickup) x.pickup = false; if (x.pickup) { body.pickup = true; body.address = {}; }
       return api().post("/orders/quote", body).then(function (qt) { x.quote = qt; return [r, city, qt]; });
     }).then(function (a) {
-      var r = a[0], city = a[1], qt = a[2], u = SF.state.user, addrs = u.addresses || [], zone = SF.restZone(r), x = co(); SF.state.coRest = r; fixPay(r);
+      var r = a[0], city = a[1], qt = a[2], u = SF.state.user, addrs = u.addresses || [], zone = SF.restZone(r), x = co(); SF.state.coRest = r; fixPay(r); SF.state.ctxShop = r.kind === "shop";
       return '<a class="backlink" href="#/cart">' + I("chevL", 18) + t("nav.cart") + '</a><h1 class="h2">' + t("co.title") + '</h1><div class="two"><div class="stack">' +
-        '<section class="card"><h3><span class="num stepn">1</span>' + t("co.address") + "</h3>" +
-        (addrs.length ? '<div class="tags">' + addrs.map(function (ad, i) { return '<button class="chip" data-act="useaddr" data-i="' + i + '">' + I("pin", 14) + esc(ad.text) + "</button>"; }).join("") + "</div>" : "") +
+        '<section class="card"><h3><span class="num stepn">1</span>' + t(x.pickup ? "sh.howGet" : "co.address") + "</h3>" +
+        /* a place that allows it: «a courier brings it» or «I pick it up myself» */
+        (r.pickup ? '<div class="seg cowho">' + '<button type="button" class="' + (x.pickup ? "" : "on") + '" data-act="copick" data-v="0">' + I("scooter", 16) + t("sh.courier") + '</button><button type="button" class="' + (x.pickup ? "on" : "") + '" data-act="copick" data-v="1">' + I("store", 16) + t("sh.pickup") + "</button></div>" : "") +
+        (x.pickup ? '<div class="pickbox">' + I("store", 22) + "<div><b>" + esc(tx(r.name)) + "</b><span>" + esc(tx(r.address) || "") + "</span><small>" + t("sh.pickupHint", { from: r.hours.from, to: r.hours.to }) + "</small></div>" + SF.callBtn(tx(r.name), r.phone, tx(r.address)) + "</div>" +
+            '<div class="mapbox">' + SF.tmap({ key: "copk", center: { lat: r.lat, lng: r.lng }, zoom: 16, markers: [{ lat: r.lat, lng: r.lng, type: "rest", label: "R" }], label: t("sh.pickup") }) + "</div>" +
+            '<p class="fine">' + I("info", 14) + t("sh.route") + ' <a class="link" target="_blank" rel="noopener" href="' + SF.geo.nav({ lat: r.lat, lng: r.lng }).google + '">Google</a> · <a class="link" target="_blank" rel="noopener" href="' + SF.geo.nav({ lat: r.lat, lng: r.lng }).yandex + '">Yandex</a></p></section>'
+        : (addrs.length ? '<div class="tags">' + addrs.map(function (ad, i) { return '<button class="chip" data-act="useaddr" data-i="' + i + '">' + I("pin", 14) + esc(ad.text) + "</button>"; }).join("") + "</div>" : "") +
         '<div class="mapbox">' + SF.tmap({ key: "co", picker: true, center: x.lat != null ? x : zone, zoom: x.lat != null ? 17 : 14, zone: zone, markers: [{ lat: r.lat, lng: r.lng, type: "rest", label: "R" }].concat(SF.state.geo ? [{ lat: SF.state.geo.lat, lng: SF.state.geo.lng, acc: SF.state.geo.acc, type: "me" }] : []), label: t("co.pinTitle"), onMove: pinMoved }) + "</div>" +
         '<div class="pinread' + (x.lat == null ? " hint" : !inZone(x, r.cityId) ? " bad" : "") + '" id="pinread">' + (x.lat != null ? pinText(x, r.cityId) : I("pin", 16) + "<span>" + t("co.pinHelp") + "</span>") + "</div>" +
         (SF.state.geo && SF.state.geo.acc > 80 ? '<div class="msg warn">' + I("info", 16) + "<span>" + t("geo.rough", { m: Math.round(SF.state.geo.acc) }) + "</span></div>" : "") +
         '<div class="geotools"><button type="button" class="btn ghost sm" data-act="geoloc">' + I("locate", 16) + t("co.myLoc") + '</button><form class="llform" data-form="coords"><label class="f grow">' + t("co.pasteLL") + '<span class="llrow"><input name="ll" id="co-ll" placeholder="' + t("co.pastePh") + '" autocomplete="off"><button class="btn sm">' + I("link", 16) + t("co.show") + "</button></span></label></form></div>" +
-        '<div class="grid2"><label class="f">' + t("co.street") + '<input data-input="co" data-k="text" value="' + esc(x.text) + '" placeholder="' + t("co.streetPh") + '" autocomplete="street-address"></label><label class="f">' + t("co.landmark") + '<input data-input="co" data-k="landmark" value="' + esc(x.landmark) + '" placeholder="' + t("co.landmarkPh") + '"></label></div></section>' +
+        '<div class="grid2"><label class="f">' + t("co.street") + '<input data-input="co" data-k="text" value="' + esc(x.text) + '" placeholder="' + t("co.streetPh") + '" autocomplete="street-address"></label><label class="f">' + t("co.landmark") + '<input data-input="co" data-k="landmark" value="' + esc(x.landmark) + '" placeholder="' + t("co.landmarkPh") + '"></label></div></section>') +
         '<section class="card"><h3><span class="num stepn">2</span>' + t("co.contact") + '</h3><div class="grid2"><label class="f">' + t("profile.name") + '<input data-input="co" data-k="name" value="' + esc(x.name) + '" autocomplete="name" placeholder="' + t("co.namePh") + '"></label><label class="f">' + t("auth.phone") + '<span class="phonein"><i>+992</i><input data-input="co" data-k="phone" value="' + esc(x.phone) + '" inputmode="tel" placeholder="90 123 45 67" autocomplete="tel-national"></span></label><label class="f full">' + t("co.comment") + '<input data-input="co" data-k="comment" value="' + esc(x.comment) + '" placeholder="' + t("co.commentPh") + '"></label></div></section>' +
         '<section class="card"><h3><span class="num stepn">3</span>' + t("co.payment") + '</h3><div class="payopts">' + (SF.state.pub.transferEnabled && r.payCard ? payOpt("transfer", "card", t("pay.transfer"), t("pay.transferSub")) : "") + (SF.state.pub.cashEnabled ? payOpt("cash", "cash", t("pay.cash"), t("pay.cashSub")) : "") + (SF.state.pub.cardEnabled ? payOpt("card", "card", t("pay.card"), t("pay.cardSub")) : "") + "</div>" +
           (!(SF.state.pub.transferEnabled && r.payCard) && !SF.state.pub.cashEnabled && !SF.state.pub.cardEnabled ? '<div class="msg err">' + I("info", 16) + t("co.noPay") + "</div>" : "") + (x.pay === "transfer" ? transferBox(r, qt) : "") + "</section></div>" +
@@ -308,6 +319,7 @@
     function payOpt(v, icon, title, sub) { var on = co().pay === v; return '<button class="payopt' + (on ? " on" : "") + '" data-act="paym" data-v="' + v + '" aria-pressed="' + on + '"><span class="pic">' + I(icon, 22) + "</span><span><b>" + title + "</b><small>" + sub + "</small></span><i></i></button>"; }
   } });
   SF.inputs.co = function (v, el) { co()[el.dataset.k] = v; };
+  SF.actions.copick = function (el) { co().pickup = el.dataset.v === "1"; SF.render({ quiet: true }); };
   SF.actions.paym = function (el) { co().pay = el.dataset.v; SF.render({ quiet: true }); };
   SF.actions.useaddr = function (el) { var a = (SF.state.user.addresses || [])[+el.dataset.i]; if (!a) return; Object.assign(co(), { text: a.text, landmark: a.landmark || "", lat: a.lat, lng: a.lng }); delete SF.state.tmv.co; SF.render({ quiet: true }); };
   /* checkout: the restaurant's own area if the admin drew one, else the town's */
@@ -338,11 +350,12 @@
   SF.actions.placeorder = function () {
     var x = co(), c = SF.cart.get(); if (SF.state.placing) return;
     if (String(x.name || "").trim().length < 2) { SF.toast(t("e.BAD_NAME"), "err"); return; }
-    if (x.lat == null) { SF.toast(t("e.ADDRESS_PIN_REQUIRED"), "err"); return; }
-    if (!inZone(x, x.cityId)) { var z = zoneOf(x.cityId); if (z.poly) { SF.toast(t("e.OUT_OF_AREA"), "err"); return; } SF.toast(t("e.OUT_OF_ZONE", { km: Math.round(SF.geo.km(z, x) * 10) / 10, max: z.km }), "err"); return; }
+    var pick = !!(x.pickup && SF.state.coRest && SF.state.coRest.pickup);
+    if (!pick && x.lat == null) { SF.toast(t("e.ADDRESS_PIN_REQUIRED"), "err"); return; }
+    if (!pick && !inZone(x, x.cityId)) { var z = zoneOf(x.cityId); if (z.poly) { SF.toast(t("e.OUT_OF_AREA"), "err"); return; } SF.toast(t("e.OUT_OF_ZONE", { km: Math.round(SF.geo.km(z, x) * 10) / 10, max: z.km }), "err"); return; }
     if (!x.pay) { SF.toast(t("e.PAY_METHOD_OFF"), "err"); return; }
     if (x.pay === "transfer" && !x.receipt) { SF.toast(t("e.RECEIPT_REQUIRED"), "err"); var up = document.querySelector(".upload"); if (up) { up.scrollIntoView({ block: "center" }); up.classList.remove("shake"); void up.offsetWidth; up.classList.add("shake"); } return; }
-    var body = { restaurantId: c.restaurantId, items: Object.keys(c.items).map(function (k) { return { productId: k, qty: c.items[k] }; }), address: { text: x.text, landmark: x.landmark, lat: x.lat, lng: x.lng },
+    var body = { restaurantId: c.restaurantId, items: Object.keys(c.items).map(function (k) { return { productId: k, qty: c.items[k] }; }), address: pick ? {} : { text: x.text, landmark: x.landmark, lat: x.lat, lng: x.lng }, pickup: pick || undefined,
       name: String(x.name || "").trim(), phone: x.phone, comment: x.comment, paymentMethod: x.pay, receipt: x.pay === "transfer" ? x.receipt : undefined, promoCode: SF.state.promo ? SF.state.promo.code : null };
     SF.state.placing = true; document.querySelectorAll("[data-act=placeorder]").forEach(function (b) { b.disabled = true; });
     return api().post("/orders", body).then(function (o) { SF.cart.clear(); SF.state.promo = null; x.comment = ""; x.receipt = null; SF.state.cartSum = 0; SF.state.justPlaced = o.id;
@@ -383,7 +396,7 @@
     var left = (cookStart + prep * 60000 - Date.now()) / 60000; return Math.max(travel, Math.round(Math.max(0, left) + travel)); }
   SF.route("/o/:id", { roles: ["customer"], live: true, title: "track.title", render: function (p) {
     return api().get("/orders/" + p.id).then(function (o) {
-      var r = o.restaurant, city = (SF.state.cities || []).filter(function (c) { return c.id === o.cityId; })[0] || r;
+      var r = o.restaurant, city = (SF.state.cities || []).filter(function (c) { return c.id === o.cityId; })[0] || r; SF.state.ctxShop = !!(r && r.kind === "shop");
       var fin = ["rejected", "cancelled"].indexOf(o.status) >= 0, done = o.status === "delivered", moving = !fin && !done && !!o.courier;
       var steps = [["trk.1", "receipt"], ["trk.2", "fire"], ["trk.3", "bag"], ["trk.4", "box"], ["trk.5", "scooter"], ["trk.6", "home"]], cur = { pending: 0, cooking: 1, ready: 2, picked_up: 4, delivered: 5 }[o.status];
       var cp = o.courierPos, markers = [{ lat: r.lat, lng: r.lng, type: "rest", label: "R" }, { lat: o.address.lat, lng: o.address.lng, type: "home", label: "" }];
@@ -415,6 +428,10 @@
   } });
   /* the courier, always answered plainly: is one assigned, where are they, do they have my food */
   function courierCard(o) {
+    /* «I pick it up myself»: where to come, when it is ready */
+    if (o.pickup) { var rr = o.restaurant || {}, ready = o.status === "ready" || o.status === "picked_up", done = o.status === "delivered";
+      return '<section class="card ccard2 pickcard' + (ready ? " ready" : "") + '"><span class="pic">' + I("store", 22) + '</span><div class="grow"><b>' + t(done ? "sh.taken" : ready ? "sh.readyCome" : "sh.prepWait") + "</b><span>" + esc(tx(rr.name || "")) + (o.address && o.address.text ? " · " + esc(o.address.text) : "") + "</span></div>" +
+        (o.address && o.address.lat != null && !done ? '<a class="btn sm ghost" target="_blank" rel="noopener" href="' + SF.geo.nav(o.address).google + '">' + I("route", 14) + t("sh.go") + "</a>" : "") + SF.callBtn(tx(rr.name || ""), rr.phone, "") + "</section>"; }
     var c = o.courier, cp = o.courierPos;
     if (o.selfDelivery) { var sd = o.selfDelivery, ph = sd.phone || (o.restaurant && o.restaurant.phone), done0 = o.status === "delivered";
       return '<section class="card courier2"><div class="crow"><span class="avatar">' + I("store", 20) + '</span><div class="grow"><small class="muted">' + t("dl.selfTitle") + "</small><b>" + esc(sd.name || tx(o.restaurant.name)) + '</b><span class="muted">' + esc(tx(o.restaurant.name)) + "</span></div>" + (ph && !done0 ? SF.callBtn(sd.name || tx(o.restaurant.name), ph, t("dl.selfTitle"), t("track.call")) : "") + "</div>" +

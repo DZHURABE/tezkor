@@ -40,6 +40,12 @@
       var order = Seed.CAT_ORDER || []; db.categories.forEach(function (c) { var i = order.indexOf(c.id); if (i >= 0) c.sort = i + 1; else c.sort = 50 + (c.sort || 0); });
       ["k6", "k7"].forEach(function (id) { var c = db.categories.filter(function (x) { return x.id === id; })[0]; if (c && !db.products.some(function (p) { return p.categoryId === id; })) c.active = false; });
       db.meta.up = 1; store.save(db); })();
+    /* shops (Tezkor «Мағозаҳо»): the same engine as restaurants with kind "shop" and their own goods categories */
+    var SHOP_CATS = [["s1", "Телефонҳо", "Телефоны", "Phones", "phone"], ["s2", "Планшет ва ноутбук", "Планшеты и ноутбуки", "Tablets & laptops", "laptop"], ["s3", "Қулоқчин ва аудио", "Наушники и аудио", "Headphones & audio", "audio"],
+      ["s4", "Зарядка ва кабел", "Зарядки и кабели", "Chargers & cables", "charge"], ["s5", "Ғилоф ва шиша", "Чехлы и стёкла", "Cases & glass", "case"], ["s6", "Аксессуарҳо", "Аксессуары", "Accessories", "acc"],
+      ["s7", "Техникаи маишӣ", "Бытовая техника", "Home appliances", "tech"], ["s8", "Либос ва пойафзол", "Одежда и обувь", "Clothes & shoes", "clothes"], ["s9", "Косметика", "Косметика", "Cosmetics", "beauty"], ["s10", "Дигар молҳо", "Другие товары", "Other goods", "other"]];
+    (function shopCats() { if (!db || !db.categories) return; var ch = false; SHOP_CATS.forEach(function (c, i) { if (!db.categories.some(function (x) { return x.id === c[0]; })) { db.categories.push({ id: c[0], name: { tg: c[1], ru: c[2], en: c[3] }, icon: "box", shopIcon: c[4], shop: true, active: true, sort: 100 + i }); ch = true; } }); if (ch) store.save(db); })();
+    function isShop(r) { return r && r.kind === "shop"; }
     var routes = [];
 
     function save() { db.meta.version++; store.save(db); }
@@ -62,7 +68,7 @@
     /* ---------- shaping ---------- */
     function pubUser(u) { if (!u) return null; var o = { id: u.id, role: u.role, name: u.name, phone: u.phone, cityId: u.cityId, active: u.active, lang: u.lang, createdAt: u.createdAt };
       if (u.mustChange) o.mustChange = true; if (u.staff) { o.staff = true; o.staffRole = ["manager", "waiter"].indexOf(u.staffRole) >= 0 ? u.staffRole : "worker"; if (u.tipCard) o.tipCard = u.tipCard; } if (u.avatar) o.avatar = u.avatar; if (u.favs) o.favs = u.favs; if (u.pwResetAt) o.pwResetAt = u.pwResetAt; if (u.phoneVerified) o.phoneVerified = u.phoneVerified;
-      if (u.restaurantId) o.restaurantId = u.restaurantId; if (u.courier) { o.courier = Object.assign({}, u.courier, courierRating(u)); if (u.courier.restaurantId) { var rr = find(db.restaurants, u.courier.restaurantId); o.courier.restaurantName = rr ? rr.name : null; } } if (u.addresses) o.addresses = u.addresses; return o; }
+      if (u.restaurantId) { o.restaurantId = u.restaurantId; var rk = find(db.restaurants, u.restaurantId); o.restKind = rk && rk.kind === "shop" ? "shop" : "food"; } if (u.courier) { o.courier = Object.assign({}, u.courier, courierRating(u)); if (u.courier.restaurantId) { var rr = find(db.restaurants, u.courier.restaurantId); o.courier.restaurantName = rr ? rr.name : null; } } if (u.addresses) o.addresses = u.addresses; return o; }
     function courierRating(u) { var rs = db.orders.filter(function (o) { return o.courierId === u.id && o.review && o.review.courierRating; });
       if (!rs.length) return { rating: u.courier ? u.courier.rating : null, ratingCount: u.courier ? u.courier.ratingCount : 0 };
       var base = (u.courier.rating || 0) * (u.courier.ratingCount || 0), sum = rs.reduce(function (s, o) { return s + o.review.courierRating; }, 0);
@@ -104,7 +110,7 @@
     function wOf(o) { var w = o.waiterId && find(db.users, o.waiterId); return w ? { id: w.id, name: w.name, tipCard: w.tipCard || null, rating: w.wRating || null } : null; }
     function pubOrder(o, viewer) {
       var r = find(db.restaurants, o.restaurantId), cu = find(db.users, o.customerId), co = o.courierId ? find(db.users, o.courierId) : null;
-      var x = Object.assign({}, o, { restaurant: r ? { id: r.id, name: r.name, phone: r.phone, lat: r.lat, lng: r.lng, tone: r.tone, address: r.address } : null,
+      var x = Object.assign({}, o, { restaurant: r ? { id: r.id, kind: r.kind || "food", name: r.name, phone: r.phone, lat: r.lat, lng: r.lng, tone: r.tone, address: r.address } : null,
         /* a known number: how many orders this customer has already received — new or regular */
         customer: cu ? { id: cu.id, name: cu.name, phone: cu.phone, verified: !!cu.phoneVerified, orders: db.orders.filter(function (x) { return x.customerId === cu.id && x.status === "delivered" && x.id !== o.id; }).length } : null,
         courier: co ? Object.assign({ id: co.id, name: co.name, phone: co.phone, vehicle: co.courier.vehicle }, courierRating(co)) : null,
@@ -177,7 +183,8 @@
       var r = find(db.restaurants, o.restaurantId), num = o.number;
       if (to === "pending") notify("rest:" + o.restaurantId, "n.newOrder", { n: num, sum: o.subtotal }, o.id);
       if (to === "picked_up" && o.dineIn) o.pickedAt = t;
-      if (to === "cooking") { hideFor(o.id, "rest:" + o.restaurantId); notify("u:" + o.customerId, "n.accepted", { n: num, min: o.prepMin }, o.id); o.cookingAt = t; if (!o.dineIn) notify(offerTarget(o), "n.courierNew", { n: num, rest: r.name, km: o.km }, o.id); }
+      if ((to === "cancelled" || to === "rejected") && o.stockTaken) { o.stockTaken = false; o.items.forEach(function (it) { var pr = find(db.products, it.productId); if (pr && pr.stock != null) { pr.stock += it.qty; if (pr.stock > 0) pr.available = true; } }); }
+      if (to === "cooking") { hideFor(o.id, "rest:" + o.restaurantId); notify("u:" + o.customerId, "n.accepted", { n: num, min: o.prepMin }, o.id); o.cookingAt = t; if (!o.dineIn && !o.pickup) notify(offerTarget(o), "n.courierNew", { n: num, rest: r.name, km: o.km }, o.id); }
       if (to === "ready") { if (!o.selfDelivery && !o.dineIn) notify(o.courierId ? "u:" + o.courierId : offerTarget(o), "n.ready", { n: num, rest: r.name }, o.id); notify("u:" + o.customerId, "n.readyCustomer", { n: num }, o.id); }
       if (to === "picked_up") { o.pickedAt = t; notify("u:" + o.customerId, "n.onTheWay", { n: num, total: o.total, cash: o.payment.method === "cash" }, o.id); }
       if (to === "delivered") { o.deliveredAt = t; if (o.payment.method === "cash") o.payment.status = "paid";
@@ -196,11 +203,14 @@
       if (!Array.isArray(b.items) || !b.items.length) E(400, "CART_EMPTY");
       var items = b.items.map(function (it) { var p = find(db.products, it.productId), q = int(it.qty);
         if (!p || p.restaurantId !== r.id) E(400, "PRODUCT_NOT_FOUND"); if (!p.available) E(409, "PRODUCT_UNAVAILABLE", { name: p.name });
-        if (!(q >= 1 && q <= 50)) E(400, "BAD_QTY"); return { productId: p.id, name: p.name, price: p.price, qty: q, kind: p.kind, photo: p.photo && p.photo.charAt(0) === "/" ? p.photo : null }; });
+        if (!(q >= 1 && q <= 50)) E(400, "BAD_QTY"); if (p.stock != null && q > p.stock) E(409, "OUT_OF_STOCK", { name: p.name, left: p.stock });
+        return { productId: p.id, name: p.name, price: p.price, qty: q, kind: p.kind, photo: p.photo && p.photo.charAt(0) === "/" ? p.photo : null }; });
       var subtotal = items.reduce(function (s, x) { return s + x.price * x.qty; }, 0);
       if (!b.dineIn && subtotal < r.minOrder) E(409, "MIN_ORDER", { min: r.minOrder });
       var a = b.address || {}, km = null, fee = null;
-      if (typeof a.lat === "number" && typeof a.lng === "number") { var city = cityOf(r.cityId); var zk = Rules.distanceKm(city, a), zmax = db.settings.zoneKm || 5;
+      /* «I'll pick it up myself»: no address, no delivery fee (only where the place allows it) */
+      if (b.pickup && !b.dineIn) { if (!r.pickup) E(409, "NO_PICKUP"); km = 0; fee = 0; }
+      else if (typeof a.lat === "number" && typeof a.lng === "number") { var city = cityOf(r.cityId); var zk = Rules.distanceKm(city, a), zmax = db.settings.zoneKm || 5;
         /* the area the admin drew on the map; without one — a circle of zoneKm around the town centre */
         if (r.zone && r.zone.length >= 3) { if (!Rules.inPolygon(a, r.zone)) E(422, "OUT_OF_AREA"); }   // the restaurant's own area, drawn by the admin
         else if (city.zone && city.zone.length >= 3) { if (!Rules.inPolygon(a, city.zone)) E(422, "OUT_OF_AREA"); }
@@ -333,20 +343,20 @@
 
     /* ---------- catalogue (public) ---------- */
     route("GET", "/cities", null, function () { return db.cities.filter(function (c) { return c.active; }); });
-    route("GET", "/categories", null, function () { return db.categories.filter(function (c) { return c.active; }).sort(function (a, b) { return a.sort - b.sort; }); });
+    route("GET", "/categories", null, function (req, b, q) { return db.categories.filter(function (c) { return c.active && (q.shop ? !!c.shop : !c.shop); }).sort(function (a, b) { return a.sort - b.sort; }); });
     route("GET", "/banners", null, function () { return db.banners.filter(function (b) { if (!b.active || b.blocked) return false; if (!b.restaurantId) return true; var r = find(db.restaurants, b.restaurantId); return r && orderable(r); })
       .sort(function (a, b) { return (b.own ? 1 : 0) - (a.own ? 1 : 0) || (b.updatedAt || 0) - (a.updatedAt || 0); })
       /* a restaurant's ad shows its town (and its real menu link for the QR code) */
       .map(function (b) { var r = b.restaurantId && find(db.restaurants, b.restaurantId); return r ? Object.assign({}, b, { place: (cityOf(r.cityId) || {}).name || null, restName: r.name }) : b; }); });
     route("GET", "/settings/public", null, function () { var s = db.settings; return { deliveryBase: s.deliveryBase, deliveryPerKm: s.deliveryPerKm, deliveryMin: s.deliveryMin, currency: s.currency, defaultCityId: s.defaultCityId, supportPhone: s.supportPhone, courierPct: s.courierPct, zoneKm: s.zoneKm || 5, handoffMin: setting("handoffMin"), verify: { channels: vChannels().map(function (c) { return { id: c.id, kind: c.kind }; }), required: verifyRequired() }, apk: !!(opts.apkAvailable && opts.apkAvailable()), cardEnabled: cardOn(), cashEnabled: payOn("cash"), services: svcMap(), svcPhotos: db.settings.svcPhotos || {}, adsPaid: adCfg().paid, transferEnabled: payOn("transfer"), demo: !PROD }; });
     route("GET", "/restaurants", null, function (req, b, q) {
-      var list = db.restaurants.filter(function (r) { return orderable(r) && (!q.cityId || r.cityId === q.cityId); });
+      var wantShop = q.kind === "shop", list = db.restaurants.filter(function (r) { return orderable(r) && (!q.cityId || r.cityId === q.cityId) && isShop(r) === wantShop; });
       if (q.categoryId) list = list.filter(function (r) { return db.products.some(function (p) { return p.restaurantId === r.id && p.categoryId === q.categoryId && p.available; }); });
-      return list.map(pubRest).sort(function (a, b) { return (b.isOpenNow - a.isOpenNow) || (b.rating - a.rating); });
+      return list.map(pubRest).sort(function (a, b) { return ((b.pinned ? 1 : 0) - (a.pinned ? 1 : 0)) || (b.isOpenNow - a.isOpenNow) || (b.rating - a.rating); });
     });
     route("GET", "/restaurants/:id", null, function (req, b, q, p) { var r = find(db.restaurants, p.id); if (!r || !live(r)) E(404, "NOT_FOUND");
       return Object.assign(pubRest(r), { products: by(db.products, "restaurantId", r.id) }); });
-    route("GET", "/products/popular", null, function (req, b, q) { var ids = db.restaurants.filter(function (r) { return orderable(r) && (!q.cityId || r.cityId === q.cityId); }).map(function (r) { return r.id; });
+    route("GET", "/products/popular", null, function (req, b, q) { var ids = db.restaurants.filter(function (r) { return orderable(r) && !isShop(r) && (!q.cityId || r.cityId === q.cityId); }).map(function (r) { return r.id; });
       /* «Popular»: what people like (👍) and buy most, plus the dishes a restaurant marks as hits */
       var score = function (p) { return (p.likes || 0) * 3 - (p.dislikes || 0) * 2 + Math.min(p.sold || 0, 200) * 0.5 + (p.popular ? 4 : 0); };
       return db.products.filter(function (p) { return p.available && ids.indexOf(p.restaurantId) >= 0 && (p.popular || score(p) > 2); })
@@ -375,7 +385,7 @@
       var dup = db.orders.filter(function (o) { return o.customerId === req.user.id && o.sig === sig && clock() - o.createdAt < 20000 && ["pending", "awaiting_payment"].indexOf(o.status) >= 0; })[0]; if (dup) return pubOrder(dup, req.user);
       if (b.name != null) { var nm = str(b.name, 60); if (nm.length < 2) E(400, "BAD_NAME"); if (nm !== req.user.name) req.user.name = nm; }
       var q = quote(req, b), a = b.address || {};
-      if (q.km == null) E(400, "ADDRESS_PIN_REQUIRED"); if (str(a.text).length < 3) E(400, "ADDRESS_TEXT_REQUIRED");
+      var pick = !!(b.pickup && q.restaurant.pickup); if (q.km == null) E(400, "ADDRESS_PIN_REQUIRED"); if (!pick && str(a.text).length < 3) E(400, "ADDRESS_TEXT_REQUIRED");
       var phone = Rules.normPhone(b.phone || req.user.phone); if (!phone) E(400, "BAD_PHONE");
       var method = ["card", "cash", "transfer"].indexOf(b.paymentMethod) >= 0 ? b.paymentMethod : "cash", t = clock();
       if (!payOn(method)) E(400, method === "card" ? "CARD_DISABLED" : "PAY_METHOD_OFF");
@@ -388,15 +398,18 @@
       }
       db.meta.seq++; var o = { id: "o" + db.meta.seq, number: db.meta.seq, customerId: req.user.id, restaurantId: q.restaurant.id, courierId: null, cityId: q.restaurant.cityId,
         items: q.items, subtotal: q.subtotal, deliveryFee: q.deliveryFee, discount: q.discount, total: q.total, km: q.km, promoCode: q.promo ? q.promo.code : null,
-        address: { text: str(a.text, 120), landmark: str(a.landmark, 120), lat: a.lat, lng: a.lng }, phone: phone, comment: str(b.comment, 200),
+        address: pick ? { text: q.restaurant.address ? (q.restaurant.address.tg || "") : "", landmark: "", lat: q.restaurant.lat, lng: q.restaurant.lng } : { text: str(a.text, 120), landmark: str(a.landmark, 120), lat: a.lat, lng: a.lng }, phone: phone, comment: str(b.comment, 200),
+        pickup: pick || undefined, selfDelivery: pick ? { pickup: true, name: "" } : undefined,
         payment: { method: method, status: method === "card" ? "pending" : method === "transfer" ? "review" : "none", provider: method === "card" ? (b.provider || "mock") : method },
         delivery: q.restaurant.delivery || "platform", sig: sig,
         status: method === "card" ? "awaiting_payment" : "pending", prepMin: null, createdAt: t, updatedAt: t, history: [{ status: method === "card" ? "awaiting_payment" : "pending", at: t, by: req.user.id }] };
       if (method === "transfer") { receiptId = "rc" + o.number; files.put(receiptId, String(b.receipt)); o.payment.receiptId = receiptId; o.payment.toCard = q.restaurant.payCard.number.slice(-4); }
       db.orders.unshift(o); if (q.promo) q.promo.uses++;
+      /* goods with a counted stock: take them off the shelf (given back if the order is cancelled) */
+      o.items.forEach(function (it) { var pr = find(db.products, it.productId); if (pr && pr.stock != null) { pr.stock = Math.max(0, pr.stock - it.qty); if (!pr.stock) pr.available = false; o.stockTaken = true; } });
       if (method === "card") db.payments.unshift({ id: "pay" + o.number, orderId: o.id, amount: o.total, method: "card", provider: o.payment.provider, status: "pending", createdAt: t });
       else notify("rest:" + o.restaurantId, "n.newOrder", { n: o.number, sum: o.subtotal }, o.id);
-      var u = req.user; u.addresses = u.addresses || []; if (!u.addresses.some(function (x) { return x.text === o.address.text; })) { u.addresses.unshift(o.address); u.addresses.length = Math.min(u.addresses.length, 5); }
+      var u = req.user; u.addresses = u.addresses || []; if (!pick && !u.addresses.some(function (x) { return x.text === o.address.text; })) { u.addresses.unshift(o.address); u.addresses.length = Math.min(u.addresses.length, 5); }
       save(); return pubOrder(o, req.user);
     });
     route("POST", "/orders/:id/pay", ["customer"], function (req, b, q, p) {
@@ -456,6 +469,7 @@
       if (b.about != null) r.about = L(str(b.about, 200));
       if (b.cover !== undefined) r.cover = photoField(b.cover, r.cover || null, "cv");
       if (b.logo !== undefined) r.logo = photoField(b.logo, r.logo || null, "lg");
+      if (b.pickup != null) { boss(req); r.pickup = !!b.pickup; }
       /* where guests send money: several cards / e-wallet phone numbers of different banks (only the owner) */
       if (b.payAccounts != null) { if (r.ownerId !== req.user.id) E(403, "OWNER_ONLY"); if (!Array.isArray(b.payAccounts) || b.payAccounts.length > 6) E(400, "BAD_PAY_CARD");
         r.payAccounts = b.payAccounts.map(function (x) { var kind = x.kind === "phone" ? "phone" : "card", num;
@@ -498,6 +512,8 @@
       if (o.status === "cooking") setStatus(o, "ready", req.user);
       o.selfDelivery = { name: str(b.name, 60), phone: Rules.normPhone(b.phone) || null }; hideFor(o.id, "own:" + o.restaurantId); hideFor(o.id, "couriers:" + o.cityId);
       setStatus(o, "picked_up", req.user); save(); return pubOrder(o, req.user); });
+    route("POST", "/restaurant/orders/:id/given", ["restaurant"], function (req, b, q, p) { var o = orderFor(req, p.id); if (!o.pickup) E(409, "NOT_PICKUP");
+      ["ready", "picked_up", "delivered"].forEach(function (st) { if (Rules.canTransition(o.status, st, "restaurant")) setStatus(o, st, req.user); }); save(); return pubOrder(o, req.user); });
     route("POST", "/restaurant/orders/:id/delivered", ["restaurant"], function (req, b, q, p) { var o = orderFor(req, p.id); if (!o.selfDelivery) E(409, "NOT_SELF_DELIVERY");
       setStatus(o, "delivered", req.user); save(); return pubOrder(o, req.user); });
     /* ---------- tables in the hall: a QR sticker on each table → the guest orders from the menu without signing up ---------- */
@@ -651,14 +667,15 @@
     function validProduct(b, partial) {
       var x = {};
       if (!partial || b.name != null) { var n = str(b.name, 60); if (n.length < 2) E(400, "BAD_NAME"); x.name = L(n); }
-      if (!partial || b.price != null) { var pr = int(b.price); if (!(pr >= 1 && pr <= 10000)) E(400, "BAD_PRICE"); x.price = pr; }
+      if (!partial || b.price != null) { var pr = int(b.price); if (!(pr >= 1 && pr <= 500000)) E(400, "BAD_PRICE"); x.price = pr; }
       if (!partial || b.categoryId != null) { if (!find(db.categories, b.categoryId)) E(400, "BAD_CATEGORY"); x.categoryId = b.categoryId; }
-      if (b.desc != null) x.desc = L(str(b.desc, 140)); if (b.weight != null) x.weight = str(b.weight, 20);
+      if (b.desc != null) x.desc = L(str(b.desc, 140)); if (b.weight != null) x.weight = str(b.weight, 20); if (b.brand != null) x.brand = str(b.brand, 40) || null;
       if (b.kind != null) x.kind = KINDS.indexOf(b.kind) >= 0 ? b.kind : "plate";
       if (b.available != null) x.available = !!b.available; if (b.popular != null) x.popular = !!b.popular;
+      if (b.stock !== undefined) { if (b.stock === null || b.stock === "") x.stock = null; else { var sk = int(b.stock); if (!(sk >= 0 && sk <= 100000)) E(400, "BAD_STOCK"); x.stock = sk; if (sk === 0) x.available = false; else if (b.available == null) x.available = true; } }
       /* when the dish is shown first on the home screen: breakfast / lunch / dinner / night (empty = guessed from the dish) */
       if (b.meals != null) x.meals = (Array.isArray(b.meals) ? b.meals : []).filter(function (m, i, a) { return ["b", "l", "d", "n"].indexOf(m) >= 0 && a.indexOf(m) === i; });
-      if (b.oldPrice !== undefined) { var op = b.oldPrice ? int(b.oldPrice) : null; if (op !== null && !(op >= 1 && op <= 10000)) E(400, "BAD_PRICE"); x.oldPrice = op; }
+      if (b.oldPrice !== undefined) { var op = b.oldPrice ? int(b.oldPrice) : null; if (op !== null && !(op >= 1 && op <= 500000)) E(400, "BAD_PRICE"); x.oldPrice = op; }
       return x;
     }
     function saveProduct(prod, b, partial) { var x = validProduct(b, partial), ph = b.photo;
@@ -793,7 +810,7 @@
       if (db.users.some(function (u) { return u.phone === phone; })) E(409, "PHONE_TAKEN");
       var tmp, rid = id("r"), owner = { id: id("u"), role: "restaurant", name: str(b.ownerName, 60) || name, phone: phone, pass: hashPw(tmp = newPassword()), mustChange: true, active: true, cityId: city.id, restaurantId: rid, createdAt: clock(), lang: "tg" };
       var la = Number(b.lat), ln = Number(b.lng), hasPin = isFinite(la) && isFinite(ln) && b.lat != null && Rules.distanceKm(city, { lat: la, lng: ln }) <= 60;
-      var r = { id: rid, name: L(name), cityId: city.id, ownerId: owner.id, cuisine: L(str(b.cuisine, 60) || "—"), tone: "#FFE3CC", eta: "30–45", rating: null, ratingCount: 0, hours: { from: "09:00", to: "22:00" }, open: false, active: true, commissionPct: com, minOrder: 20, lat: hasPin ? la : city.lat + 0.004, lng: hasPin ? ln : city.lng - 0.004, address: L(str(b.address, 80)), phone: phone, createdAt: clock() };
+      var r = { id: rid, kind: b.kind === "shop" ? "shop" : "food", pinned: !!b.pinned, pickup: b.kind === "shop" ? b.pickup !== false : !!b.pickup, name: L(name), cityId: city.id, ownerId: owner.id, cuisine: L(str(b.cuisine, 60) || "—"), tone: "#FFE3CC", eta: "30–45", rating: null, ratingCount: 0, hours: { from: "09:00", to: "22:00" }, open: false, active: true, commissionPct: com, minOrder: 20, lat: hasPin ? la : city.lat + 0.004, lng: hasPin ? ln : city.lng - 0.004, address: L(str(b.address, 80)), phone: phone, createdAt: clock() };
       /* where the restaurant delivers — drawn by the admin on the map (optional) */
       if (Array.isArray(b.zone) && b.zone.length) { if (b.zone.length < 3 || b.zone.length > 200) E(400, "BAD_ZONE"); r.zone = b.zone.map(function (x) { var a1 = Number(x.lat), a2 = Number(x.lng); if (!(isFinite(a1) && isFinite(a2)) || Rules.distanceKm(city, { lat: a1, lng: a2 }) > 60) E(400, "BAD_ZONE"); return { lat: Math.round(a1 * 1e6) / 1e6, lng: Math.round(a2 * 1e6) / 1e6 }; }); }
       /* access: a free trial of N days, or N paid months (1–12) */
@@ -818,6 +835,7 @@
       if (ow && b.ownerName != null) { var on = str(b.ownerName, 60); if (on.length < 2) E(400, "BAD_NAME"); ow.name = on; }
       if (ow && b.ownerPhone != null) { var op = Rules.normPhone(b.ownerPhone); if (!op) E(400, "BAD_PHONE");
         if (op !== ow.phone) { if (db.users.some(function (u) { return u.phone === op; })) E(409, "PHONE_TAKEN"); ow.phone = op; ow.phoneVerified = null; } }
+      if (b.kind != null) r.kind = b.kind === "shop" ? "shop" : "food"; if (b.pinned != null) r.pinned = !!b.pinned; if (b.pickup != null) r.pickup = !!b.pickup;
       if (b.active != null) r.active = !!b.active; if (b.commissionPct != null) { var c = int(b.commissionPct); if (!(c >= 0 && c <= 50)) E(400, "BAD_COMMISSION"); r.commissionPct = c; } save(); return pubRest(r); });
     /* ---------- admins: one main admin (the one set on the server) and up to two helpers he adds himself ----------
        helpers run everything day to day; only the main admin adds or removes admins, and nobody else can block him or reset his password */
@@ -939,7 +957,7 @@
       Object.assign(s, next); save(); return s; });
     /* ---------- Tezkor services: one account, many services. Only the ones with a ready module can be switched on;
        the admin switches them on and off himself, the apps read the switches from /settings/public ---------- */
-    var SERVICES = [["food", true], ["taxi"], ["shops"], ["ads", true], ["masters", true], ["jobs", true], ["grocery"], ["pharmacy"], ["realty", true]];
+    var SERVICES = [["food", true], ["taxi"], ["shops", true], ["ads", true], ["masters", true], ["jobs", true], ["grocery"], ["pharmacy"], ["realty", true]];
     function svcMap() { var s = db.settings.services || {}, o = {}; SERVICES.forEach(function (x) { o[x[0]] = x[0] === "food" ? s.food !== false : !!(x[1] && s[x[0]]); }); return o; }
     function svcOn(k) { return !!svcMap()[k]; }
     function needSvc(k, req) { if (!svcOn(k) && !(req && req.user && req.user.role === "admin")) E(403, "SERVICE_OFF", { service: k }); }
