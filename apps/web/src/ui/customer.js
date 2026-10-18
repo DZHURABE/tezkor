@@ -290,8 +290,9 @@
       return '<a class="backlink" href="#/cart">' + I("chevL", 18) + t("nav.cart") + '</a><h1 class="h2">' + t("co.title") + '</h1><div class="two"><div class="stack">' +
         '<section class="card"><h3><span class="num stepn">1</span>' + t("co.address") + "</h3>" +
         (addrs.length ? '<div class="tags">' + addrs.map(function (ad, i) { return '<button class="chip" data-act="useaddr" data-i="' + i + '">' + I("pin", 14) + esc(ad.text) + "</button>"; }).join("") + "</div>" : "") +
-        '<div class="mapbox">' + SF.tmap({ key: "co", picker: true, center: x.lat != null ? x : zone, zoom: x.lat != null ? 17 : 14, zone: zone, markers: [{ lat: r.lat, lng: r.lng, type: "rest", label: "R" }], label: t("co.pinTitle"), onMove: pinMoved }) + "</div>" +
+        '<div class="mapbox">' + SF.tmap({ key: "co", picker: true, center: x.lat != null ? x : zone, zoom: x.lat != null ? 17 : 14, zone: zone, markers: [{ lat: r.lat, lng: r.lng, type: "rest", label: "R" }].concat(SF.state.geo ? [{ lat: SF.state.geo.lat, lng: SF.state.geo.lng, acc: SF.state.geo.acc, type: "me" }] : []), label: t("co.pinTitle"), onMove: pinMoved }) + "</div>" +
         '<div class="pinread' + (x.lat == null ? " hint" : !inZone(x, r.cityId) ? " bad" : "") + '" id="pinread">' + (x.lat != null ? pinText(x, r.cityId) : I("pin", 16) + "<span>" + t("co.pinHelp") + "</span>") + "</div>" +
+        (SF.state.geo && SF.state.geo.acc > 80 ? '<div class="msg warn">' + I("info", 16) + "<span>" + t("geo.rough", { m: Math.round(SF.state.geo.acc) }) + "</span></div>" : "") +
         '<div class="geotools"><button type="button" class="btn ghost sm" data-act="geoloc">' + I("locate", 16) + t("co.myLoc") + '</button><form class="llform" data-form="coords"><label class="f grow">' + t("co.pasteLL") + '<span class="llrow"><input name="ll" id="co-ll" placeholder="' + t("co.pastePh") + '" autocomplete="off"><button class="btn sm">' + I("link", 16) + t("co.show") + "</button></span></label></form></div>" +
         '<div class="grid2"><label class="f">' + t("co.street") + '<input data-input="co" data-k="text" value="' + esc(x.text) + '" placeholder="' + t("co.streetPh") + '" autocomplete="street-address"></label><label class="f">' + t("co.landmark") + '<input data-input="co" data-k="landmark" value="' + esc(x.landmark) + '" placeholder="' + t("co.landmarkPh") + '"></label></div></section>' +
         '<section class="card"><h3><span class="num stepn">2</span>' + t("co.contact") + '</h3><div class="grid2"><label class="f">' + t("profile.name") + '<input data-input="co" data-k="name" value="' + esc(x.name) + '" autocomplete="name" placeholder="' + t("co.namePh") + '"></label><label class="f">' + t("auth.phone") + '<span class="phonein"><i>+992</i><input data-input="co" data-k="phone" value="' + esc(x.phone) + '" inputmode="tel" placeholder="90 123 45 67" autocomplete="tel-national"></span></label><label class="f full">' + t("co.comment") + '<input data-input="co" data-k="comment" value="' + esc(x.comment) + '" placeholder="' + t("co.commentPh") + '"></label></div></section>' +
@@ -310,7 +311,7 @@
   SF.actions.paym = function (el) { co().pay = el.dataset.v; SF.render({ quiet: true }); };
   SF.actions.useaddr = function (el) { var a = (SF.state.user.addresses || [])[+el.dataset.i]; if (!a) return; Object.assign(co(), { text: a.text, landmark: a.landmark || "", lat: a.lat, lng: a.lng }); delete SF.state.tmv.co; SF.render({ quiet: true }); };
   /* checkout: the restaurant's own area if the admin drew one, else the town's */
-  function zoneOf(cityId) { var r = SF.state.coRest; return r && r.cityId === cityId ? SF.restZone(r) : SF.zone(cityId); }
+  function zoneOf(cityId) { var r = SF.state.coRest; return r ? SF.restZone(r) : SF.zone(cityId || SF.state.cityId); }
   function inZone(p, cityId) { return SF.inZoneOf(p, zoneOf(cityId)); }
   function pinText(p, cityId) { var z = zoneOf(cityId), km = Math.round(SF.geo.km(z, p) * 10) / 10;
     if (z.poly) return inZone(p, cityId) ? I("check", 16) + "<span>" + t("co.inZone", { km: km, city: z.name }) + "</span>" : I("info", 16) + "<span>" + t("e.OUT_OF_AREA") + "</span>";
@@ -324,9 +325,15 @@
   SF.actions.geoloc = function () {
     if (!navigator.geolocation) { SF.toast(t("geo.denied"), "err"); return; }
     SF.toast(t("geo.wait"), "info");
-    return new Promise(function (done) { navigator.geolocation.getCurrentPosition(function (pos) { SF.tmapCenter("co", { lat: pos.coords.latitude, lng: pos.coords.longitude }, 17); SF.toast(t("geo.found")); done(); },
+    return new Promise(function (done) { navigator.geolocation.getCurrentPosition(function (pos) { var acc = pos.coords.accuracy || 0;
+        SF.state.geo = { lat: pos.coords.latitude, lng: pos.coords.longitude, acc: acc, at: Date.now() }; SF.tmapCenter("co", SF.state.geo, acc > 300 ? 15 : 17);
+        SF.toast(acc > 80 ? t("geo.rough", { m: Math.round(acc) }) : t("geo.found"), acc > 80 ? "info" : "ok"); done(); },
       function () { SF.toast(t("geo.denied"), "err"); done(); }, { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 }); });
   };
+  /* checkout opened without a pin: if the phone already allows location, find it at once (no question asked) */
+  SF.after.push(function () { if (!/^\/checkout/.test(SF.path()) || !document.querySelector('[data-tmap="co"]')) return; var x = SF.state.co;
+    if (!x || x.lat != null || SF.state.geoTried || !navigator.permissions || !navigator.geolocation) return; SF.state.geoTried = true;
+    navigator.permissions.query({ name: "geolocation" }).then(function (st) { if (st.state === "granted") SF.actions.geoloc(); }).catch(function () {}); });
   SF.forms.coords = function (fd) { var p = SF.geo.parse(fd.ll); if (!p) { SF.toast(t("geo.bad"), "err"); return; } SF.tmapCenter("co", p, 17); SF.toast(t("geo.found")); };
   SF.actions.placeorder = function () {
     var x = co(), c = SF.cart.get(); if (SF.state.placing) return;
@@ -529,7 +536,8 @@
   SF.actions.addrkind = function (el) { na().kind = el.dataset.v; SF.render({ quiet: true }); };
   SF.actions.nageo = function () {
     if (!navigator.geolocation) { SF.toast(t("geo.denied"), "err"); return; } SF.toast(t("geo.wait"), "info");
-    return new Promise(function (done) { navigator.geolocation.getCurrentPosition(function (pos) { var p = { lat: pos.coords.latitude, lng: pos.coords.longitude }; na().lat = p.lat; na().lng = p.lng; SF.tmapCenter("na", p, 17); SF.toast(t("geo.found")); done(); },
+    return new Promise(function (done) { navigator.geolocation.getCurrentPosition(function (pos) { var p = { lat: pos.coords.latitude, lng: pos.coords.longitude }, acc = pos.coords.accuracy || 0; na().lat = p.lat; na().lng = p.lng; SF.tmapCenter("na", p, acc > 300 ? 15 : 17);
+        SF.toast(acc > 80 ? t("geo.rough", { m: Math.round(acc) }) : t("geo.found"), acc > 80 ? "info" : "ok"); done(); },
       function () { SF.toast(t("geo.denied"), "err"); done(); }, { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 }); });
   };
   SF.actions.addrsave = function () { var x = na();

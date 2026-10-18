@@ -48,7 +48,7 @@ function webPage(base) {
   if (!pages.has(base)) {
     let p;
     try {
-      p = fs.readFileSync(WEB, "utf8").replace("<head>", "<head><script>window.SOMON_CONFIG=" + JSON.stringify({ api: "/api", tiles: process.env.MAP_TILES || "https://tile.openstreetmap.org/{z}/{x}/{y}.png", tilesAttr: process.env.MAP_TILES_ATTR || "© OpenStreetMap" }) + "</script>")
+      p = fs.readFileSync(WEB, "utf8").replace("<head>", "<head><script>window.SOMON_CONFIG=" + JSON.stringify({ api: "/api", tiles: process.env.MAP_TILES || "https://tile.openstreetmap.org/{z}/{x}/{y}.png", satTiles: process.env.MAP_SAT_TILES != null ? process.env.MAP_SAT_TILES : undefined, satAttr: process.env.MAP_SAT_ATTR || undefined, tilesAttr: process.env.MAP_TILES_ATTR || "© OpenStreetMap" }) + "</script>")
         .replace(/<title>[^<]*<\/title>/, "<title>" + site.TITLE + "</title>").replace(/<meta name="description" content="[^"]*">/, '<meta name="description" content="' + site.DESC + '">')
         .replace("</head>", site.headTags(base) + "</head>").replace("<body>", "<body>" + site.noscript(base));
     } catch { p = "<h1>Build the web app first: node apps/web/build.mjs</h1>"; }

@@ -45,9 +45,13 @@
       '<div class="tm-tiles"></div><svg class="tm-ov" aria-hidden="true"></svg>' +
       (o.picker ? '<div class="tm-pin" aria-hidden="true"><svg viewBox="-14 -40 28 42" width="34" height="50"><path d="M0 0C-4-9-13-14-13-24A13 13 0 1 1 13-24C13-14 4-9 0 0Z"/><circle cy="-24" r="5" fill="#fff"/></svg><i></i></div>' : "") +
       '<div class="tm-zoom"><button type="button" data-tz="1" aria-label="+">' + I("plus", 18) + '</button><button type="button" data-tz="-1" aria-label="−">' + I("minus", 18) + "</button></div>" +
-      (cfg.tiles ? '<span class="tm-attr">' + esc(cfg.tilesAttr || "© OpenStreetMap") + "</span>" : '<span class="tm-attr">' + esc(t("map.schematic")) + "</span>") + "</div>";
+      /* satellite view: houses and yards are visible even where street maps are empty */
+      (cfg.tiles && satUrl() ? '<button type="button" class="tm-layer' + (sat() ? " on" : "") + '" data-tlayer="1" aria-pressed="' + sat() + '">' + I(sat() ? "map" : "image", 16) + "<span>" + t(sat() ? "map.street" : "map.sat") + "</span></button>" : "") +
+      (cfg.tiles ? '<span class="tm-attr">' + esc(sat() ? cfg.satAttr || "© Esri, Maxar, Earthstar Geographics" : cfg.tilesAttr || "© OpenStreetMap") + "</span>" : '<span class="tm-attr">' + esc(t("map.schematic")) + "</span>") + "</div>";
   };
 
+  function satUrl() { return cfg.satTiles === "" ? null : cfg.satTiles || "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"; }
+  function sat() { if (SF.state.mapSat == null) SF.state.mapSat = !!SF.ls.get("mapSat", false); return SF.state.mapSat && !!satUrl(); }
   function viewFor(o, el) {
     var v = SF.state.tmv[o.key];
     if (v && !o.refit) return v;
@@ -70,10 +74,10 @@
     if (cfg.tiles) {
       var need = {}, n = Math.pow(2, z);
       for (var tx = Math.floor(ox / T); tx <= Math.floor((ox + w) / T); tx++) for (var ty = Math.floor(oy / T); ty <= Math.floor((oy + h) / T); ty++) {
-        if (ty < 0 || ty >= n) continue; var k = z + "/" + tx + "/" + ty; need[k] = 1;
+        if (ty < 0 || ty >= n) continue; var S = sat(), k = (S ? "s" : "m") + z + "/" + tx + "/" + ty; need[k] = 1;
         var img = el._tiles[k];
         if (!img) { img = el._tiles[k] = document.createElement("img"); img.alt = ""; img.draggable = false; img.decoding = "async";
-          img.src = cfg.tiles.replace("{s}", "abc".charAt((tx + ty) % 3)).replace("{z}", z).replace("{x}", ((tx % n) + n) % n).replace("{y}", ty); tl.appendChild(img); }
+          img.src = (S ? satUrl() : cfg.tiles).replace("{s}", "abc".charAt((tx + ty) % 3)).replace("{z}", z).replace("{x}", ((tx % n) + n) % n).replace("{y}", ty); tl.appendChild(img); }
         img.style.transform = "translate(" + Math.round(tx * T - ox) + "px," + Math.round(ty * T - oy) + "px)";
       }
       Object.keys(el._tiles).forEach(function (k) { if (!need[k]) { el._tiles[k].remove(); delete el._tiles[k]; } });
@@ -92,6 +96,7 @@
     if (o.route && o.route[0] && o.route[1] && o.route[1].lat != null) { var a = P(o.route[0]), b = P(o.route[1]), mx = (a.x + b.x) / 2, my = Math.min(a.y, b.y) - Math.min(60, Math.abs(a.x - b.x) / 4 + 12);
       g += '<path class="m-route" d="M' + a.x.toFixed(1) + " " + a.y.toFixed(1) + " Q " + mx.toFixed(1) + " " + my.toFixed(1) + " " + b.x.toFixed(1) + " " + b.y.toFixed(1) + '"/>'; }
     (o.markers || []).forEach(function (m) { if (m.lat == null) return; var p = P(m);
+      if (m.type === "me") { g += '<circle class="m-acc" cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="' + Math.max(8, (m.acc || 0) / mpp(m.lat, z)).toFixed(1) + '"/><circle class="m-me" cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="8"/>'; return; }
       g += '<g transform="translate(' + p.x.toFixed(1) + "," + p.y.toFixed(1) + ')">' + (m.type === "courier"
         ? '<circle r="15" class="m-cour"/><path d="M-7-3h7l3 6M-6 4a2.5 2.5 0 100 .1M6 4a2.5 2.5 0 100 .1" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round"/><circle r="15" class="m-pulse"/>'
         : '<path class="m-pin m-' + m.type + '" d="M0 0C-4-8-12-12-12-21A12 12 0 1 1 12-21C12-12 4-8 0 0Z"/><text class="m-pt" y="-17">' + esc(m.label || "") + "</text>") + "</g>"; });
@@ -101,7 +106,7 @@
 
   function clampView(o, v) {
     if (o.free) return; var lim = o.zone || o.center; if (!lim) return;
-    var maxKm = (o.zone ? o.zone.km : 5) * 1.6, d = SF.geo.km(lim, v);
+    var maxKm = Math.max(8, (o.zone ? o.zone.km : 5) * 3), d = SF.geo.km(lim, v);
     if (d > maxKm) { var f = maxKm / d; v.lat = lim.lat + (v.lat - lim.lat) * f; v.lng = lim.lng + (v.lng - lim.lng) * f; }
   }
   function zoomBy(el, dz, ax, ay) {
@@ -118,7 +123,7 @@
     viewFor(o, el); draw(el);
     var ptrs = {}, start = null, pinch = null, moved = 0, lastTap = 0;
     el.addEventListener("pointerdown", function (e) {
-      if (e.target.closest(".tm-zoom")) return;
+      if (e.target.closest(".tm-zoom") || e.target.closest("[data-tlayer]")) return;
       el.setPointerCapture && el.setPointerCapture(e.pointerId); ptrs[e.pointerId] = { x: e.clientX, y: e.clientY };
       var ids = Object.keys(ptrs), v = SF.state.tmv[o.key];
       if (ids.length === 1) { start = { x: e.clientX, y: e.clientY, cx: wx(v.lng, v.z), cy: wy(v.lat, v.z) }; moved = 0; el.classList.add("drag"); }
@@ -149,7 +154,12 @@
     }
     el.addEventListener("pointerup", up); el.addEventListener("pointercancel", up);
     el.addEventListener("wheel", function (e) { e.preventDefault(); var rc = el.getBoundingClientRect(); clearTimeout(el._wh); var dz = e.deltaY < 0 ? 1 : -1; el._wh = setTimeout(function () { zoomBy(el, dz, e.clientX - rc.left, e.clientY - rc.top); }, 40); }, { passive: false });
-    el.addEventListener("click", function (e) { var b = e.target.closest("[data-tz]"); if (b) { e.preventDefault(); e.stopPropagation(); zoomBy(el, +b.dataset.tz); } });
+    el.addEventListener("click", function (e) { var ly = e.target.closest("[data-tlayer]");
+      if (ly) { e.preventDefault(); e.stopPropagation(); SF.state.mapSat = !sat(); SF.ls.set("mapSat", SF.state.mapSat);
+        document.querySelectorAll("[data-tmap]").forEach(function (m) { if (!m._m) return; Object.keys(m._tiles).forEach(function (k) { m._tiles[k].remove(); }); m._tiles = {};
+          var bt = m.querySelector("[data-tlayer]"); if (bt) { bt.classList.toggle("on", SF.state.mapSat); bt.setAttribute("aria-pressed", SF.state.mapSat); bt.innerHTML = I(SF.state.mapSat ? "map" : "image", 16) + "<span>" + t(SF.state.mapSat ? "map.street" : "map.sat") + "</span>"; }
+          var at = m.querySelector(".tm-attr"); if (at) at.textContent = SF.state.mapSat ? cfg.satAttr || "© Esri, Maxar, Earthstar Geographics" : cfg.tilesAttr || "© OpenStreetMap"; draw(m); }); return; }
+      var b = e.target.closest("[data-tz]"); if (b) { e.preventDefault(); e.stopPropagation(); zoomBy(el, +b.dataset.tz); } });
     el.addEventListener("keydown", function (e) { var v = SF.state.tmv[o.key], s = 60, k = e.key, cx = wx(v.lng, v.z), cy = wy(v.lat, v.z);
       if (k === "+" || k === "=") return zoomBy(el, 1); if (k === "-") return zoomBy(el, -1);
       var d = { ArrowLeft: [-s, 0], ArrowRight: [s, 0], ArrowUp: [0, -s], ArrowDown: [0, s] }[k]; if (!d) return; e.preventDefault();

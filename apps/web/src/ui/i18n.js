@@ -756,4 +756,6 @@ SF.I18N = {};
   K("pa.card", "Корт", "Карта", "Card"); K("pa.phone", "Ҳамён (рақами телефон)", "Кошелёк (номер телефона)", "Wallet (phone number)"); K("pa.phoneNum", "Рақами ҳамён", "Номер кошелька", "Wallet number");
   K("pa.bankPh", "Алиф, DC, Эсхата…", "Алиф, DC, Эсхата…", "Alif, DC, Eskhata…"); K("pa.holderPh", "Номи соҳиб", "Имя владельца", "Owner's name"); K("pa.add", "Боз корт / ҳамён", "Ещё карта / кошелёк", "Another card / wallet");
   K("pa.phoneS", "Ҳамён", "Кошелёк", "Wallet");
+  K("geo.rough", "Телефон ҷойро тахминан нишон дод (±{m} м). Харитаро кашида, нишонаро ба дари хонаатон гузоред.", "Телефон определил место примерно (±{m} м). Подвиньте карту и поставьте метку точно у дома.", "The phone found you only roughly (±{m} m). Drag the map and put the pin at your door.");
+  K("map.sat", "Спутник", "Спутник", "Satellite"); K("map.street", "Харита", "Карта", "Map");
 })();
