@@ -11,29 +11,8 @@
     return '<div class="hbars">' + list.map(function (x) { return '<div class="hb"><span class="hl">' + x.l + '</span><span class="ht"><i style="width:' + (x.v / max * 100).toFixed(1) + '%"></i></span><b class="num">' + fmt(x.v) + "</b></div>"; }).join("") + "</div>"; }
   function cityName(id) { return tx(((SF.state.allCities || SF.state.cities || []).filter(function (c) { return c.id === id; })[0] || {}).name); }
 
-  /* ---------- Dashboard ---------- */
-  R("/admin", { title: "adm.dash", live: true, render: function () {
-    return api().get("/admin/dashboard").then(function (d) {
-      var st = ["pending", "cooking", "ready", "picked_up", "delivered", "cancelled", "rejected"];
-      var sb = d.subs || {};
-      return ((sb.soon || sb.expired) ? '<a class="alert" href="#/admin/restaurants">' + I("clock", 18) + "<b>" + t("sub.dashDue", { s: sb.soon, e: sb.expired }) + "</b>" + I("chevR", 18) + "</a>" : "") +
-        '<div class="kpis k4">' + SF.kpi("wallet", t("k.todaySales"), money(d.todaySales), t("k.orders", { n: d.todayCount }), "brand") + SF.kpi("chart", t("k.monthGmv"), money(d.monthSales), t("k.orders", { n: d.monthCount })) +
-        SF.kpi("percent", t("k.platform"), money(d.platformMonth), t("k.month")) + SF.kpi("bolt", t("k.activeNow"), d.active, t("k.couriersOnline", { n: d.couriersOnline })) + "</div>" +
-        '<div class="kpis k4">' + SF.kpi("store", t("adm.restaurants"), d.restaurants) + SF.kpi("users", t("k.customers"), d.customers) + SF.kpi("scooter", t("adm.couriers"), d.couriers) + SF.kpi("wallet", t("sub.kpi"), money(sb.month || 0), t("sub.kpiSub", { n: sb.count || 0 })) + "</div>" +
-        '<div class="kpis k4">' + SF.kpi("percent", t("adm.commission"), money(d.commission || 0), t("k.month")) + SF.kpi("scooter", t("k.courierPay"), money(d.courierMonth || 0), t("k.month")) + SF.kpi("store", t("k.restPayout"), money(d.payout || 0), t("k.month")) + SF.kpi("x", t("k.cancelled"), d.cancelled || 0, t("k.month")) + "</div>" +
-        '<div class="two"><section class="card"><h3>' + t("k.gmv14") + "</h3>" + SF.bars(d.series, money, t("k.gmv14")) + "</section>" +
-        '<section class="card"><h3>' + t("k.byStatus") + "</h3>" + hbars(st.map(function (s) { return { l: SF.statusPill(s), v: d.byStatus[s] || 0 }; }), String) + "</section></div>" +
-        '<div class="two"><section class="card"><div class="rowhead"><h3>' + t("k.topRest") + '</h3><a class="link" href="#/admin/restaurants">' + t("btn.all") + "</a></div>" + hbars(d.byRest.slice(0, 6).map(function (r) { return { l: esc(tx(r.name)), v: r.sum }; }), money) + "</section>" +
-        '<section class="card"><h3>' + t("k.byCity") + "</h3>" + hbars(d.byCity.map(function (c) { return { l: esc(tx(c.name)), v: c.sum }; }), money) + '<div class="line"><span>' + I("card", 14) + t("pay.card") + '</span><b class="num">' + d.payMix.card + '</b></div><div class="line"><span>' + I("cash", 14) + t("pay.cash") + '</span><b class="num">' + d.payMix.cash + "</b></div></section></div>" +
-        /* every restaurant on its own line */
-        '<section class="card"><div class="rowhead"><h3>' + I("store", 18) + " " + t("rs2.title") + '</h3><a class="link" href="#/admin/restaurants">' + t("btn.all") + "</a></div>" +
-          (d.byRest.length ? '<div class="tscroll"><table class="tbl cardtbl rsum"><thead><tr><th>' + t("rs2.rest") + "</th><th>" + t("rs2.today") + "</th><th>" + t("rs2.month") + "</th><th>" + t("rs2.orders") + "</th><th>" + t("rs2.platform") + "</th><th>" + t("rs2.open") + "</th></tr></thead><tbody>" +
-            d.byRest.map(function (r) { var H = [t("rs2.rest"), t("rs2.today"), t("rs2.month"), t("rs2.orders"), t("rs2.platform"), t("rs2.open")];
-              return SF.labelCells(H, "<tr" + (r.active ? "" : ' class="muted"') + "><td><b>" + esc(tx(r.name)) + "</b>" + (r.ratingCount ? ' <small class="muted">★ ' + r.rating + "</small>" : "") + '</td><td class="num">' + money(r.today) + ' <small class="muted">(' + r.todayCount + ')</small></td><td class="num">' + money(r.sum) + '</td><td class="num">' + r.count + '</td><td class="num">' + money(r.platform) + '</td><td class="num">' + (r.open ? '<span class="pill p-warn">' + r.open + "</span>" : "0") + "</td></tr>"); }).join("") + "</tbody></table></div>" : '<p class="muted">' + t("rs2.none") + "</p>") + "</section>" +
-        /* launch day: start every number from 0 (main admin only) */
-        (d.isMain ? '<section class="card launch"><div class="grow"><b>' + I("bolt", 18) + " " + t("rz.title") + '</b><p class="muted">' + t("rz.sub") + "</p>" + (d.statsResetAt ? '<small class="muted">' + t("rz.last", { d: SF.dt(d.statsResetAt) }) + "</small>" : "") + '</div><button type="button" class="btn danger" data-act="rzopen">' + I("trash", 16) + t("rz.btn") + "</button></section>" : "");
-    });
-  } });
+  /* no dashboard: the admin lands on «Services», where everything is switched on and off */
+  R("/admin", { title: "adm.services", render: function () { setTimeout(function () { SF.go("/admin/services"); }, 0); return ""; } });
 
   /* ---------- Orders ---------- */
   R("/admin/orders", { title: "adm.orders", live: true, render: function (p, q) {
@@ -150,7 +129,7 @@
         '<div class="seg nrkind" role="group">' + [["food", "store", "sh.kFood"], ["shop", "bag", "sh.kShop"]].map(function (k) { return '<button type="button" class="' + (x.kind === k[0] ? "on" : "") + '" aria-pressed="' + (x.kind === k[0]) + '" data-act="nrkind" data-v="' + k[0] + '">' + I(k[1], 16) + " " + t(k[2]) + "</button>"; }).join("") + "</div>" +
         inp("name", t(x.kind === "shop" ? "sh.name" : "adm.restName"), " required") +
         '<div class="grid2"><label class="f">' + t("profile.city") + '<select name="cityId" data-input="nrcity">' + (SF.state.cities || []).map(function (y) { return '<option value="' + y.id + '"' + (y.id === x.cityId ? " selected" : "") + ">" + esc(tx(y.name)) + "</option>"; }).join("") + "</select></label>" + inp("cuisine", t("adm.cuisine"), ' placeholder="' + t("adm.cuisinePh") + '"') + "</div>" +
-        inp("address", t("adm.addrL"), ' placeholder="' + t("nr.addrPh") + '"') +
+        inp("address", t("adm.addrL"), ' data-geo="nrmap" placeholder="' + t("nr.addrPh") + '"') +
         '<div class="lbl">' + t("dl.who") + '</div><div class="nrdel">' + [["platform", "scooter"], ["own", "store"], ["mixed", "route"]].map(function (m) { var on = (x.f.delivery || "platform") === m[0]; return '<label class="nrdl' + (on ? " on" : "") + '"><input type="radio" name="delivery" value="' + m[0] + '" data-input="nrf"' + (on ? " checked" : "") + ">" + I(m[1], 20) + "<b>" + t("dl.m." + m[0]) + "</b><small>" + t("dl.desc." + m[0], { n: (SF.state.pub && SF.state.pub.handoffMin) || 7 }) + "</small></label>"; }).join("") + "</div>" +
         '<label class="checkrow"><input type="checkbox" name="pinned"' + (x.f.pinned ? " checked" : "") + "><span>" + t("sh.pinned") + '<small class="muted">' + t("sh.pinnedHint") + "</small></span></label>" +
         '<label class="checkrow"><input type="checkbox" name="pickup"' + (x.f.pickup != null ? (x.f.pickup ? " checked" : "") : x.kind === "shop" ? " checked" : "") + "><span>" + t("sh.pickupSet") + '<small class="muted">' + t("sh.pickupSetSub") + "</small></span></label></section>" +

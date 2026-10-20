@@ -51,7 +51,7 @@
   };
 
   function satUrl() { return cfg.satTiles === "" ? null : cfg.satTiles || "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"; }
-  function sat() { if (SF.state.mapSat == null) SF.state.mapSat = !!SF.ls.get("mapSat", false); return SF.state.mapSat && !!satUrl(); }
+  function sat() { if (SF.state.mapSat == null) SF.state.mapSat = !!SF.ls.get("mapSat", true); return SF.state.mapSat && !!satUrl(); }
   function viewFor(o, el) {
     var v = SF.state.tmv[o.key];
     if (v && !o.refit) return v;
@@ -171,20 +171,33 @@
     return '<div class="mfind" data-mf="' + esc(key) + '" role="search"><span class="mfi">' + I("search", 18) + '</span><input name="mq" autocomplete="off" enterkeyhint="search" placeholder="' + t("mf.ph") + '" aria-label="' + t("mf.ph") + '"><button type="button" class="btn primary sm" data-act="mfgo" data-key="' + esc(key) + '">' + t("mf.go") + '</button></div><div class="mfres" data-mfres="' + esc(key) + '" hidden></div>'; };
   document.addEventListener("keydown", function (e) { if (e.key !== "Enter") return; var i = e.target.closest && e.target.closest(".mfind input"); if (!i) return; e.preventDefault(); e.stopPropagation(); SF.actions.mfgo({ dataset: { key: i.closest(".mfind").dataset.mf } }); }, true);
   SF.actions.mfgo = function (el) { var inp = document.querySelector('[data-mf="' + el.dataset.key + '"] input'); return inp ? find(el.dataset.key, inp.value) : null; };
-  function find(key, q0) {
-    var q = String(q0 || "").trim(), box = document.querySelector('[data-mfres="' + key + '"]'); if (q.length < 2 || !box) return;
+  function find(key, q0, auto) {
+    var q = String(q0 || "").trim(), box = document.querySelector('[data-mfres="' + key + '"]'); if (q.length < (auto ? 3 : 2) || !box) return;
     var ll = SF.geo.parse(q); if (ll) { box.hidden = true; return pick(key, ll, q); }
     box.hidden = false; box.innerHTML = '<p class="mfmsg">' + t("mf.search") + "</p>";
-    var url = (cfg.geocoder || "https://nominatim.openstreetmap.org/search") + "?format=jsonv2&limit=7&addressdetails=1&countrycodes=tj,uz,kg,kz&accept-language=" + (SF.state.lang === "tg" ? "tg,ru" : SF.state.lang || "ru") + "&q=" + encodeURIComponent(q);
+    var url = (cfg.geocoder || "https://nominatim.openstreetmap.org/search") + "?format=jsonv2&limit=7&addressdetails=1&countrycodes=tj,uz,kg,kz" + biasQ() + "&accept-language=" + (SF.state.lang === "tg" ? "tg,ru" : SF.state.lang || "ru") + "&q=" + encodeURIComponent(q);
     return fetch(url, { headers: { Accept: "application/json" } }).then(function (r) { return r.json(); }).then(function (l) {
       if (!l.length) { box.innerHTML = '<p class="mfmsg">' + t("mf.none") + "</p>"; return; }
       box.innerHTML = l.map(function (x) { var nm = String(x.display_name || "").split(",").slice(0, 3).join(","), big = /city|town|village|suburb|administrative/.test((x.type || "") + " " + (x.addresstype || ""));
         return '<button type="button" class="mfrow" data-act="mfpick" data-key="' + esc(key) + '" data-lat="' + x.lat + '" data-lng="' + x.lon + '" data-name="' + esc((x.name || nm.split(",")[0] || "").trim()) + '" data-big="' + (big ? 1 : 0) + '">' + I("pin", 16) + "<span><b>" + esc(nm.split(",")[0]) + "</b><small>" + esc(nm.split(",").slice(1).join(",").trim()) + "</small></span></button>"; }).join("");
+      if (auto && l[0] && q === (box._q || q)) { var f = l[0]; pick(key, { lat: +f.lat, lng: +f.lon }, (f.name || "").trim()); }
     }).catch(function () { box.innerHTML = '<p class="mfmsg">' + t("mf.fail") + "</p>"; });
   };
-  function pick(key, p, name) { SF.tmapCenter(key, p, 16); var h = SF.mapPick && SF.mapPick[key]; if (h) h(p, name); }
+  /* prefer results near the chosen town (not a hard limit: a village in another district still turns up) */
+  function biasQ() { var z = SF.zone && SF.zone(SF.state.cityId); if (!z) return ""; return "&viewbox=" + (z.lng - 1.2).toFixed(3) + "," + (z.lat + 0.9).toFixed(3) + "," + (z.lng + 1.2).toFixed(3) + "," + (z.lat - 0.9).toFixed(3); }
+  /* type an address anywhere (data-geo="mapKey"): after a short pause the place is searched and the map opens on it by itself */
+  var geoT = {};
+  document.addEventListener("input", function (e) { var i = e.target, key = i && i.dataset && i.dataset.geo; if (!key) return;
+    clearTimeout(geoT[key]); var q = i.value; var box = document.querySelector('[data-mfres="' + key + '"]'); if (box) box._q = q.trim();
+    if (q.trim().length < 3) { if (box) box.hidden = true; return; }
+    geoT[key] = setTimeout(function () { if (document.body.contains(i)) find(key, i.value, true); }, 750); });
+  /* a place picked from the list or found automatically: map there (a slot creates the map the first time) */
+  function openOn(key, p) { var slot = document.querySelector('[data-mapslot="' + key + '"]');
+    if (slot && !slot.querySelector("[data-tmap]") && SF.mapSlots && SF.mapSlots[key]) { SF.state.tmv[key] = { lat: p.lat, lng: p.lng, z: 17 }; slot.innerHTML = SF.tmap(SF.mapSlots[key](p)); SF.mountMaps(); }
+    else SF.tmapCenter(key, p, 17); }
+  function pick(key, p, name) { openOn(key, p); var h = SF.mapPick && SF.mapPick[key]; if (h) h(p, name); }
   SF.actions.mfpick = function (el) { var box = el.closest("[data-mfres]"); if (box) box.hidden = true; return pick(el.dataset.key, { lat: +el.dataset.lat, lng: +el.dataset.lng }, el.dataset.name); };
-  SF.mapPick = SF.mapPick || {};
+  SF.mapPick = SF.mapPick || {}; SF.mapSlots = SF.mapSlots || {};
   SF.zone = function (cityId) {
     var cs = SF.state.cities || [], c = cs.filter(function (x) { return x.id === cityId; })[0] || cs.filter(function (x) { return x.id === (SF.state.pub || {}).defaultCityId; })[0] || cs[0];
     if (!c) return null; var km = (SF.state.pub || {}).zoneKm || 5, poly = c.zone && c.zone.length > 2 ? c.zone : null;

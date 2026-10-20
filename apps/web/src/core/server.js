@@ -1055,7 +1055,7 @@
     function adSweep() { var t = clock(), ch = false; adList().forEach(function (a) { if (a.status === "active" && a.until && a.until < t) { a.status = "archived"; a.archivedAt = t; ch = true; } }); if (ch) save(); }
     function adRank(a) { var t = clock(); return (a.vipUntil > t ? 2e13 : 0) + Math.max(a.bumpAt && a.topUntil > t ? a.bumpAt : 0, a.bumpedAt || 0, a.publishedAt || a.createdAt); }
     function pubAd(a, viewer) { var c = cityOf(a.cityId), u = find(db.users, a.userId), t = clock(), own = viewer && (viewer.id === a.userId || viewer.role === "admin");
-      var o = { id: a.id, svc: svcOfAd(a), cat: a.cat, title: a.title, desc: a.desc, price: a.price, cityId: a.cityId, city: c ? c.name : null, phone: a.phone, photos: a.photos || [], status: a.status, views: a.views || 0, cond: a.cond || null, sold: !!a.sold, bumpedAt: a.bumpedAt || null, userKey: a.userId ? a.userId.slice(-6) : null,
+      var o = { id: a.id, svc: svcOfAd(a), cat: a.cat, title: a.title, desc: a.desc, price: a.price, cityId: a.cityId, city: c ? c.name : null, phone: a.phone, photos: a.photos || [], status: a.status, views: a.views || 0, cond: a.cond || null, addr: a.addr || "", lat: a.lat == null ? null : a.lat, lng: a.lng == null ? null : a.lng, sold: !!a.sold, bumpedAt: a.bumpedAt || null, userKey: a.userId ? a.userId.slice(-6) : null,
         createdAt: a.createdAt, publishedAt: a.publishedAt || null, until: a.until || null, seller: u ? u.name : "", vip: a.vipUntil > t, color: a.colorUntil > t, top: a.topUntil > t };
       if (own) { o.reason = a.reason || null; o.mine = viewer.id === a.userId; o.updatedAt = a.updatedAt; var pp = adPays().filter(function (x) { return x.adId === a.id && x.status === "awaiting"; }); if (pp.length) o.awaiting = pp.map(function (x) { return { id: x.id, kind: x.kind, amount: x.amount }; });
         if (viewer.role === "admin") { o.userId = a.userId; o.userPhone = u ? u.phone : null; o.feeDue = !!a.feeDue; } }
@@ -1071,6 +1071,9 @@
       if (b.price !== undefined) { var pr = b.price === "" || b.price == null ? null : Number(b.price); if (pr != null && !(pr >= 0 && pr <= 1e8)) E(400, "BAD_PRICE"); a.price = pr == null ? null : Math.round(pr); }
       if (b.cityId !== undefined) { if (!find(db.cities, b.cityId)) E(400, "BAD_CITY"); a.cityId = b.cityId; }
       if (b.phone !== undefined) { var ph = Rules.normPhone(b.phone); if (!ph) E(400, "BAD_PHONE"); a.phone = ph; }
+      if (b.addr !== undefined) a.addr = str(b.addr, 140);
+      if (b.lat !== undefined || b.lng !== undefined) { var la = b.lat == null || b.lat === "" ? null : Number(b.lat), lo = b.lng == null || b.lng === "" ? null : Number(b.lng);
+        if (la == null || lo == null) { a.lat = null; a.lng = null; } else { if (!(la >= -90 && la <= 90 && lo >= -180 && lo <= 180)) E(400, "BAD_PIN"); a.lat = Math.round(la * 1e6) / 1e6; a.lng = Math.round(lo * 1e6) / 1e6; } }
       if (b.cond !== undefined) { if (["", "new", "used"].indexOf(b.cond || "") < 0) E(400, "BAD_COND"); a.cond = b.cond || null; }
       if (b.photos !== undefined) a.photos = adPhotos(b.photos, a.photos); }
     /* send to the admin (or straight live when the admin switched checking off) */

@@ -47,6 +47,11 @@
       return '<a class="svrowi" href="#' + CFG[k].base + '/new" data-act="closemodal" style="--sb:#F2F4F3;--i:' + i + '">' + SF.svVis(k) + '<span class="grow"><b>' + T(k, "new") + "</b><small>" + t("svd." + k) + "</small></span>" + I("chevR", 18) + "</a>"; }).join("") + "</div>"); };
 
   function draft() { return SF.state.adf; }
+  /* the pin map of the form: opens by itself when the person types a place */
+  function adMap(d) { var c = (SF.state.cities || []).filter(function (x) { return x.id === d.cityId; })[0] || {}; var p = d.lat != null ? { lat: d.lat, lng: d.lng } : { lat: c.lat, lng: c.lng };
+    return { key: "adm", picker: true, free: true, center: p, zoom: d.lat != null ? 17 : 15, label: t("ap.pinT"), onMove: function (q, fin) { if (!fin) return; var x = draft(); if (x) { x.lat = q.lat; x.lng = q.lng; } } }; }
+  SF.mapSlots = SF.mapSlots || {}; SF.mapSlots.adm = function () { return adMap(draft() || {}); };
+  SF.mapPick = SF.mapPick || {}; SF.mapPick.adm = function (p) { var d = draft(); if (!d) return; d.lat = p.lat; d.lng = p.lng; };
   function loadCfg() { return api().get("/ads/config").then(function (c) { SF.state.adcfg = c; return c; }); }
   var TABS = [["active", ["active"]], ["pending", ["pending", "rejected"]], ["draft", ["draft"]], ["archived", ["archived", "blocked"]]];
 
@@ -108,7 +113,7 @@
     /* ---------- edit ---------- */
     SF.route(B + "/:id/edit", { roles: ["customer"], title: "ads.edit", render: function (p) { var g = gate(sv); if (g) return g;
       return Promise.all([api().get("/ads/" + p.id), loadCfg()]).then(function (r) { var a = r[0];
-        if (!draft() || draft().id !== a.id) SF.state.adf = { id: a.id, svc: sv, cat: a.cat, title: a.title, desc: a.desc || "", price: a.price == null ? "" : String(a.price), cityId: a.cityId, phone: String(a.phone || "").replace(/\D/g, "").slice(-9), photos: (a.photos || []).slice(), cond: a.cond || "" };
+        if (!draft() || draft().id !== a.id) { delete SF.state.tmv.adm; SF.state.adf = { id: a.id, svc: sv, cat: a.cat, title: a.title, desc: a.desc || "", price: a.price == null ? "" : String(a.price), cityId: a.cityId, phone: String(a.phone || "").replace(/\D/g, "").slice(-9), photos: (a.photos || []).slice(), cond: a.cond || "", addr: a.addr || "", lat: a.lat == null ? null : a.lat, lng: a.lng == null ? null : a.lng }; }
         return formPage(sv, a); }); } });
 
     /* ---------- promotion (only while paid listings are on) ---------- */
@@ -133,8 +138,8 @@
           '<a class="gbtn gl" href="#' + B + '" aria-label="' + t("btn.back") + '">' + I("chevL", 20) + '</a><span class="gbtns"><button type="button" class="gbtn" data-act="adshare" data-title="' + esc(a.title) + '" aria-label="' + t("ads.share") + '">' + I("share", 18) + "</button>" + (mine ? "" : favA(a).replace("favbtn adfav", "favbtn adfav gbtn")) + "</span>" +
           (ph.length > 1 ? '<span class="gcount num" id="gcount">1/' + ph.length + "</span>" : "") + "</div>";
         var info = '<section class="adinfo">' + (mine ? '<div class="adown">' + stPill(a.status, a) + (a.reason ? '<p class="adwhy">' + I("info", 16) + esc(a.reason) + "</p>" : "") + (a.awaiting ? '<p class="adwhy warn">' + I("wallet", 16) + t("ads.awaiting") + "</p>" : "") + "</div>" : "") +
-          "<h1>" + esc(a.title) + '</h1><b class="adprice num">' + price(a) + '</b><p class="adwhere">' + I("pin", 15) + esc(cityName(a)) + " · " + when(a.publishedAt || a.createdAt) + "</p>" +
-          (a.desc ? '<p class="addesc">' + esc(a.desc).replace(/\n/g, "<br>") + "</p>" : "") +
+          "<h1>" + esc(a.title) + '</h1><b class="adprice num">' + price(a) + '</b><p class="adwhere">' + I("pin", 15) + esc(a.addr ? a.addr + ", " : "") + esc(cityName(a)) + " · " + when(a.publishedAt || a.createdAt) + "</p>" +
+          (a.lat != null ? '<section class="adloc"><div class="mapbox">' + SF.tmap({ key: "adv-" + a.id, free: true, center: { lat: a.lat, lng: a.lng }, zoom: 16, markers: [{ lat: a.lat, lng: a.lng, type: "home", label: "" }], label: t("ap.pinT") }) + '</div><a class="btn ghost sm" target="_blank" rel="noopener" href="' + SF.geo.nav(a).google + '">' + I("route", 14) + t("sh.go") + "</a></section>" : "") + (a.desc ? '<p class="addesc">' + esc(a.desc).replace(/\n/g, "<br>") + "</p>" : "") +
           '<dl class="adattrs"><dt>' + t("ads.cat") + "</dt><dd>" + t("adc." + a.cat) + "</dd>" + (a.cond ? "<dt>" + t("af.cond") + "</dt><dd>" + t("af.c." + a.cond) + "</dd>" : "") + "<dt>" + t("profile.city") + "</dt><dd>" + esc(cityName(a)) + "</dd><dt>" + t("ads.views") + '</dt><dd class="num">' + a.views + "</dd>" + (mine ? "" : "<dt>" + T(sv, "seller") + "</dt><dd>" + esc(a.seller) + "</dd>") + "</dl>" +
           (mine || !more ? "" : sellerCard(a, more.sellerInfo)) +
           (mine ? "" : '<p class="fine adsafe">' + I("shield", 14) + T(sv, "safety") + '</p><button type="button" class="link sm adrep" data-act="adreport" data-id="' + a.id + '">' + I("flag", 14) + " " + t("rp.btn") + "</button>") + "</section>" +
@@ -164,7 +169,7 @@
     try { navigator.clipboard.writeText(url).then(function () { SF.toast(t("ads.copied")); }); } catch (e) { SF.toast(url, "info"); } };
 
   /* ---------- the form (create / edit) ---------- */
-  function fresh(sv) { var u = SF.state.user; return { id: null, svc: sv, cat: "", title: "", desc: "", price: "", cityId: SF.state.cityId, phone: String(u.phone || "").replace(/\D/g, "").slice(-9), photos: [], cond: "" }; }
+  function fresh(sv) { var u = SF.state.user; delete SF.state.tmv.adm; return { id: null, svc: sv, cat: "", title: "", desc: "", price: "", cityId: SF.state.cityId, phone: String(u.phone || "").replace(/\D/g, "").slice(-9), photos: [], cond: "", addr: "", lat: null, lng: null }; }
   function formPage(sv, a) {
     var d = draft(), cities = SF.state.cities || [], B = CFG[sv].base;
     return back(a ? B + "/" + a.id : B, T(sv, a ? "edit" : "new")) +
@@ -178,6 +183,8 @@
       '<label class="f">' + t("ads.desc") + '<textarea data-input="adf" data-k="desc" rows="4" maxlength="3000" placeholder="' + T(sv, "descPh") + '">' + esc(d.desc) + "</textarea></label>" +
       '<div class="grid2"><label class="f">' + T(sv, "price") + '<input data-input="adf" data-k="price" inputmode="numeric" value="' + esc(d.price) + '" placeholder="0"><small class="muted">' + T(sv, "priceHint") + "</small></label>" +
       '<label class="f">' + t("profile.city") + '<select data-input="adf" data-k="cityId">' + cities.map(function (c) { return '<option value="' + c.id + '"' + (c.id === d.cityId ? " selected" : "") + ">" + esc(SF.tx(c.name)) + "</option>"; }).join("") + "</select></label></div>" +
+      '<label class="f">' + t("ap.addr") + '<input data-input="adf" data-k="addr" data-geo="adm" value="' + esc(d.addr || "") + '" maxlength="140" placeholder="' + t("ap.addrPh") + '" autocomplete="off"><small class="muted">' + t("ap.addrHint") + "</small></label>" +
+      '<div class="mfres" data-mfres="adm" hidden></div><div class="mapslot" data-mapslot="adm">' + (d.lat != null ? SF.tmap(adMap(d)) : "") + "</div>" +
       (sv === "ads" && ["jobs", "services", "realty"].indexOf(d.cat) < 0 ? '<p class="adlbl">' + t("af.cond") + '</p><div class="seg" role="group">' + [["", "af.c.na"], ["new", "af.c.new"], ["used", "af.c.used"]].map(function (o) { var on = (d.cond || "") === o[0]; return '<button type="button" class="' + (on ? "on" : "") + '" aria-pressed="' + on + '" data-act="adcond" data-v="' + o[0] + '">' + t(o[1]) + "</button>"; }).join("") + "</div>" : "") +
       '<label class="f">' + t("ads.phone") + '<span class="phonein"><span class="cc">+992</span><input data-input="adf" data-k="phone" inputmode="tel" value="' + esc(d.phone) + '" placeholder="9X XXX XX XX"></span></label>' +
       '<button type="button" class="btn ok block lg" data-act="adsave">' + t("ads.continue") + "</button>" +
@@ -194,7 +201,7 @@
   SF.actions.adphdel = function (el) { draft().photos.splice(+el.dataset.i, 1); SF.render({ quiet: true }); };
   SF.actions.adsave = function (el) { var d = draft(), isDraft = !!el.dataset.draft, B = CFG[d.svc || "ads"].base;
     if (!d.cat) { SF.toast(t("ads.needCat"), "err"); return; } if (String(d.title).trim().length < 3) { SF.toast(t("e.BAD_AD_TITLE"), "err"); return; }
-    var body = { svc: d.svc, cat: d.cat, title: d.title, desc: d.desc, price: String(d.price).replace(/\D/g, ""), cityId: d.cityId, phone: d.phone, photos: d.photos, cond: d.cond || "", draft: isDraft };
+    var body = { svc: d.svc, cat: d.cat, title: d.title, desc: d.desc, price: String(d.price).replace(/\D/g, ""), cityId: d.cityId, phone: d.phone, photos: d.photos, cond: d.cond || "", addr: d.addr || "", lat: d.lat == null ? null : d.lat, lng: d.lng == null ? null : d.lng, draft: isDraft };
     return (d.id ? api().patch("/ads/" + d.id, body) : api().post("/ads", body)).then(function (a) { SF.state.adf = null;
       if (isDraft) { SF.toast(t("ads.draftSaved")); SF.go(B + "/my?tab=draft"); return; }
       if ((SF.state.adcfg || {}).paid && ["active", "pending"].indexOf(a.status) >= 0) { SF.go(B + "/" + a.id + "/promote"); return; }

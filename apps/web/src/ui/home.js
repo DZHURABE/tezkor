@@ -11,7 +11,7 @@
   /* the picture of a service: the admin's own photo when he uploaded one, otherwise a clean colour tile with a line icon (no cartoon emoji) */
   var SV_LOOK = { food: ["#FF8A3D", "#D9480F", "bag"], taxi: ["#FFC93C", "#E09A00", "car"], shops: ["#2FBF71", "#0B7A3E", "cart"], ads: ["#4C8DFF", "#1E56C8", "megaphone"], masters: ["#9B6BFF", "#5F35C9", "wrench"],
     jobs: ["#FF6B9A", "#C2255C", "briefcase"], grocery: ["#7BD35A", "#2F8A1F", "store"], pharmacy: ["#3EC5E8", "#0B7FA3", "heart"], realty: ["#FF8A6B", "#D0432A", "house"] };
-  SF.svVis = function (k, big) { var ph = ((SF.state.pub || {}).svcPhotos || {})[k] || (k === "food" && SF.PHOTO ? SF.PHOTO.burger : null), L = SV_LOOK[k] || ["#9AA6A1", "#5E6964", "grid"];
+  SF.svVis = function (k, big) { var ph = ((SF.state.pub || {}).svcPhotos || {})[k] , L = SV_LOOK[k] || ["#9AA6A1", "#5E6964", "grid"];
     return ph ? '<span class="sve svph' + (big ? " big" : "") + '" aria-hidden="true"><img src="' + esc(ph) + '" alt="" loading="lazy"></span>'
       : '<span class="sve svgr' + (big ? " big" : "") + '" style="--g1:' + L[0] + ";--g2:" + L[1] + '" aria-hidden="true">' + I(L[2], big ? 40 : 26) + "</span>"; };
   /* «soon»: a small red flame badge that glows on and off */
@@ -33,8 +33,9 @@
   function etaMin(r) { return parseInt(String(r.eta || "").split(/[–-]/)[0], 10) || 99; }
   SF.route("/", { title: "nav.home", render: function (p, q) {
     if (q.cat) { setTimeout(function () { SF.go("/food?cat=" + q.cat); }, 0); return ""; }       // old links
-    return Promise.all([api().get("/banners"), api().get("/restaurants?cityId=" + encodeURIComponent(SF.state.cityId))]).then(function (res) {
-      var banners = res[0], rests = res[1];
+    var cq = "cityId=" + encodeURIComponent(SF.state.cityId), soft = function (u) { return api().get(u).catch(function () { return null; }); };
+    return Promise.all([api().get("/banners"), api().get("/restaurants?" + cq), SF.svcOn("ads") ? soft("/ads/search?svc=ads&limit=4&" + cq) : null, SF.svcOn("shops") ? soft("/shops/goods?limit=8&" + cq) : null]).then(function (res) {
+      var banners = res[0], rests = res[1], newAds = res[2], newGoods = res[3];
       return Promise.all(rests.slice(0, 12).map(function (r) { return api().get("/restaurants/" + r.id).then(function (f) { return Object.assign(f, { orderCount: r.orderCount, hasSale: r.hasSale, isNew: r.isNew }); }); })).then(function (full) {
         full.forEach(function (r) { var ps = (r.products || []).filter(function (x) { return x.available; }), ks = ps.filter(function (x) { return x.popular; }).concat(ps).map(function (x) { return x.kind; }); r.art1 = ks[0]; });
         var u = SF.state.user, h = new Date().getHours(), greet = h < 12 ? "home.morning" : h < 18 ? "home.day" : "home.evening";
@@ -45,9 +46,10 @@
         var head = '<section class="sahead"><p class="sahi">' + t(greet) + (u ? ", <b>" + esc(u.name.split(" ")[0]) + "</b>" : "") + '</p>' +
           '<form class="sasearch" data-form="search" role="search">' + I("search", 20) + '<input name="q" placeholder="' + t("sa.searchPh") + '" aria-label="' + t("sa.searchPh") + '" enterkeyhint="search"><button class="sago" aria-label="' + t("btn.find") + '">' + I("chevR", 18) + "</button></form></section>";
         /* 2. big food banner first, then the restaurants' own ads; they slide by themselves and by finger */
-        var hero = '<a class="banner sahero" href="#/food"><span class="shbg" style="background-image:url(' + SF.PHOTO.hero + ')" aria-hidden="true"></span><div><b class="sht">' + t("sa.heroT1") + " <em>" + t("sa.heroT2") + "</em> " + t("sa.heroT3") + "</b>" +
-          '<span class="shf"><i>' + I("bolt", 14) + t("sa.fast") + "</i><i>" + I("shield", 14) + t("sa.safe") + "</i>" + (eta ? "<i>" + I("clock", 14) + t("sa.from", { n: eta }) + "</i>" : "") + "</span>" +
-          '<em class="shgo">' + t("sa.orderFood") + I("chevR", 16) + "</em></div></a>";
+        var live = SF.SERVICES.filter(function (x) { return SF.svcOn(x[0]) && x[3]; }).slice(0, 4);
+        var hero = '<a class="banner sahero gen" href="#/services"><div><b class="sht">' + t("sa.heroG1") + " <em>" + t("sa.heroG2") + "</em></b>" +
+          '<span class="shf">' + live.map(function (x) { return "<i>" + t("svs." + x[0]) + "</i>"; }).join("") + "</span>" +
+          '<em class="shgo">' + t("sa.allSv") + I("chevR", 16) + "</em></div></a>";
         var slides = [hero].concat(banners.map(function (b) { return SF.bannerHtml(b, "a"); }));
         var ban = '<section class="banners b3 sabanners" id="banners" aria-label="' + t("home.offers") + '">' + slides.join("") + "</section>" + (slides.length > 1 ? '<div class="bdots" aria-hidden="true">' + slides.map(function (b, i) { return '<i class="' + (i ? "" : "on") + '"></i>'; }).join("") + "</div>" : "");
         /* 3. services */
@@ -56,7 +58,10 @@
         var promo = sale ? '<a class="sapromo" href="#/food"><div><b>' + t("sa.saleT", { n: sale }) + "</b><span>" + t("sa.saleSub") + '</span><em class="shgo">' + t("sa.look") + I("chevR", 16) + '</em></div><img src="' + SF.PHOTO.burger + '" alt=""></a>' : "";
         /* 5. popular restaurants */
         var popH = pop.length ? '<section class="sasect"><div class="sect2"><div><h2>' + t("hs.popRest") + '</h2></div><a class="link" href="#/food">' + t("sa.allR") + "</a></div>" + '<div class="hscroll rrowscroll">' + pop.map(SF.restCard).join("") + "</div></section>" : "";
-        return '<div class="sahome">' + (SF.installBar ? SF.installBar() : "") + head + ban + svc + promo + popH + "</div>";
+        var adsH = newAds && newAds.list && newAds.list.length ? '<section class="sasect"><div class="sect2"><div><h2>' + t("sa.newAds") + '</h2></div><a class="link" href="#/ads">' + t("sa.allR") + '</a></div><div class="adlist">' + newAds.list.map(function (x) { return SF.adRow(x); }).join("") + "</div></section>" : "";
+        if (newGoods && newGoods.list) SF.rememberProducts(newGoods.list);
+        var gdH = newGoods && newGoods.list && newGoods.list.length ? '<section class="sasect"><div class="sect2"><div><h2>' + t("sa.newGoods") + '</h2></div><a class="link" href="#/shops/goods">' + t("sa.allR") + '</a></div><div class="hscroll goodsrow">' + newGoods.list.map(goodCard).join("") + "</div></section>" : "";
+        return '<div class="sahome">' + (SF.installBar ? SF.installBar() : "") + head + svc + ban + adsH + gdH + promo + popH + "</div>";
       });
     });
   } });
@@ -79,6 +84,7 @@
   function gqs(o) { return GK.filter(function (k) { return o[k]; }).map(function (k) { return k + "=" + encodeURIComponent(o[k]); }).join("&"); }
   function gcurQ() { return SF.match(SF.path()).query || {}; }
   function gapi(q, off) { return "/shops/goods?cityId=" + encodeURIComponent(SF.state.cityId) + (q.q ? "&q=" + encodeURIComponent(q.q) : "") + (q.cat ? "&cat=" + q.cat : "") + (q.brand ? "&brand=" + encodeURIComponent(q.brand) : "") + (q.min ? "&priceMin=" + q.min : "") + (q.max ? "&priceMax=" + q.max : "") + (q.sale ? "&sale=1" : "") + (q.sort ? "&sort=" + q.sort : "") + "&offset=" + off + "&limit=20"; }
+  SF.goodCard = function (p) { return goodCard(p); };
   function goodCard(p) { return '<div class="gwrap">' + SF.prodCard(p) + '<a class="gshop" href="#/r/' + p.restaurant.id + '">' + I("store", 12) + esc(tx(p.restaurant.name)) + "</a></div>"; }
   SF.route("/shops/goods", { title: "sv.shops", render: function (p, q) {
     if (!SF.svcOn("shops") && !(SF.state.user && SF.state.user.role === "admin")) { SF.go("/"); return ""; }
