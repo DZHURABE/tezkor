@@ -144,12 +144,12 @@
   SF.route("/search", { title: "nav.search", render: function (p, q) {
     var s = q.q || "", cat = q.cat || "", so = q.sort || "rel"; SF.state.q = s;
     var base = "#/search?q=" + encodeURIComponent(s) + (so !== "rel" ? "&sort=" + so : "");
-    var head = '<h1 class="h2 pt">' + t("nav.search") + '</h1><form class="bigsearch live" data-form="search" role="search">' + I("search", 20) + '<input id="sq" name="q" data-input="liveq" placeholder="' + t("home.search") + '" aria-label="' + t("home.search") + '" value="' + esc(s) + '" autocomplete="off" enterkeyhint="search">' +
+    var head = '<h1 class="h2 pt">' + t("nav.search") + '</h1><form class="bigsearch live" data-form="search" role="search">' + I("search", 20) + '<input id="sq" name="q" data-input="liveq" placeholder="' + t("sa.searchPh") + '" aria-label="' + t("sa.searchPh") + '" value="' + esc(s) + '" autocomplete="off" enterkeyhint="search">' +
       (s ? '<button type="button" class="iconbtn qx" data-act="qclear" aria-label="' + t("sr.clear") + '">' + I("x", 18) + "</button>" : "") + "</form>";
     if (s.length < 2) { var rc = recent();
       return head + (rc.length ? '<div class="sect2"><h2>' + t("sr.recent") + '</h2><button class="link" data-act="recentclear">' + t("sr.clearAll") + '</button></div><div class="tags">' + rc.map(function (w) { return '<a class="chip" href="#/search?q=' + encodeURIComponent(w) + '">' + I("clock", 14) + esc(w) + "</a>"; }).join("") + "</div>" : "") +
-        '<div class="sect2"><h2>' + t("sr.try") + '</h2></div><div class="tags">' + ["палав", "бургер", "шашлик", "питса", "шаурма", "самбӯса"].map(function (w) { return '<a class="chip" href="#/search?q=' + encodeURIComponent(w) + '">' + esc(w) + "</a>"; }).join("") + "</div>" +
-        '<div class="sect2"><h2>' + t("home.cats") + "</h2></div>" + SF.catRow("", "#/");
+        '<div class="sect2"><h2>' + t("sr.try") + '</h2></div><div class="tags">' + ["телефон", "диван", "палав", "усто", "хона", "шашлик"].map(function (w) { return '<a class="chip" href="#/search?q=' + encodeURIComponent(w) + '">' + esc(w) + "</a>"; }).join("") + "</div>" +
+        '<div class="sect2"><h2>' + t("sv.title") + "</h2></div>" + SF.svcGrid(true);
     }
     var soft = function (u) { return api().get(u).catch(function () { return null; }); }, qq = "q=" + encodeURIComponent(s) + "&limit=6&" + cityQ();
     var more = ["ads", "masters", "jobs", "realty"].filter(function (k) { return SF.svcOn(k); });

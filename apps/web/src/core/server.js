@@ -41,10 +41,20 @@
       ["k6", "k7"].forEach(function (id) { var c = db.categories.filter(function (x) { return x.id === id; })[0]; if (c && !db.products.some(function (p) { return p.categoryId === id; })) c.active = false; });
       db.meta.up = 1; store.save(db); })();
     /* shops (Tezkor «Мағозаҳо»): the same engine as restaurants with kind "shop" and their own goods categories */
-    var SHOP_CATS = [["s1", "Телефонҳо", "Телефоны", "Phones", "phone"], ["s2", "Планшет ва ноутбук", "Планшеты и ноутбуки", "Tablets & laptops", "laptop"], ["s3", "Қулоқчин ва аудио", "Наушники и аудио", "Headphones & audio", "audio"],
-      ["s4", "Зарядка ва кабел", "Зарядки и кабели", "Chargers & cables", "charge"], ["s5", "Ғилоф ва шиша", "Чехлы и стёкла", "Cases & glass", "case"], ["s6", "Аксессуарҳо", "Аксессуары", "Accessories", "acc"],
-      ["s7", "Техникаи маишӣ", "Бытовая техника", "Home appliances", "tech"], ["s8", "Либос ва пойафзол", "Одежда и обувь", "Clothes & shoes", "clothes"], ["s9", "Косметика", "Косметика", "Cosmetics", "beauty"], ["s10", "Дигар молҳо", "Другие товары", "Other goods", "other"]];
-    (function shopCats() { if (!db || !db.categories) return; var ch = false; SHOP_CATS.forEach(function (c, i) { if (!db.categories.some(function (x) { return x.id === c[0]; })) { db.categories.push({ id: c[0], name: { tg: c[1], ru: c[2], en: c[3] }, icon: "box", shopIcon: c[4], shop: true, active: true, sort: 100 + i }); ch = true; } }); if (ch) store.save(db); })();
+    /* kinds of shop: what the owner sells decides the sections, the fields and the staff names he sees */
+    var SHOP_TYPES = ["tech", "grocery", "clothes", "home", "general"];
+    var T_ = function () { return Array.prototype.slice.call(arguments); };
+    var SHOP_CATS = [["s1", "Телефонҳо", "Телефоны", "Phones", "phone", T_("tech", "general")], ["s2", "Планшет ва ноутбук", "Планшеты и ноутбуки", "Tablets & laptops", "laptop", T_("tech", "general")], ["s3", "Қулоқчин ва аудио", "Наушники и аудио", "Headphones & audio", "audio", T_("tech", "general")],
+      ["s4", "Зарядка ва кабел", "Зарядки и кабели", "Chargers & cables", "charge", T_("tech", "general")], ["s5", "Ғилоф ва шиша", "Чехлы и стёкла", "Cases & glass", "case", T_("tech", "general")], ["s6", "Аксессуарҳо", "Аксессуары", "Accessories", "acc", T_("tech", "clothes", "general")],
+      ["s7", "Техникаи маишӣ", "Бытовая техника", "Home appliances", "tech", T_("tech", "home", "general")], ["s8", "Либос ва пойафзол", "Одежда и обувь", "Clothes & shoes", "clothes", T_("clothes", "general")], ["s9", "Косметика", "Косметика", "Cosmetics", "beauty", T_("clothes", "home", "general")], ["s10", "Дигар молҳо", "Другие товары", "Other goods", "other", T_("tech", "grocery", "clothes", "home", "general")],
+      ["g1", "Орд, ярма ва макарон", "Мука, крупы, макароны", "Flour, grains & pasta", "other", T_("grocery", "general")], ["g2", "Равған ва ёғ", "Масло и жиры", "Oil & fats", "other", T_("grocery", "general")], ["g3", "Қанд, чой ва қаҳва", "Сахар, чай и кофе", "Sugar, tea & coffee", "other", T_("grocery", "general")],
+      ["g4", "Шир ва тухм", "Молочные и яйца", "Dairy & eggs", "other", T_("grocery", "general")], ["g5", "Гӯшт ва мурғ", "Мясо и птица", "Meat & poultry", "other", T_("grocery", "general")], ["g6", "Сабзавот ва мева", "Овощи и фрукты", "Vegetables & fruit", "other", T_("grocery", "general")],
+      ["g7", "Нон ва ширинӣ", "Хлеб и сладости", "Bread & sweets", "other", T_("grocery", "general")], ["g8", "Нӯшокиҳо", "Напитки", "Drinks", "other", T_("grocery", "general")], ["g9", "Консерва ва хушкмева", "Консервы и сухофрукты", "Canned & dried fruit", "other", T_("grocery", "general")], ["g10", "Хӯҷагӣ ва тозакунӣ", "Хозтовары и бытовая химия", "Household & cleaning", "other", T_("grocery", "home", "general")],
+      ["c1", "Либоси мардона", "Мужская одежда", "Men's clothes", "clothes", T_("clothes", "general")], ["c2", "Либоси занона", "Женская одежда", "Women's clothes", "clothes", T_("clothes", "general")], ["c3", "Либоси кӯдакона", "Детская одежда", "Kids' clothes", "clothes", T_("clothes", "general")], ["c4", "Пойафзол", "Обувь", "Shoes", "clothes", T_("clothes", "general")],
+      ["h1", "Зарфу асбоби ошхона", "Посуда и кухня", "Dishes & kitchen", "other", T_("home", "general")], ["h2", "Мебел ва ороиш", "Мебель и декор", "Furniture & decor", "other", T_("home", "general")], ["h3", "Асбоби сохтмон", "Стройматериалы и инструменты", "Building & tools", "other", T_("home", "general")]];
+    (function shopCats() { if (!db || !db.categories) return; var ch = false; SHOP_CATS.forEach(function (c, i) { var ex = db.categories.filter(function (x) { return x.id === c[0]; })[0];
+      if (!ex) { db.categories.push({ id: c[0], name: { tg: c[1], ru: c[2], en: c[3] }, icon: "box", shopIcon: c[4], shop: true, types: c[5], active: true, sort: 100 + i }); ch = true; } else if (!ex.types) { ex.types = c[5]; ch = true; } });
+      (db.restaurants || []).forEach(function (r) { if (r.kind === "shop" && !r.shopType) { r.shopType = "general"; ch = true; } }); if (ch) store.save(db); })();
     function isShop(r) { return r && r.kind === "shop"; }
     var routes = [];
 
@@ -68,7 +78,7 @@
     /* ---------- shaping ---------- */
     function pubUser(u) { if (!u) return null; var o = { id: u.id, role: u.role, name: u.name, phone: u.phone, cityId: u.cityId, active: u.active, lang: u.lang, createdAt: u.createdAt };
       if (u.mustChange) o.mustChange = true; if (u.staff) { o.staff = true; o.staffRole = ["manager", "waiter"].indexOf(u.staffRole) >= 0 ? u.staffRole : "worker"; if (u.tipCard) o.tipCard = u.tipCard; } if (u.avatar) o.avatar = u.avatar; if (u.favs) o.favs = u.favs; if (u.pwResetAt) o.pwResetAt = u.pwResetAt; if (u.phoneVerified) o.phoneVerified = u.phoneVerified;
-      if (u.restaurantId) { o.restaurantId = u.restaurantId; var rk = find(db.restaurants, u.restaurantId); o.restKind = rk && rk.kind === "shop" ? "shop" : "food"; } if (u.courier) { o.courier = Object.assign({}, u.courier, courierRating(u)); if (u.courier.restaurantId) { var rr = find(db.restaurants, u.courier.restaurantId); o.courier.restaurantName = rr ? rr.name : null; } } if (u.addresses) o.addresses = u.addresses; return o; }
+      if (u.restaurantId) { o.restaurantId = u.restaurantId; var rk = find(db.restaurants, u.restaurantId); o.restKind = rk && rk.kind === "shop" ? "shop" : "food"; if (rk && rk.kind === "shop") o.shopType = rk.shopType || "general"; } if (u.courier) { o.courier = Object.assign({}, u.courier, courierRating(u)); if (u.courier.restaurantId) { var rr = find(db.restaurants, u.courier.restaurantId); o.courier.restaurantName = rr ? rr.name : null; } } if (u.addresses) o.addresses = u.addresses; return o; }
     function courierRating(u) { var rs = db.orders.filter(function (o) { return o.courierId === u.id && o.review && o.review.courierRating; });
       if (!rs.length) return { rating: u.courier ? u.courier.rating : null, ratingCount: u.courier ? u.courier.ratingCount : 0 };
       var base = (u.courier.rating || 0) * (u.courier.ratingCount || 0), sum = rs.reduce(function (s, o) { return s + o.review.courierRating; }, 0);
@@ -700,11 +710,12 @@
       save(); return pubOwn(u); });
     route("POST", "/restaurant/couriers/:id/password", ["restaurant"], function (req, b, q, p) { var u = myCourier(req, p.id), tmp = newPassword(); u.pass = hashPw(tmp); u.mustChange = true;
       Object.keys(db.sessions).forEach(function (k) { if (db.sessions[k].userId === u.id) delete db.sessions[k]; }); save(); return { phone: u.phone, password: tmp }; });
-    function validProduct(b, partial) {
+    function validProduct(b, partial, rest) {
       var x = {};
       if (!partial || b.name != null) { var n = str(b.name, 60); if (n.length < 2) E(400, "BAD_NAME"); x.name = L(n); }
       if (!partial || b.price != null) { var pr = int(b.price); if (!(pr >= 1 && pr <= 500000)) E(400, "BAD_PRICE"); x.price = pr; }
-      if (!partial || b.categoryId != null) { if (!find(db.categories, b.categoryId)) E(400, "BAD_CATEGORY"); x.categoryId = b.categoryId; }
+      if (!partial || b.categoryId != null) { var cat = find(db.categories, b.categoryId); if (!cat) E(400, "BAD_CATEGORY");
+        if (rest) { if ((rest.kind === "shop") !== !!cat.shop) E(400, "BAD_CATEGORY"); var st = rest.shopType || "general"; if (rest.kind === "shop" && st !== "general" && cat.types && cat.types.indexOf(st) < 0) E(400, "BAD_CATEGORY"); } x.categoryId = b.categoryId; }
       if (b.desc != null) x.desc = L(str(b.desc, 140)); if (b.weight != null) x.weight = str(b.weight, 20); if (b.brand != null) x.brand = str(b.brand, 40) || null;
       if (b.kind != null) x.kind = KINDS.indexOf(b.kind) >= 0 ? b.kind : "plate";
       if (b.available != null) x.available = !!b.available; if (b.popular != null) x.popular = !!b.popular;
@@ -714,7 +725,7 @@
       if (b.oldPrice !== undefined) { var op = b.oldPrice ? int(b.oldPrice) : null; if (op !== null && !(op >= 1 && op <= 500000)) E(400, "BAD_PRICE"); x.oldPrice = op; }
       return x;
     }
-    function saveProduct(prod, b, partial) { var x = validProduct(b, partial), ph = b.photo;
+    function saveProduct(prod, b, partial) { var x = validProduct(b, partial, find(db.restaurants, prod.restaurantId)), ph = b.photo;
       Object.assign(prod, x); if (prod.oldPrice && prod.oldPrice <= prod.price) E(400, "OLD_PRICE_LOW");
       if (ph !== undefined) prod.photo = photoField(ph, prod.photo || null, "ph"); return prod;
     }
@@ -846,7 +857,7 @@
       if (db.users.some(function (u) { return u.phone === phone; })) E(409, "PHONE_TAKEN");
       var tmp, rid = id("r"), owner = { id: id("u"), role: "restaurant", name: str(b.ownerName, 60) || name, phone: phone, pass: hashPw(tmp = newPassword()), mustChange: true, active: true, cityId: city.id, restaurantId: rid, createdAt: clock(), lang: "tg" };
       var la = Number(b.lat), ln = Number(b.lng), hasPin = isFinite(la) && isFinite(ln) && b.lat != null && Rules.distanceKm(city, { lat: la, lng: ln }) <= 60;
-      var r = { id: rid, kind: b.kind === "shop" ? "shop" : "food", pinned: !!b.pinned, pickup: b.kind === "shop" ? b.pickup !== false : !!b.pickup, name: L(name), cityId: city.id, ownerId: owner.id, cuisine: L(str(b.cuisine, 60) || "—"), tone: "#FFE3CC", eta: "30–45", rating: null, ratingCount: 0, hours: { from: "09:00", to: "22:00" }, open: false, active: true, commissionPct: com, minOrder: 20, lat: hasPin ? la : city.lat + 0.004, lng: hasPin ? ln : city.lng - 0.004, address: L(str(b.address, 80)), phone: phone, createdAt: clock() };
+      var r = { id: rid, kind: b.kind === "shop" ? "shop" : "food", shopType: b.kind === "shop" ? (SHOP_TYPES.indexOf(b.shopType) >= 0 ? b.shopType : "general") : undefined, pinned: !!b.pinned, pickup: b.kind === "shop" ? b.pickup !== false : !!b.pickup, name: L(name), cityId: city.id, ownerId: owner.id, cuisine: L(str(b.cuisine, 60) || "—"), tone: "#FFE3CC", eta: "30–45", rating: null, ratingCount: 0, hours: { from: "09:00", to: "22:00" }, open: false, active: true, commissionPct: com, minOrder: 20, lat: hasPin ? la : city.lat + 0.004, lng: hasPin ? ln : city.lng - 0.004, address: L(str(b.address, 80)), phone: phone, createdAt: clock() };
       if (["platform", "own", "mixed"].indexOf(b.delivery) >= 0) r.delivery = b.delivery;
       /* where the restaurant delivers — drawn by the admin on the map (optional) */
       if (Array.isArray(b.zone) && b.zone.length) { if (b.zone.length < 3 || b.zone.length > 200) E(400, "BAD_ZONE"); r.zone = b.zone.map(function (x) { var a1 = Number(x.lat), a2 = Number(x.lng); if (!(isFinite(a1) && isFinite(a2)) || Rules.distanceKm(city, { lat: a1, lng: a2 }) > 60) E(400, "BAD_ZONE"); return { lat: Math.round(a1 * 1e6) / 1e6, lng: Math.round(a2 * 1e6) / 1e6 }; }); }
@@ -882,6 +893,7 @@
     route("POST", "/admin/restaurants/:id/template", ["admin"], function (req, b, q, p) { var r = find(db.restaurants, p.id); if (!r) E(404, "NOT_FOUND"); return fillMenu(r, str(b.key) || "tj-uz"); });
     route("PATCH", "/admin/restaurants/:id", ["admin"], function (req, b, q, p) { var r = find(db.restaurants, p.id); if (!r) E(404, "NOT_FOUND");
       if (b.delivery != null) { if (["platform", "own", "mixed"].indexOf(b.delivery) < 0) E(400, "BAD_DELIVERY"); r.delivery = b.delivery; }
+      if (b.shopType != null && r.kind === "shop") { if (SHOP_TYPES.indexOf(b.shopType) < 0) E(400, "BAD_SHOP_TYPE"); r.shopType = b.shopType; }
       if (b.logo !== undefined) r.logo = photoField(b.logo, r.logo || null, "lg"); if (b.cover !== undefined) r.cover = photoField(b.cover, r.cover || null, "cv");
       /* the admin corrects what was typed when the restaurant was added: name, kitchen, city, address, phones, the owner's name and login number */
       if (b.name != null) { var nm = str(b.name, 60); if (nm.length < 2) E(400, "BAD_NAME"); r.name = L(nm); }
@@ -970,7 +982,7 @@
     route("PATCH", "/admin/categories/:id", ["admin"], function (req, b, q, p) { var c = find(db.categories, p.id); if (!c) E(404, "NOT_FOUND"); if (b.active != null) c.active = !!b.active; if (b.name != null) { var n = str(b.name, 40); if (n.length < 2) E(400, "BAD_NAME"); c.name = L(n); } if (b.icon != null && KINDS.indexOf(b.icon) >= 0) c.icon = b.icon; if (b.photo !== undefined) c.photo = photoField(b.photo, c.photo || null, "cat"); if (b.sort != null) c.sort = int(b.sort); save(); return c; });
     route("DELETE", "/admin/categories/:id", ["admin"], function (req, b, q, p) { if (by(db.products, "categoryId", p.id).length) E(409, "CATEGORY_IN_USE"); var dc = find(db.categories, p.id); if (dc && dc.photo) media.del(dc.photo); db.categories = db.categories.filter(function (c) { return c.id !== p.id; }); save(); return true; });
     route("GET", "/admin/products", ["admin"], function (req, b, q) { return db.products.filter(function (x) { return !q.restaurantId || x.restaurantId === q.restaurantId; }).map(function (x) { var r = find(db.restaurants, x.restaurantId); return Object.assign({}, x, { restaurantName: r ? r.name : null }); }); });
-    route("PATCH", "/admin/products/:id", ["admin"], function (req, b, q, p) { var x = find(db.products, p.id); if (!x) E(404, "NOT_FOUND"); Object.assign(x, validProduct(b, true)); save(); return x; });
+    route("PATCH", "/admin/products/:id", ["admin"], function (req, b, q, p) { var x = find(db.products, p.id); if (!x) E(404, "NOT_FOUND"); Object.assign(x, validProduct(b, true, find(db.restaurants, x.restaurantId))); save(); return x; });
     route("GET", "/admin/promos", ["admin"], function () { return db.promos; });
     route("POST", "/admin/promos", ["admin"], function (req, b) { var code = str(b.code).toUpperCase(), v = int(b.value), mo = int(b.minOrder || 0), mu = int(b.maxUses || 0);
       if (!/^[A-Z0-9]{3,16}$/.test(code)) E(400, "BAD_PROMO_CODE"); if (db.promos.some(function (x) { return x.code === code; })) E(409, "PROMO_EXISTS");

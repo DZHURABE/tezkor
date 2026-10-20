@@ -266,7 +266,7 @@ SF.I18N = {};
   /* restaurant self-promotion */
   K("rest.promo", "Реклама", "Реклама", "Promotion");
   K("menu.photo", "Акси хӯрок", "Фото блюда", "Dish photo"); K("menu.photoSub", "Аз телефон интихоб кунед ё акс гиред", "Выберите в телефоне или сфотографируйте", "Pick from your phone or take a picture");
-  K("menu.photoSet", "Акс гузошта шуд", "Фото добавлено", "Photo added"); K("menu.photoOr", "Агар акс набошад, расми зерин нишон дода мешавад:", "Если фото нет, покажем рисунок:", "Without a photo, this drawing is shown:");
+  K("menu.photoSet", "Акс гузошта шуд", "Фото добавлено", "Photo added"); K("menu.photoOr", "Аксҳои ҳақиқӣ фурӯшро зиёд мекунанд. Бе акс — ҷойи холӣ нишон дода мешавад.", "Настоящие фото увеличивают продажи. Без фото покажем нейтральную заглушку.", "Real photos sell more. Without one a neutral placeholder is shown.");
   K("menu.oldPrice", "Нархи пештара", "Старая цена", "Old price"); K("menu.oldPriceHint", "барои тахфиф", "для скидки", "for a discount");
   K("start.title", "Барои оғози кор", "Чтобы начать работу", "To get started"); K("start.menu", "Хӯрокҳоро ба меню илова кунед", "Добавьте блюда в меню", "Add dishes to the menu");
   K("start.card", "Рақами кортро нависед (барои интиқол)", "Укажите номер карты (для переводов)", "Add your card number (for transfers)");
@@ -827,7 +827,7 @@ SF.I18N = {};
   K("rest.markReady.sh", "Тайёр — ҷамъ шуд", "Готово — собрано", "Ready — packed");
   K("rest.prep.sh", "Вақти ҷамъ кардан", "Время сборки", "Packing time");
   K("sh.brand", "Бренд", "Бренд", "Brand"); K("sh.brandPh", "Apple, Samsung, Xiaomi…", "Apple, Samsung, Xiaomi…", "Apple, Samsung, Xiaomi…"); K("sh.allBrands", "Ҳама брендҳо", "Все бренды", "All brands");
-  K("menu.photoOr.sh", "Агар акс набошад, нишонаи категория нишон дода мешавад.", "Если фото нет, покажем значок категории.", "Without a photo the category icon is shown."); K("menu.desc.sh", "Тавсиф (ҳолат, кафолат, ранг)", "Описание (состояние, гарантия, цвет)", "Description (condition, warranty, colour)");
+  K("menu.photoOr.sh", "Аксҳои ҳақиқӣ фурӯшро зиёд мекунанд. Бе акс — ҷойи холӣ нишон дода мешавад.", "Настоящие фото увеличивают продажи. Без фото покажем нейтральную заглушку.", "Real photos sell more. Without one a neutral placeholder is shown."); K("menu.desc.sh", "Тавсиф (ҳолат, кафолат, ранг)", "Описание (состояние, гарантия, цвет)", "Description (condition, warranty, colour)");
   /* v5: own couriers, cancel without courier, delete person, map search, payment help, install */
   K("dl.noCour", "Курйер нест — фармоишро бекор кардан", "Курьера нет — отменить заказ", "No courier — cancel the order");
   K("dl.noCourT", "Фармоишро бекор мекунед?", "Отменить заказ?", "Cancel this order?");
@@ -886,4 +886,20 @@ SF.I18N = {};
   K("ap.addrHint", "Ном нависед, харита худаш мекушояд. Нуқтаро ба хонаатон гузоред.", "Введите название — карта откроется сама. Передвиньте метку на ваш дом.", "Type a name and the map opens by itself. Move the pin onto your house."); K("ap.pinT", "Харита: ҷои эълон", "Карта: место объявления", "Map: where the listing is");
   K("sa.heroG1", "Ҳама чиз", "Всё нужное", "Everything you need"); K("sa.heroG2", "дар як барнома", "в одном приложении", "in one app"); K("sa.allSv", "Ҳамаи хизматҳо", "Все сервисы", "All services");
   K("sa.newAds", "Эълонҳои нав", "Новые объявления", "New listings"); K("sa.newGoods", "Молҳои нав дар мағозаҳо", "Новые товары в магазинах", "New goods in shops"); K("sr.found", "{n} ёфт шуд", "Найдено: {n}", "{n} found"); K("sr.seeAll", "Ҳамаашро дидан", "Смотреть все", "See all");
+  K("sht.label", "Мағоза чӣ мефурӯшад?", "Что продаёт магазин?", "What does the shop sell?"); K("sht.hint", "Аз ин вобаста бахшҳо ва майдонҳои мол фарқ мекунанд.", "От этого зависят разделы и поля товара.", "Sections and product fields depend on it.");
+  K("sht.tech", "Телефон ва техника", "Телефоны и техника", "Phones & electronics"); K("sht.grocery", "Хӯрокворӣ (продуктовӣ)", "Продукты", "Groceries"); K("sht.clothes", "Либос ва пойафзол", "Одежда и обувь", "Clothes & shoes"); K("sht.home", "Рӯзғор ва сохтмон", "Хозтовары и стройка", "Home & building"); K("sht.general", "Омехта (ҳама чиз)", "Смешанный (всё)", "Mixed (everything)");
+  K("sh.optional", "ихтиёрӣ", "необязательно", "optional"); K("sh.specG", "Вазн ё ҳаҷм", "Вес или объём", "Weight or volume"); K("sh.specC", "Андоза ва ранг", "Размер и цвет", "Size and colour"); K("sh.specH", "Андоза / намуд", "Размер / вид", "Size / kind"); K("sh.specX", "Андоза, вазн ё намуд", "Размер, вес или вид", "Size, weight or kind");
+  K("sfs.waiter", "Кассир", "Кассир", "Cashier"); K("sfs.waiterSub", "Танҳо фармоишҳоро мебинад ва қабул мекунад.", "Видит и принимает только заказы.", "Sees and accepts orders only.");
+  K("sfs.worker", "Фурӯшанда", "Продавец", "Seller"); K("sfs.workerSub", "Фармоишҳоро қабул мекунад ва молро «ҳаст/нест» мекунад.", "Принимает заказы и отмечает товар «есть/нет».", "Takes orders and marks goods in / out of stock.");
+  K("sfs.manager", "Мудири мағоза", "Управляющий магазина", "Shop manager"); K("sfs.managerSub", "Ҳама чизро идора мекунад: мол, нарх, кормандон. Корти пардохт — танҳо соҳиб.", "Управляет всем: товары, цены, сотрудники. Карта оплаты — только владелец.", "Manages everything: goods, prices, staff. Payment card — owner only.");
+  /* shop cabinet: no restaurant words */
+  K("k.top.sh", "Беҳтарин молҳо · 30 рӯз", "Топ товаров · 30 дней", "Top goods · 30 days"); K("k.payout.sh", "Ба мағоза пардохт", "К выплате магазину", "Payout to the shop");
+  K("sf.sub.sh", "Ба ҳар кас вуруди худро диҳед — фармоиш ба ҳама бо садо мерасад. «Кассир» фармоиш қабул мекунад; «Мудири мағоза» мол, нарх ва кормандонро идора мекунад. Корти пардохт — танҳо соҳиб.", "Дайте каждому свой вход — заказ приходит всем со звуком. «Кассир» принимает заказы; «Управляющий магазина» ведёт товары, цены и сотрудников. Карта оплаты — только владелец.", "Give everyone their own login. A cashier takes orders; the shop manager runs goods, prices and staff. Payment card — owner only.");
+  K("sl.waiters.sh", "Кассирҳо ва фурӯшандагон", "Кассиры и продавцы", "Cashiers and sellers"); K("sl.dishes.sh", "Беҳтарин молҳо", "Лучшие товары", "Best goods");
+  K("promo.coverSub.sh", "Мағоза, мол ё даромадгоҳ — беҳтараш уфуқӣ", "Магазин, товар или вход — лучше горизонтально", "Shop, goods or entrance — landscape is best");
+  K("promo.sub.sh", "Мағозаатонро худатон таблиғ кунед: баннер дар саҳифаи асосӣ, муқова ва тахфифҳо. Мизоҷон фавран мебинанд.", "Рекламируйте свой магазин сами: баннер на главной, обложка и скидки. Клиенты видят это сразу.", "Promote your shop: a banner on the home page, a cover and discounts.");
+  K("promo.page.sh", "Саҳифаи мағоза", "Страница магазина", "Shop page"); K("promo.cuisine.sh", "Чӣ мефурӯшед", "Что продаёте", "What you sell"); K("promo.about.sh", "Дар бораи мағоза", "О магазине", "About the shop");
+  K("promo.saleSub.sh", "Дар «Мол» нархи нав ва «Нархи кӯҳна»-ро нависед — мизоҷ нархи хатхӯрдаро ва −%-ро мебинад.", "В «Товарах» укажите новую цену и «Старую цену» — клиент увидит зачёркнутую цену и −%.", "In Goods set a new price and an old price — the customer sees the strike-through and −%.");
+  K("promo.toMenu.sh", "Ба мол гузаштан", "Перейти к товарам", "Go to goods"); K("promo.tip1.sh", "Аксҳои ҳақиқии мол фурӯшро хеле зиёд мекунанд.", "Настоящие фото товаров заметно увеличивают продажи.", "Real photos of the goods raise sales.");
+  K("promo.tip3.sh", "Моли беҳтаринро «Машҳур» қайд кунед — дар саҳифаи асосӣ мебарояд.", "Отметьте лучшие товары как «Популярное» — они появятся на главной.", "Mark your best goods as Popular — they show on the home page.");
 })();

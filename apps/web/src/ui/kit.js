@@ -114,7 +114,11 @@ var SF = (function () {
     scooter: '<rect x="18" y="30" width="26" height="22" rx="4" fill="#fff"/><path d="M24 36h14M24 42h10" stroke="#E8590C" stroke-width="3" stroke-linecap="round"/><path d="M20 60h40l10-18h6l-8 22q-2 5-7 5H20z" fill="#F7C948"/><path d="M68 42l4-10" stroke="#fff" stroke-width="3.5" stroke-linecap="round"/><circle cx="28" cy="72" r="9" fill="#15171C"/><circle cx="70" cy="72" r="9" fill="#15171C"/><circle cx="28" cy="72" r="3.5" fill="#fff"/><circle cx="70" cy="72" r="3.5" fill="#fff"/>'
   };
   SF.KINDS = Object.keys(A).filter(function (k) { return k !== "scooter"; });
-  SF.art = function (k, s) { return '<svg class="art" viewBox="0 0 100 100" width="' + s + '" height="' + s + '" aria-hidden="true">' + (A[k] || A.plate) + "</svg>"; };
+  /* no cartoon stickers: a real photo when we have one for this kind of dish, otherwise a quiet placeholder (the owner's own photo replaces both) */
+  SF.art = function (k, s) { var ph = SF.PHOTO && SF.PHOTO[k] && k !== "hero" && k !== "courier";
+    if (ph) return '<img class="art photo" src="' + SF.PHOTO[k] + '" width="' + s + '" height="' + s + '" alt="" loading="lazy" decoding="async">';
+    return '<svg class="art ph" viewBox="0 0 48 48" width="' + s + '" height="' + s + '" aria-hidden="true"><circle cx="24" cy="24" r="17" fill="none" stroke="currentColor" stroke-width="1.6" opacity=".35"/><circle cx="24" cy="24" r="9.5" fill="none" stroke="currentColor" stroke-width="1.6" opacity=".35"/><path d="M40 12v10M37 12v5a3 3 0 006 0v-5M40 22v14M8 12c3 0 5 3 5 8 0 3-1.5 4.5-3 5v11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" opacity=".55"/></svg>'; };
+  SF.artOld = function (k, s) { return '<svg class="art" viewBox="0 0 100 100" width="' + s + '" height="' + s + '" aria-hidden="true">' + (A[k] || A.plate) + "</svg>"; };
   /* password field with a show/hide eye — typing a password blind is the main reason people "forget" it */
   SF.pwInput = function (name, ac, extra) { return '<span class="pwin"><input type="password" name="' + name + '" autocomplete="' + ac + '" autocapitalize="off" autocorrect="off" spellcheck="false"' + (extra || "") + '><button type="button" class="pweye" data-act="pweye" aria-label="' + SF.t("pw.show") + '" aria-pressed="false">' + SF.icon("eye", 18) + "</button></span>"; };
   SF.actions = SF.actions || {};

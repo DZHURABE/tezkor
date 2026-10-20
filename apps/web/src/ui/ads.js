@@ -28,7 +28,7 @@
   function back(href, title, extra) { return '<div class="svhead"><a class="svback" href="#' + href + '" aria-label="' + t("btn.back") + '">' + I("chevL", 20) + "</a><h1>" + title + "</h1>" + (extra || "") + "</div>"; }
   function isAdmin() { return SF.state.user && SF.state.user.role === "admin"; }
   /* while the admin keeps a service off, every page of it says «soon» */
-  function gate(sv) { SF.state.L = sv; return SF.svcOn(sv) || isAdmin() ? null : back("/", t("sv." + sv)) + '<div class="soonbox page">' + SF.svVis(sv, true) + '<h2 class="h2">' + t("sa.soonT") + '</h2><p class="muted">' + t("sa.soonSub") + '</p><a class="btn primary" href="#/food">' + t("sa.orderFood") + "</a></div>"; }
+  function gate(sv) { SF.state.L = sv; return SF.svcOn(sv) || isAdmin() ? null : back("/", t("sv." + sv)) + '<div class="soonbox page">' + SF.soonHero(sv) + '<h2 class="h2">' + t("sa.soonT") + '</h2><p class="muted">' + t("sa.soonSub") + '</p><a class="btn primary" href="#/services">' + t("sa.allSv") + "</a></div>"; }
   function stPill(s, a) { if (a && a.sold && s === "archived") return '<span class="pill p-ok">' + t("ads.sold") + "</span>"; var c = { draft: "mut", pending: "warn", active: "ok", rejected: "bad", archived: "mut", blocked: "bad" }[s] || "mut"; return '<span class="pill p-' + c + '">' + t("ads.st." + s) + "</span>"; }
   function favA(a) { var u = SF.state.user, on = !!(u && u.favs && (u.favs.a || []).indexOf(a.id) >= 0);
     return '<button type="button" class="favbtn adfav' + (on ? " on" : "") + '" data-act="fav" data-t="a" data-id="' + a.id + '" aria-pressed="' + on + '" aria-label="' + t(on ? "fav.remove" : "fav.add") + '">' + I("heart", 18) + "</button>"; }

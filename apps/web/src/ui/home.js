@@ -24,9 +24,11 @@
     return '<nav class="svgrid" aria-label="' + t("sv.title") + '">' + list.map(svcTile).join("") +
       (all ? "" : '<a href="#/services" class="svt more" style="--sb:#F2F4F3;--i:7"><span class="sve" aria-hidden="true">' + I("grid", 26) + "</span><b>" + t("sa.all") + "</b><small>" + t("sa.allSub", { n: SF.SERVICES.length }) + "</small></a>") + "</nav>"; };
 
-  SF.actions.soon = function (el) { var k = el.dataset.k, x = SF.SERVICES.filter(function (s) { return s[0] === k; })[0] || ["", ""];
-    SF.modal('<button class="mx" data-act="closemodal" aria-label="' + t("btn.close") + '">' + I("x", 20) + '</button><div class="soonbox">' + SF.svVis(k, true) + '<h2 class="h2">' + t("sa.soonT") + '</h2><p class="muted">' + t("sa.soonSub") + "</p>" +
-      (k ? '<span class="pill p-mut">' + t("sv." + k) + " · " + t("sv.soon") + "</span>" : "") + '<a class="btn primary block lg" href="#/food" data-act="closemodal">' + t("sa.orderFood") + "</a></div>"); };
+  /* «coming soon» / closed service: a calm gradient poster (or the admin's own photo) with the name and what it will give — no stickers */
+  SF.soonHero = function (k) { var L = SV_LOOK[k] || ["#9AA6A1", "#5E6964"], ph = ((SF.state.pub || {}).svcPhotos || {})[k];
+    return '<div class="soonhero" style="--g1:' + L[0] + ";--g2:" + L[1] + '">' + (ph ? '<img src="' + esc(ph) + '" alt="">' : "") + '<div class="sh-in"><span class="sh-badge">' + SF.soonBadge() + '</span><b>' + t("svs." + k) + "</b><small>" + t("svd." + k) + "</small></div></div>"; };
+  SF.actions.soon = function (el) { var k = el.dataset.k;
+    SF.modal('<button class="mx" data-act="closemodal" aria-label="' + t("btn.close") + '">' + I("x", 20) + '</button><div class="soonbox">' + SF.soonHero(k) + '<h2 class="h2">' + t("sa.soonT") + '</h2><p class="muted">' + t("sa.soonSub") + '</p><a class="btn primary block lg" href="#/services" data-act="closemodal">' + t("sa.allSv") + "</a></div>"); };
   /* «+» in the bottom bar is in ads.js: it posts into the listing services the admin switched on */
 
   /* ---------- Home ---------- */
