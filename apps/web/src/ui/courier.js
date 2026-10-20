@@ -33,14 +33,15 @@
   }
   function activeCard(o) {
     var stage = o.status === "picked_up" ? 2 : o.status === "ready" ? 1 : 0, city = cityOf(o.cityId) || o.restaurant, cp = o.courierPos || { lat: SF.state.user.courier.lat, lng: SF.state.user.courier.lng };
-    var target = stage === 2 ? o.address : o.restaurant;
+    var target = stage === 2 ? o.address : o.restaurant, far = cp.lat == null || SF.geo.km(cp, target) > 30;   /* GPS is old or wrong (a PC, no signal): do not stretch the map over half the country — show the place itself */
     var steps = [t("cour.s1"), t("cour.s2"), t("cour.s3")];
     var action = stage === 0 ? '<div class="msg info">' + I("fire", 16) + t("cour.cooking", { min: o.prepMin || 20 }) + '</div><button class="btn block" disabled>' + t("cour.picked") + "</button>"
       : stage === 1 ? '<button class="btn primary block lg" data-act="pickup" data-id="' + o.id + '">' + I("bag", 18) + t("cour.picked") + "</button>"
       : '<button class="btn ok block lg" data-act="deliver" data-id="' + o.id + '">' + I("check", 18) + (o.payment.method === "cash" ? t("cour.deliveredCash", { sum: money(o.total) }) : t("cour.deliveredBtn")) + "</button>";
     return '<section class="card active"><div class="rowhead"><b class="num">№' + o.number + "</b>" + SF.statusPill(o.status) + "</div>" +
       '<ol class="steps three">' + steps.map(function (s, i) { var st = i < stage ? "done" : i === stage ? "now" : ""; return '<li class="' + st + '"><span>' + I(st === "done" ? "check" : ["store", "bag", "home"][i], 16) + "</span><small>" + s + "</small></li>"; }).join("") + "</ol>" +
-      '<div class="mapcard">' + SF.tmap({ key: "c-" + o.id + "-" + stage, center: target, zone: SF.zone(o.cityId), fit: [cp, target], markers: [{ lat: o.restaurant.lat, lng: o.restaurant.lng, type: "rest", label: "R" }, { lat: o.address.lat, lng: o.address.lng, type: "home", label: "" }, { lat: cp.lat, lng: cp.lng, type: "courier" }], route: [cp, target], label: t("cour.map") }) + "</div>" +
+      '<div class="mapcard">' + SF.tmap({ key: "c-" + o.id + "-" + stage + (far ? "f" : ""), center: target, zoom: far ? 16 : undefined, free: true, zone: far ? undefined : SF.zone(o.cityId), fit: far ? undefined : [cp, target], markers: [{ lat: o.restaurant.lat, lng: o.restaurant.lng, type: "rest", label: "R" }, { lat: o.address.lat, lng: o.address.lng, type: "home", label: "" }].concat(far ? [] : [{ lat: cp.lat, lng: cp.lng, type: "courier" }]), route: far ? undefined : [cp, target], label: t("cour.map") }) + "</div>" +
+      (far ? '<div class="msg warn">' + I("info", 16) + "<span>" + t("cour.gpsFar") + "</span></div>" : '<p class="fine mapdist">' + I("route", 14) + t("cour.dist", { km: SF.geo.km(cp, target).toFixed(1) }) + "</p>") +
       navBlock(target, stage === 2 ? t("cour.client") : tx(o.restaurant.name), stage === 2 ? t("cour.coords") : t("cour.coordsR")) + route(o, true) +
       '<div class="contact"><span class="avatar sm">' + esc(o.customer.name.charAt(0)) + '</span><div class="grow"><b>' + esc(o.customer.name) + '</b><span class="muted num">' + esc(SF.phone(o.phone || o.customer.phone)) + '</span>' + SF.custMark(o.customer) + '</div>' + SF.callBtn(o.customer.name, o.phone || o.customer.phone, t("role.customer"), t("cour.call")) + "</div>" +
       (o.comment ? '<div class="note">' + I("info", 14) + esc(o.comment) + "</div>" : "") +

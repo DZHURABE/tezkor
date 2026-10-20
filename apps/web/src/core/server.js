@@ -139,7 +139,28 @@
 
     /* ---------- notifications ---------- */
     function notify(target, key, params, orderId) { if (/^u:(null|undefined)$/.test(target)) return; db.notifications.unshift({ id: id("n"), target: target, key: key, params: params || {}, orderId: orderId || null, at: clock(), readBy: {}, gone: false });
-      if (db.notifications.length > 400) db.notifications.length = 400; }
+      if (db.notifications.length > 400) db.notifications.length = 400;
+      try { pushTo(target, key, params || {}, orderId || null); } catch (e) {} }
+    /* ---------- Web Push: the phone gets the signal even when the app is closed or the screen is off ----------
+       opts.push = { publicKey, send(sub, payload) → Promise<{gone}>, text(key, params, lang) → {title, body} } (the Node API only) */
+    function pushSubs() { return db.pushSubs || (db.pushSubs = []); }
+    function pushUsers(target) {
+      var m = /^(u|rest|own|couriers):(.*)$/.exec(target), k = m && m[1], v = m && m[2];
+      if (target === "admins") return db.users.filter(function (u) { return u.role === "admin" && !u.deleted && u.active !== false; });
+      if (!m) return [];
+      return db.users.filter(function (u) { if (u.deleted || u.active === false) return false;
+        if (k === "u") return u.id === v;
+        if (k === "rest") return u.role === "restaurant" && u.restaurantId === v;
+        if (u.role !== "courier" || !u.courier || !u.courier.online) return false;
+        if (k === "own") return crests(u).indexOf(v) >= 0;
+        return !crests(u).length && u.cityId === v; }); }
+    function pushUrl(u, orderId) { return u.role === "restaurant" ? "/#/rest/orders" : u.role === "courier" ? "/#/courier" : u.role === "admin" ? "/#/admin/orders" : orderId ? "/#/o/" + orderId : "/#/orders"; }
+    function pushTo(target, key, params, orderId) {
+      if (!opts.push || !pushSubs().length) return;
+      pushUsers(target).forEach(function (u) { var subs = pushSubs().filter(function (s) { return s.userId === u.id; }); if (!subs.length) return;
+        var tx = opts.push.text(key, params, u.lang || "tg"); if (!tx) return;
+        var payload = { title: tx.title, body: tx.body, tag: orderId || key, url: pushUrl(u, orderId), urgent: /^n\.(newOrder|courierNew|courierAuto|ready)$/.test(key) };
+        subs.forEach(function (s) { Promise.resolve(opts.push.send(s, payload)).then(function (r) { if (r && r.gone) { db.pushSubs = pushSubs().filter(function (x) { return x !== s; }); save(); } }, function () {}); }); }); }
     /* one courier can work for several places (one phone number, ten shops): the list of places he carries for */
     function crests(u) { var c = (u && u.courier) || {}; return c.restaurantIds && c.restaurantIds.length ? c.restaurantIds : (c.restaurantId ? [c.restaurantId] : []); }
     function setCrests(u, ids) { var seen = {}; ids = (ids || []).filter(function (x) { if (!x || seen[x] || !find(db.restaurants, x)) return false; return (seen[x] = 1); }); u.courier.restaurantIds = ids; u.courier.restaurantId = ids[0] || null; }
@@ -171,6 +192,8 @@
     function tick() { var t = clock(), ms = handoffMs(), changed = false;
       db.orders.forEach(function (o) { if (o.delivery === "mixed" && !o.handedOff && !o.courierId && !o.selfDelivery && (o.status === "cooking" || o.status === "ready") && o.cookingAt && t - o.cookingAt >= ms) {
         o.handedOff = true; changed = true; var r = find(db.restaurants, o.restaurantId); notify("couriers:" + o.cityId, "n.courierNew", { n: o.number, rest: r.name, km: o.km }, o.id); } });
+      /* an order nobody has accepted yet: the shop's phone is nudged again every 2 minutes (5 times) */
+      if (opts.push) db.orders.forEach(function (o) { if (o.status === "pending" && (o.pushNag || 0) < 5 && t - (o.pushNagAt || o.createdAt) >= 120000) { o.pushNag = (o.pushNag || 0) + 1; o.pushNagAt = t; changed = true; pushTo("rest:" + o.restaurantId, "n.newOrder", { n: o.number, sum: o.subtotal }, o.id); } });
       db.orders.forEach(function (o) { if (o.status === "awaiting_payment" && o.payment && o.payment.method === "transfer" && t - o.createdAt > 2 * 3600000) { setStatus(o, "cancelled", null); o.cancelReason = "unpaid"; changed = true; } });
       if (changed) save();
       if (!db.meta.lastCleanup || t - db.meta.lastCleanup.at > DAY) cleanup(); }
@@ -492,6 +515,14 @@
     /* ---------- notifications ---------- */
     route("GET", "/notifications", "*", function (req) { var ts = targetsOf(req.user), uid = req.user.id;
       return db.notifications.filter(function (n) { return !n.gone && ts.indexOf(n.target) >= 0 && !n.readBy[uid]; }).slice(0, 20); });
+    route("GET", "/push/key", null, function () { return { key: opts.push ? opts.push.publicKey : null }; });
+    route("POST", "/push/subscribe", "*", function (req, b) {
+      if (!opts.push) throw E(501, "PUSH_OFF");
+      var ep = String(b.endpoint || ""), k = b.keys || {}; if (!/^https:\/\//.test(ep) || ep.length > 600 || !k.p256dh || !k.auth || String(k.p256dh).length > 200 || String(k.auth).length > 60) throw E(400, "BAD_SUB");
+      db.pushSubs = pushSubs().filter(function (s) { return s.endpoint !== ep; });
+      var mine = pushSubs().filter(function (s) { return s.userId === req.user.id; }); mine.slice(0, Math.max(0, mine.length - 4)).forEach(function (o) { db.pushSubs = pushSubs().filter(function (s) { return s !== o; }); });
+      pushSubs().push({ id: id("ps"), userId: req.user.id, endpoint: ep, keys: { p256dh: String(k.p256dh), auth: String(k.auth) }, at: clock() }); save(); return true; });
+    route("POST", "/push/unsubscribe", "*", function (req, b) { db.pushSubs = pushSubs().filter(function (s) { return !(s.userId === req.user.id && (!b.endpoint || s.endpoint === b.endpoint)); }); save(); return true; });
     route("POST", "/notifications/read", "*", function (req, b) { var ts = targetsOf(req.user), uid = req.user.id;
       db.notifications.forEach(function (n) { if (ts.indexOf(n.target) >= 0 && (!b.id || n.id === b.id)) n.readBy[uid] = true; }); save(); return true; });
 
@@ -1221,7 +1252,7 @@
         return { status: 500, body: { ok: false, error: { code: "SERVER_ERROR" } } };
       }
     }
-    return { handle: handle, inbound: inbound, cleanup: cleanup, version: function () { return db.meta.version; }, reload: function () { var d = store.load(); if (d) db = d; }, _db: function () { return db; } };
+    return { tick: tick, handle: handle, inbound: inbound, cleanup: cleanup, version: function () { return db.meta.version; }, reload: function () { var d = store.load(); if (d) db = d; }, _db: function () { return db; } };
   }
   var KINDS = ["plov", "qurutob", "lagman", "mantu", "soup", "tea", "burger", "fries", "drink", "pizza", "salad", "juice", "shashlik", "kebab", "bread", "samsa", "dessert", "cake", "icecream", "coffee", "shawarma", "ayran", "sushi", "grocery", "box", "plate"];
   return { createServer: createServer, KINDS: KINDS };

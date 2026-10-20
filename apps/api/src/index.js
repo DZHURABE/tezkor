@@ -60,7 +60,9 @@ function webPage(base) {
 let api = null, be = null;
 async function main() {
   be = await openStorage(process.env, console.log);
-  const keep = { store: be.store, files: be.files, media: be.media, archive: be.archive, storageInfo: be.storageInfo, afterCleanup: be.sweepMedia, apkAvailable, verify, verifyStatus: verify.status };
+  let push = null;
+  try { push = require("./providers/webpush").create(process.env, { dir: path.dirname(DATA_FILE), i18nFile: path.join(__dirname, "../../web/src/ui/i18n.js"), log: console.log }); } catch (e) { console.error("push disabled:", e.message); }
+  const keep = { push, store: be.store, files: be.files, media: be.media, archive: be.archive, storageInfo: be.storageInfo, afterCleanup: be.sweepMedia, apkAvailable, verify, verifyStatus: verify.status };
   api = createServer(DEMO ? keep : Object.assign(keep, {
     production: true, hashPassword, checkPassword,
     newToken: () => crypto.randomBytes(24).toString("base64url"),
@@ -69,6 +71,8 @@ async function main() {
     admin: { phone: process.env.ADMIN_PHONE, password: process.env.ADMIN_PASSWORD, name: process.env.ADMIN_NAME || "Admin" },
     resetAdmin: process.env.ADMIN_RESET_PASSWORD ? { phone: process.env.ADMIN_PHONE, password: process.env.ADMIN_RESET_PASSWORD } : null,
   }));
+  /* every minute: nudge the shop phones about orders nobody has accepted yet, even when nobody opens the app */
+  setInterval(() => { try { api.tick(); } catch (e) {} }, 60e3).unref();
   /* housekeeping once a day (also a minute after start), so the storage never fills up */
   const housekeeping = async () => { try { const r = api.cleanup(); r.media = be.sweepMedia(api._db()); await be.backup(api._db()); console.log("cleanup:", JSON.stringify(r)); } catch (e) { console.error("cleanup failed:", e.message); } };
   setTimeout(housekeeping, +process.env.FIRST_CLEANUP_MS || 60e3).unref(); setInterval(housekeeping, 24 * 3600e3).unref();

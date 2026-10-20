@@ -4,7 +4,7 @@
    Without tiles (offline demo) it draws a street-grid background that moves with the map.
    Picker mode: a fixed pin in the middle — the customer moves the map until the pin is on their house. */
 (function () {
-  var t = SF.t, esc = SF.esc, I = SF.icon, T = 256, ZMIN = 12, ZMAX = 18;
+  var t = SF.t, esc = SF.esc, I = SF.icon, T = 256, ZMIN = 5, ZMAX = 18;
   var cfg = window.SOMON_CONFIG || {};
   SF.state.tmv = SF.state.tmv || {};
   var specs = {};
