@@ -74,8 +74,22 @@
       '<label class="f">' + t("dl.who2") + '<input name="name" id="so-n" maxlength="60" placeholder="' + t("dl.who2Ph") + '"></label><label class="f">' + t("auth.phone") + '<span class="phonein"><i>+992</i><input name="phone" id="so-p" inputmode="tel"></span></label>' +
       '<button class="btn primary block lg">' + I("scooter", 18) + t("dl.selfGo") + "</button></form>"); }); };
   SF.actions.selfpick = function (el) { document.getElementById("so-n").value = el.dataset.n; document.getElementById("so-p").value = el.dataset.p; };
-  SF.forms.selfout = function (fd, f) { return api().post("/restaurant/orders/" + f.dataset.id + "/out", { name: fd.name, phone: fd.phone }).then(function () { SF.closeModal(); SF.toast(t("dl.selfToast")); SF.render({ quiet: true }); }); };
-  SF.actions.selfdone = function (el) { return api().post("/restaurant/orders/" + el.dataset.id + "/delivered").then(function () { SF.toast(t("dl.doneToast")); SF.render({ quiet: true }); }); };
+  SF.forms.selfout = function (fd, f) { return api().post("/restaurant/orders/" + f.dataset.id + "/out", { name: fd.name, phone: fd.phone }).then(function (o) { SF.closeModal(); SF.toast(t("dl.selfToast")); SF.render({ quiet: true }); setTimeout(function () { routeModal(o); }, 350); }); };
+  /* where to go: address, the customer's number and a map with the way — opens by itself when the shop takes the order out */
+  function destBlock(o) { if (o.pickup || o.dineIn || !o.address || o.address.lat == null || ["cooking", "ready", "picked_up"].indexOf(o.status) < 0) return "";
+    return '<div class="tdest">' + I("pin", 16) + '<div class="grow"><b>' + esc(o.address.text || "") + "</b>" + (o.address.landmark ? "<small>" + esc(o.address.landmark) + "</small>" : "") + '</div><button type="button" class="btn sm primary" data-act="route" data-id="' + o.id + '">' + I("route", 14) + t("rt.btn") + "</button></div>"; }
+  function routeModal(o) { if (!o || !o.address || o.address.lat == null) return; var r = o.restaurant || {}, g = SF.geo.nav(o.address), key = "rt-" + o.id, ph = o.phone ? String(o.phone).replace(/[^\d+]/g, "") : "";
+    delete SF.state.tmv[key];
+    SF.modal('<button class="mx" data-act="closemodal" aria-label="' + t("btn.close") + '">' + I("x", 20) + '</button><div class="stack routebox"><h2 class="h2">' + t("rt.title", { n: o.number }) + "</h2>" +
+      '<div class="tdest big">' + I("pin", 18) + '<div class="grow"><b>' + esc(o.address.text || "") + "</b>" + (o.address.landmark ? "<small>" + esc(o.address.landmark) + "</small>" : "") + "</div></div>" +
+      '<div class="mapbox">' + SF.tmap({ key: key, free: true, center: o.address, zoom: 16, fit: r.lat != null ? [{ lat: r.lat, lng: r.lng }, o.address] : undefined, route: r.lat != null ? [{ lat: r.lat, lng: r.lng }, o.address] : undefined,
+        markers: (r.lat != null ? [{ lat: r.lat, lng: r.lng, type: "rest", label: "R" }] : []).concat([{ lat: o.address.lat, lng: o.address.lng, type: "home", label: "" }]), label: t("rt.map") }) + "</div>" +
+      '<div class="row2"><a class="btn primary" target="_blank" rel="noopener" href="' + g.google + '">' + I("route", 16) + "Google</a><a class=\"btn primary\" target=\"_blank\" rel=\"noopener\" href=\"" + g.yandex + '">' + I("route", 16) + "Yandex</a></div>" +
+      (ph ? '<a class="btn ghost block" href="tel:' + esc(ph) + '">' + I("phone", 16) + t("rt.call") + " · " + esc(SF.phone(o.phone)) + "</a>" : "") +
+      (o.selfDelivery && o.status === "picked_up" ? '<button class="btn ok block" data-act="selfdone" data-id="' + o.id + '">' + I("check", 16) + t("dl.delivered") + "</button>" : "") + "</div>", "wide");
+    SF.mountMaps && SF.mountMaps(); }
+  SF.actions.route = function (el) { routeModal((SF.state.tk || {})[el.dataset.id]); };
+  SF.actions.selfdone = function (el) { return api().post("/restaurant/orders/" + el.dataset.id + "/delivered").then(function () { SF.closeModal(); SF.toast(t("dl.doneToast")); SF.render({ quiet: true }); }); };
 
   /* ---------- Our couriers ---------- */
   R("/rest/couriers", { title: "dl.couriers", live: true, render: function () {
@@ -84,10 +98,10 @@
       return '<section class="card dlmode d-' + d + '"><span class="kic">' + I(d === "platform" ? "scooter" : "store", 20) + '</span><div class="grow"><small class="muted">' + t("dl.who") + "</small><b>" + t("dl.m." + d) + "</b><p>" + t("dl.desc." + d, { n: (SF.state.pub && SF.state.pub.handoffMin) || 7 }) + '</p><p class="fine">' + t("dl.adminSets") + "</p></div></section>" +
         '<div class="toolbar"><p class="muted">' + t("dl.count", { n: list.length, on: list.filter(function (c) { return c.courier.online; }).length }) + '</p><button class="btn primary" data-act="ocnew">' + I("plus", 18) + t("dl.add") + "</button></div>" +
         (list.length ? '<div class="stack">' + list.map(function (c) {
-          var st = !c.active ? '<span class="pill p-bad">' + t("dl.blocked") + "</span>" : c.busy ? '<span class="pill p-warn">' + t("dl.busy") + "</span>" : c.courier.online ? '<span class="pill p-ok">' + t("cour.onlineL") + "</span>" : '<span class="pill p-mut">' + t("cour.offlineL") + "</span>";
-          return '<div class="card ocrow' + (c.active ? "" : " off") + '"><span class="avatar">' + esc(c.name.charAt(0)) + '</span><div class="grow"><b>' + esc(c.name) + '</b><small class="muted num">' + esc(SF.phone(c.phone)) + " · " + t("veh." + c.courier.vehicle) + " · " + t("dl.deliveredN", { n: c.delivered }) + "</small>" + st + "</div>" +
+          var sh = (c.courier.restaurantIds || []).length > 1, st = !c.active ? '<span class="pill p-bad">' + t("dl.blocked") + "</span>" : c.busy ? '<span class="pill p-warn">' + t("dl.busy") + "</span>" : c.courier.online ? '<span class="pill p-ok">' + t("cour.onlineL") + "</span>" : '<span class="pill p-mut">' + t("cour.offlineL") + "</span>";
+          return '<div class="card ocrow' + (c.active ? "" : " off") + '"><span class="avatar">' + esc(c.name.charAt(0)) + '</span><div class="grow"><b>' + esc(c.name) + '</b><small class="muted num">' + esc(SF.phone(c.phone)) + " · " + t("veh." + c.courier.vehicle) + " · " + t("dl.deliveredN", { n: c.delivered }) + "</small>" + st + (sh ? ' <span class="pill p-info" title="' + esc(t("cr.sharedNote")) + '">' + t("cr.shared", { n: c.courier.restaurantIds.length }) + "</span>" : "") + "</div>" + (sh ? "" :
             '<button class="iconbtn" data-act="ocpass" data-id="' + c.id + '" data-name="' + esc(c.name) + '" aria-label="' + t("dl.newPass") + '" title="' + t("dl.newPass") + '">' + I("shield", 18) + "</button>" +
-            '<button class="switch' + (c.active ? " on" : "") + '" role="switch" aria-checked="' + c.active + '" data-act="ocact" data-id="' + c.id + '" aria-label="' + t("adm.activeL") + '"></button></div>'; }).join("") + "</div>"
+            '<button class="switch' + (c.active ? " on" : "") + '" role="switch" aria-checked="' + c.active + '" data-act="ocact" data-id="' + c.id + '" aria-label="' + t("adm.activeL") + '"></button>') + "</div>"; }).join("") + "</div>"
           : SF.empty("scooter", t("dl.none"), t("dl.noneSub")));
     });
   } });
@@ -230,7 +244,7 @@
   SF.actions.given = function (el) { return api().post("/restaurant/orders/" + el.dataset.id + "/given").then(function () { SF.toast(t("sh.givenDone")); SF.render({ quiet: true }); }); };
   function worker() { var u = SF.state.user; return !!(u && u.staff && u.staffRole !== "manager"); }
   function ticket(o) {
-    var acts = "";
+    var acts = ""; (SF.state.tk = SF.state.tk || {})[o.id] = o;
     /* «I pick it up myself»: ready → the customer comes and takes it */
     if (o.pickup && ["cooking", "ready", "picked_up"].indexOf(o.status) >= 0) acts = '<div class="msg info">' + I("store", 16) + t("sh.custComes") + "</div>" + (o.status === "cooking" ? '<button class="btn ghost block" data-act="ready" data-id="' + o.id + '">' + I("bag", 16) + t("rest.markReady") + "</button>" : "") +
       '<button class="btn ok block" data-act="given" data-id="' + o.id + '">' + I("check", 16) + t("sh.given") + "</button>";
@@ -248,6 +262,7 @@
       (o.pickup ? '<div class="tcust tdine">' + I("store", 14) + "<b>" + t("sh.pickup") + '</b><span class="grow"></span></div>' : "") +
       (o.dineIn ? '<div class="tcust tdine">' + I("grid", 14) + "<b>" + t("tb.table", { n: esc(o.tableName) }) + "</b>" + (o.guestName ? '<span class="grow muted">' + esc(o.guestName) + "</span>" : '<span class="grow"></span>') + '<span class="cmark new">' + t("tb.inHall") + "</span></div>" : "") +
       (o.customer ? '<div class="tcust">' + I("user", 14) + '<b class="grow">' + esc(o.customer.name) + "</b>" + SF.custMark(o.customer) + "</div>" : "") +
+      destBlock(o) +
       '<div class="tmeta"><span>' + I(o.payment.method === "cash" ? "cash" : "card", 14) + (o.dineIn ? t("tb.payTable") : t("pay." + o.payment.method)) + '</span><b class="num">' + money(o.subtotal) + "</b></div>" +
       (o.payment.method === "transfer" ? '<div class="paycheck' + (o.payment.status === "review" ? " review" : "") + '"><span>' + (o.payment.status === "review" ? t("tr.restCheck", { sum: money(o.total), card: o.payment.toCard }) : t("ps." + o.payment.status)) + '</span><button type="button" class="btn sm ghost" data-act="rcpt" data-id="' + o.id + '">' + I("receipt", 14) + t("tr.receipt") + "</button></div>" : "") +
       (o.prepMin && o.status === "cooking" ? '<div class="timer"><i style="--p:' + Math.min(100, Math.round((Date.now() - o.history[o.history.length - 1].at) / (o.prepMin * 600))) + '%"></i><span class="num">' + t("rest.prepLeft", { n: Math.max(0, o.prepMin - Math.round((Date.now() - o.history[o.history.length - 1].at) / 60000)) }) + "</span></div>" : "") + acts + "</article>";

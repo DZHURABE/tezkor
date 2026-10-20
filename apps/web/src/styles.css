@@ -1818,3 +1818,5 @@ details.more[open] summary .ic:last-child{transform:rotate(180deg)}details.more>
   .tabbar a.on{color:var(--brand)}}
 @media (max-width:760px) and (prefers-color-scheme:dark){:root:not([data-theme="light"]) .tabbar,:root:not([data-theme="light"]) .tabbar.show{background:rgba(26,32,30,.88);border-color:rgba(255,255,255,.1)}}
 @media (max-width:760px){:root[data-theme="dark"] .tabbar,:root[data-theme="dark"] .tabbar.show{background:rgba(26,32,30,.88);border-color:rgba(255,255,255,.1)}}
+.chklist{display:flex;flex-direction:column;gap:2px;max-height:200px;overflow:auto;border:1.5px solid var(--line);border-radius:14px;padding:6px 10px;background:var(--surface-2)}.chklist .checkrow{padding:6px 0}
+.tdest{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;background:var(--brand-soft);color:var(--ink);margin:8px 0}.tdest b{display:block;font-size:14px}.tdest small{display:block;color:var(--muted);font-size:12.5px}.tdest.big{margin:0}.routebox .mapbox{height:260px}

@@ -78,7 +78,7 @@
     /* ---------- shaping ---------- */
     function pubUser(u) { if (!u) return null; var o = { id: u.id, role: u.role, name: u.name, phone: u.phone, cityId: u.cityId, active: u.active, lang: u.lang, createdAt: u.createdAt };
       if (u.mustChange) o.mustChange = true; if (u.staff) { o.staff = true; o.staffRole = ["manager", "waiter"].indexOf(u.staffRole) >= 0 ? u.staffRole : "worker"; if (u.tipCard) o.tipCard = u.tipCard; } if (u.avatar) o.avatar = u.avatar; if (u.favs) o.favs = u.favs; if (u.pwResetAt) o.pwResetAt = u.pwResetAt; if (u.phoneVerified) o.phoneVerified = u.phoneVerified;
-      if (u.restaurantId) { o.restaurantId = u.restaurantId; var rk = find(db.restaurants, u.restaurantId); o.restKind = rk && rk.kind === "shop" ? "shop" : "food"; if (rk && rk.kind === "shop") o.shopType = rk.shopType || "general"; } if (u.courier) { o.courier = Object.assign({}, u.courier, courierRating(u)); if (u.courier.restaurantId) { var rr = find(db.restaurants, u.courier.restaurantId); o.courier.restaurantName = rr ? rr.name : null; } } if (u.addresses) o.addresses = u.addresses; return o; }
+      if (u.restaurantId) { o.restaurantId = u.restaurantId; var rk = find(db.restaurants, u.restaurantId); o.restKind = rk && rk.kind === "shop" ? "shop" : "food"; if (rk && rk.kind === "shop") o.shopType = rk.shopType || "general"; } if (u.courier) { o.courier = Object.assign({}, u.courier, courierRating(u)); if (crests(u).length) { var rr = find(db.restaurants, crests(u)[0]); o.courier.restaurantName = rr ? rr.name : null; o.courier.restaurantIds = crests(u); o.courier.restaurantNames = crests(u).map(function (x) { var q = find(db.restaurants, x); return q ? q.name : null; }).filter(Boolean); } } if (u.addresses) o.addresses = u.addresses; return o; }
     function courierRating(u) { var rs = db.orders.filter(function (o) { return o.courierId === u.id && o.review && o.review.courierRating; });
       if (!rs.length) return { rating: u.courier ? u.courier.rating : null, ratingCount: u.courier ? u.courier.ratingCount : 0 };
       var base = (u.courier.rating || 0) * (u.courier.ratingCount || 0), sum = rs.reduce(function (s, o) { return s + o.review.courierRating; }, 0);
@@ -140,7 +140,10 @@
     /* ---------- notifications ---------- */
     function notify(target, key, params, orderId) { if (/^u:(null|undefined)$/.test(target)) return; db.notifications.unshift({ id: id("n"), target: target, key: key, params: params || {}, orderId: orderId || null, at: clock(), readBy: {}, gone: false });
       if (db.notifications.length > 400) db.notifications.length = 400; }
-    function targetsOf(u) { var t = ["u:" + u.id]; if (u.role === "restaurant") t.push("rest:" + u.restaurantId); if (u.role === "courier" && u.courier.online) t.push(u.courier.restaurantId ? "own:" + u.courier.restaurantId : "couriers:" + u.cityId); if (u.role === "admin") t.push("admins"); return t; }
+    /* one courier can work for several places (one phone number, ten shops): the list of places he carries for */
+    function crests(u) { var c = (u && u.courier) || {}; return c.restaurantIds && c.restaurantIds.length ? c.restaurantIds : (c.restaurantId ? [c.restaurantId] : []); }
+    function setCrests(u, ids) { var seen = {}; ids = (ids || []).filter(function (x) { if (!x || seen[x] || !find(db.restaurants, x)) return false; return (seen[x] = 1); }); u.courier.restaurantIds = ids; u.courier.restaurantId = ids[0] || null; }
+    function targetsOf(u) { var t = ["u:" + u.id]; if (u.role === "restaurant") t.push("rest:" + u.restaurantId); if (u.role === "courier" && u.courier.online) { if (crests(u).length) crests(u).forEach(function (x) { t.push("own:" + x); }); else t.push("couriers:" + u.cityId); } if (u.role === "admin") t.push("admins"); return t; }
     function hideFor(orderId, target) { db.notifications.forEach(function (n) { if (n.orderId === orderId && (!target || n.target === target)) n.gone = true; }); }
 
     /* ---------- who delivers ----------
@@ -151,14 +154,14 @@
     function offerable(o, u) {
       if (o.dineIn || o.courierId || (o.status !== "cooking" && o.status !== "ready") || o.selfDelivery) return false;
       var d = o.delivery || "platform";
-      if (u.courier.restaurantId) return o.restaurantId === u.courier.restaurantId;
+      if (crests(u).length) return crests(u).indexOf(o.restaurantId) >= 0;
       return o.cityId === u.cityId && (d === "platform" || (d === "mixed" && !!o.handedOff));
     }
     /* the restaurant's own couriers: the nearest free one who is online gets the order at once (no one to choose) */
     function autoAssign(o) {
       var r = find(db.restaurants, o.restaurantId); if (!r || o.courierId || o.selfDelivery || o.dineIn || o.pickup) return false;
       var best = null, bd = 1e9;
-      db.users.forEach(function (u) { if (!u.courier || u.deleted || !u.active || !u.courier.online || u.courier.restaurantId !== o.restaurantId || activeOf(u.id)) return;
+      db.users.forEach(function (u) { if (!u.courier || u.deleted || !u.active || !u.courier.online || crests(u).indexOf(o.restaurantId) < 0 || activeOf(u.id)) return;
         var d = Rules.distanceKm(r, { lat: u.courier.lat, lng: u.courier.lng }); if (d < bd) { bd = d; best = u; } });
       if (!best) return false;
       o.courierId = best.id; o.assignedAt = clock(); o.autoAssigned = true; o.courierFrom = { lat: best.courier.lat, lng: best.courier.lng }; hideFor(o.id, "couriers:" + o.cityId); hideFor(o.id, "own:" + o.restaurantId);
@@ -210,7 +213,7 @@
       if (to === "picked_up") { o.pickedAt = t; notify("u:" + o.customerId, "n.onTheWay", { n: num, total: o.total, cash: o.payment.method === "cash" }, o.id); }
       if (to === "delivered") { o.deliveredAt = t; if (o.payment.method === "cash") o.payment.status = "paid";
         o.items.forEach(function (it) { var pr = find(db.products, it.productId); if (pr) pr.sold = (pr.sold || 0) + it.qty; });
-        var dc = o.courierId && find(db.users, o.courierId); o.ownDelivery = !dc || !!(dc.courier && dc.courier.restaurantId === o.restaurantId); Object.assign(o, Rules.split(o, r, db.settings)); hideFor(o.id); notify("u:" + o.customerId, "n.delivered", { n: num }, o.id); }
+        var dc = o.courierId && find(db.users, o.courierId); o.ownDelivery = !dc || !!(dc.courier && crests(dc).indexOf(o.restaurantId) >= 0); Object.assign(o, Rules.split(o, r, db.settings)); hideFor(o.id); notify("u:" + o.customerId, "n.delivered", { n: num }, o.id); }
       if (to === "rejected" || to === "cancelled") { hideFor(o.id); if (o.payment.status === "paid") { o.payment.status = "refunded"; db.payments.forEach(function (p) { if (p.orderId === o.id) p.status = "refunded"; }); }
         if (to === "rejected") notify("u:" + o.customerId, "n.rejected", { n: num }, o.id); else if (role !== "customer") notify("u:" + o.customerId, "n.cancelled", { n: num }, o.id);
         if (role === "customer") notify("rest:" + o.restaurantId, "n.customerCancelled", { n: num }, o.id); }
@@ -657,7 +660,7 @@
 
     /* the restaurant's own couriers: they use the same courier app but see only this restaurant's orders */
     function pubOwn(u) { var x = pubUser(u); x.busy = !!activeOf(u.id); x.delivered = db.orders.filter(function (o) { return o.courierId === u.id && o.status === "delivered"; }).length; return x; }
-    function myCourier(req, cid) { boss(req); var u = find(db.users, cid); if (!u || !u.courier || u.courier.restaurantId !== req.user.restaurantId) E(404, "NOT_FOUND"); return u; }
+    function myCourier(req, cid) { boss(req); var u = find(db.users, cid); if (!u || !u.courier || crests(u).indexOf(req.user.restaurantId) < 0) E(404, "NOT_FOUND"); if (crests(u).length > 1) E(403, "SHARED_COURIER"); return u; }
     /* staff: the owner adds workers who log in with their own phone and see the same orders (no single phone to wait on) */
     function ownerOnly(req) { var r = myRest(req); if (r.ownerId !== req.user.id) E(403, "OWNER_ONLY"); return r; }
     function myStaff(req, id) { var r = boss(req), u = find(db.users, id); if (!u || u.role !== "restaurant" || u.restaurantId !== r.id || u.id === r.ownerId) E(404, "NOT_FOUND");
@@ -703,7 +706,7 @@
       save(); return pubStaff(u); });
     route("POST", "/restaurant/staff/:id/password", ["restaurant"], function (req, b, q, p) { var u = myStaff(req, p.id), tmp = newPassword(); u.pass = hashPw(tmp); u.mustChange = true; dropSessions(u.id); save(); return { phone: u.phone, password: tmp }; });
     route("DELETE", "/restaurant/staff/:id", ["restaurant"], function (req, b, q, p) { var u = myStaff(req, p.id); dropSessions(u.id); db.users.splice(db.users.indexOf(u), 1); save(); return true; });
-    route("GET", "/restaurant/couriers", ["restaurant"], function (req) { return db.users.filter(function (u) { return !u.deleted && u.courier && u.courier.restaurantId === req.user.restaurantId; }).map(pubOwn); });
+    route("GET", "/restaurant/couriers", ["restaurant"], function (req) { return db.users.filter(function (u) { return !u.deleted && u.courier && crests(u).indexOf(req.user.restaurantId) >= 0; }).map(pubOwn); });
     route("POST", "/restaurant/couriers", ["restaurant"], function (req, b) { var r = boss(req), nc = newCourier(b, cityOf(r.cityId), r.id); save(); return Object.assign(pubOwn(nc.user), { login: nc.login }); });
     route("PATCH", "/restaurant/couriers/:id", ["restaurant"], function (req, b, q, p) { var u = myCourier(req, p.id);
       if (b.active != null) { if (!b.active && activeOf(u.id)) E(409, "HAS_ACTIVE_ORDER"); u.active = !!b.active; if (!u.active) { u.courier.online = false; Object.keys(db.sessions).forEach(function (k) { if (db.sessions[k].userId === u.id) delete db.sessions[k]; }); } }
@@ -875,7 +878,7 @@
       db.payments = (db.payments || []).filter(function (x) { return !oids[x.orderId]; });
       db.notifications = db.notifications.filter(function (x) { return !oids[x.orderId] && x.target !== "rest:" + r.id && x.target !== "own:" + r.id; });
       var pids = {}; db.products = db.products.filter(function (p) { if (p.restaurantId !== r.id) return true; pids[p.id] = 1; n.products++; if (p.photo) { try { media.del(p.photo); } catch (e) {} } return false; });
-      var gone = {}; db.users = db.users.filter(function (u) { if (u.restaurantId === r.id || (u.courier && u.courier.restaurantId === r.id)) { gone[u.id] = 1; n.people++; return false; } return true; });
+      var gone = {}; db.users = db.users.filter(function (u) { if (u.courier && crests(u).indexOf(r.id) >= 0 && crests(u).length > 1) { setCrests(u, crests(u).filter(function (x) { return x !== r.id; })); return true; } if (u.restaurantId === r.id || (u.courier && crests(u).indexOf(r.id) >= 0)) { gone[u.id] = 1; n.people++; return false; } return true; });
       Object.keys(db.sessions).forEach(function (k) { if (gone[db.sessions[k].userId]) delete db.sessions[k]; });
       db.users.forEach(function (u) { if (u.favs) Object.keys(u.favs).forEach(function (k) { if (Array.isArray(u.favs[k])) u.favs[k] = u.favs[k].filter(function (x) { return x !== r.id && !pids[x]; }); }); });
       db.subs = (db.subs || []).filter(function (s) { return s.restaurantId !== r.id; }); db.banners = (db.banners || []).filter(function (x) { return x.restaurantId !== r.id; }); db.promos = (db.promos || []).filter(function (x) { return x.restaurantId !== r.id; });
@@ -960,7 +963,7 @@
     function newCourier(b, city, restaurantId) { var name = str(b.name, 60), phone = Rules.normPhone(b.phone);
       if (name.length < 2) E(400, "BAD_NAME"); if (!phone) E(400, "BAD_PHONE"); if (db.users.some(function (u) { return u.phone === phone; })) E(409, "PHONE_TAKEN");
       var tmp = newPassword(), u = { id: id("u"), role: "courier", name: name, phone: phone, pass: hashPw(tmp), mustChange: true, active: true, cityId: city.id, createdAt: clock(), lang: "tg",
-        courier: { online: false, vehicle: ["scooter", "bike", "car", "foot"].indexOf(b.vehicle) >= 0 ? b.vehicle : "scooter", carNumber: str(b.carNumber, 20).toUpperCase() || null, passport: str(b.passport, 30).toUpperCase() || null, rating: null, ratingCount: 0, lat: city.lat, lng: city.lng, restaurantId: restaurantId || null } };
+        courier: { online: false, vehicle: ["scooter", "bike", "car", "foot"].indexOf(b.vehicle) >= 0 ? b.vehicle : "scooter", carNumber: str(b.carNumber, 20).toUpperCase() || null, passport: str(b.passport, 30).toUpperCase() || null, rating: null, ratingCount: 0, lat: city.lat, lng: city.lng, restaurantId: restaurantId || null, restaurantIds: restaurantId ? [restaurantId] : [] } };
       db.users.push(u); return { user: u, login: { phone: phone, password: tmp } }; }
     /* the admin corrects a courier's card: vehicle, car / moto number, passport, town, name */
     route("PATCH", "/admin/couriers/:id", ["admin"], function (req, b, q, p) { var u = find(db.users, p.id); if (!u || !u.courier) E(404, "NOT_FOUND");
@@ -969,9 +972,13 @@
       if (b.carNumber != null) u.courier.carNumber = str(b.carNumber, 20).toUpperCase() || null; if (b.passport != null) u.courier.passport = str(b.passport, 30).toUpperCase() || null;
       if (b.cityId != null) { if (!find(db.cities, b.cityId)) E(400, "BAD_CITY"); u.cityId = b.cityId; }
       /* attach to one restaurant (its own courier) or back to all Тезкор orders */
-      if (b.restaurantId !== undefined) { if (b.restaurantId && !find(db.restaurants, b.restaurantId)) E(400, "BAD_RESTAURANT"); if (activeOf(u.id)) E(409, "HAS_ACTIVE_ORDER"); u.courier.restaurantId = b.restaurantId || null; }
+      if (b.restaurantIds !== undefined) { if (!Array.isArray(b.restaurantIds) || b.restaurantIds.length > 30) E(400, "BAD_RESTAURANT"); b.restaurantIds.forEach(function (x) { if (!find(db.restaurants, x)) E(400, "BAD_RESTAURANT"); }); if (activeOf(u.id)) E(409, "HAS_ACTIVE_ORDER"); setCrests(u, b.restaurantIds); }
+      else if (b.restaurantId !== undefined) { if (b.restaurantId && !find(db.restaurants, b.restaurantId)) E(400, "BAD_RESTAURANT"); if (activeOf(u.id)) E(409, "HAS_ACTIVE_ORDER"); setCrests(u, b.restaurantId ? [b.restaurantId] : []); }
       save(); return pubUser(u); });
     route("POST", "/admin/couriers", ["admin"], function (req, b) { var rr = b.restaurantId ? find(db.restaurants, b.restaurantId) : null; if (b.restaurantId && !rr) E(400, "BAD_RESTAURANT");
+      /* the same phone again for another place: the courier is added to that place too (no second account) */
+      var ph0 = Rules.normPhone(b.phone), ex = ph0 && rr ? db.users.filter(function (u) { return u.phone === ph0 && u.courier && !u.deleted; })[0] : null;
+      if (ex) { if (!crests(ex).length) E(409, "PHONE_TAKEN"); if (crests(ex).indexOf(rr.id) < 0) setCrests(ex, crests(ex).concat([rr.id])); save(); return Object.assign(pubUser(ex), { linked: true }); }
       var nc = newCourier(b, rr ? cityOf(rr.cityId) : (find(db.cities, b.cityId) || db.cities[0]), rr ? rr.id : null); save(); return Object.assign(pubUser(nc.user), { login: nc.login }); });
     route("POST", "/admin/users/:id/password", ["admin"], function (req, b, q, p) { var u = find(db.users, p.id); if (!u) E(404, "NOT_FOUND"); if (u.id === req.user.id) E(409, "USE_PROFILE"); if (u.role === "admin") mainOnly(req);
       var tmp = newPassword(); u.pass = hashPw(tmp); u.mustChange = true; u.pwResetAt = null; Object.keys(db.sessions).forEach(function (k) { if (db.sessions[k].userId === u.id) delete db.sessions[k]; });
