@@ -27,6 +27,9 @@ var SF = (function () {
 
   /* ---------- icons (24px line set) ---------- */
   var P = {
+    flag: '<path d="M5 21V4M5 4h11l-2 4 2 4H5"/>', thumbup: '<path d="M7 11v9H4v-9zM7 11l4-7a2 2 0 0 1 2 2v3h5.5a2 2 0 0 1 2 2.3l-1.2 6.2a2 2 0 0 1-2 1.6H7"/>', thumbdown: '<path d="M7 13V4H4v9zM7 13l4 7a2 2 0 0 0 2-2v-3h5.5a2 2 0 0 0 2-2.3L19.3 6.3a2 2 0 0 0-2-1.6H7"/>',
+    bike: '<circle cx="6" cy="16" r="3.5"/><circle cx="18" cy="16" r="3.5"/><path d="M6 16l4-8h5l3 8M10 8l5 8M13 5h3"/>', walk: '<circle cx="13" cy="4.5" r="1.8"/><path d="M12 8l-3 4 3 2v6M9 12l-2 4M12 8l4 3 2 .5M12 14l3 3 .5 3"/>',
+    sparkles: '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8z"/>',
     headset: '<path d="M4 14v-2a8 8 0 0 1 16 0v2"/><rect x="3" y="14" width="5" height="7" rx="2"/><rect x="16" y="14" width="5" height="7" rx="2"/>',
     car: '<path d="M4 16V12l2.2-5.2A2 2 0 0 1 8 5.6h8a2 2 0 0 1 1.8 1.2L20 12v4"/><path d="M3 12h18v4.5a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><circle cx="7.5" cy="14.8" r="1.2" fill="currentColor"/><circle cx="16.5" cy="14.8" r="1.2" fill="currentColor"/><path d="M5.5 17.5V20M18.5 17.5V20"/>',
     house: '<path d="M3 11l9-7 9 7"/><path d="M5 9.5V20h14V9.5"/><path d="M10 20v-5.5h4V20"/>', mobile: '<rect x="6.5" y="2.5" width="11" height="19" rx="2.6"/><path d="M11 18.3h2"/>',

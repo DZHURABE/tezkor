@@ -6,8 +6,8 @@
 
   /* key, picture, tile colour, where it opens when switched on */
   SF.SERVICES = [
-    ["food", "🍔", "#FFF1E6", "/food"], ["taxi", "🚕", "#FFF7DB", null], ["shops", "🛒", "#E8F7EE", "/shops"], ["ads", "📢", "#E8F0FF", "/ads"],
-    ["masters", "🛠️", "#F1EBFF", "/masters"], ["jobs", "💼", "#FFE9EF", "/jobs"], ["grocery", "🥦", "#EAF7E3", null], ["pharmacy", "💊", "#E6F4FB", null], ["realty", "🏠", "#FFECE8", "/realty"]];
+    ["food", "", "#FFF1E6", "/food"], ["taxi", "", "#FFF7DB", null], ["shops", "", "#E8F7EE", "/shops"], ["ads", "", "#E8F0FF", "/ads"],
+    ["masters", "", "#F1EBFF", "/masters"], ["jobs", "", "#FFE9EF", "/jobs"], ["grocery", "", "#EAF7E3", null], ["pharmacy", "", "#E6F4FB", null], ["realty", "", "#FFECE8", "/realty"]];
   /* the picture of a service: the admin's own photo when he uploaded one, otherwise a clean colour tile with a line icon (no cartoon emoji) */
   var SV_LOOK = { food: ["#FF8A3D", "#D9480F", "bag"], taxi: ["#FFC93C", "#E09A00", "car"], shops: ["#2FBF71", "#0B7A3E", "cart"], ads: ["#4C8DFF", "#1E56C8", "megaphone"], masters: ["#9B6BFF", "#5F35C9", "wrench"],
     jobs: ["#FF6B9A", "#C2255C", "briefcase"], grocery: ["#7BD35A", "#2F8A1F", "store"], pharmacy: ["#3EC5E8", "#0B7FA3", "heart"], realty: ["#FF8A6B", "#D0432A", "house"] };
@@ -24,9 +24,9 @@
     return '<nav class="svgrid" aria-label="' + t("sv.title") + '">' + list.map(svcTile).join("") +
       (all ? "" : '<a href="#/services" class="svt more" style="--sb:#F2F4F3;--i:7"><span class="sve" aria-hidden="true">' + I("grid", 26) + "</span><b>" + t("sa.all") + "</b><small>" + t("sa.allSub", { n: SF.SERVICES.length }) + "</small></a>") + "</nav>"; };
 
-  SF.actions.soon = function (el) { var k = el.dataset.k, x = SF.SERVICES.filter(function (s) { return s[0] === k; })[0] || ["", "✨"];
+  SF.actions.soon = function (el) { var k = el.dataset.k, x = SF.SERVICES.filter(function (s) { return s[0] === k; })[0] || ["", ""];
     SF.modal('<button class="mx" data-act="closemodal" aria-label="' + t("btn.close") + '">' + I("x", 20) + '</button><div class="soonbox">' + SF.svVis(k, true) + '<h2 class="h2">' + t("sa.soonT") + '</h2><p class="muted">' + t("sa.soonSub") + "</p>" +
-      (k ? '<span class="pill p-mut">' + t("sv." + k) + " · " + t("sv.soon") + "</span>" : "") + '<a class="btn primary block lg" href="#/food" data-act="closemodal">' + "🍔 " + t("sa.orderFood") + "</a></div>"); };
+      (k ? '<span class="pill p-mut">' + t("sv." + k) + " · " + t("sv.soon") + "</span>" : "") + '<a class="btn primary block lg" href="#/food" data-act="closemodal">' + t("sa.orderFood") + "</a></div>"); };
   /* «+» in the bottom bar is in ads.js: it posts into the listing services the admin switched on */
 
   /* ---------- Home ---------- */
@@ -42,7 +42,7 @@
         var pop = full.slice().sort(function (a, b) { return (b.isOpenNow ? 1 : 0) - (a.isOpenNow ? 1 : 0) || (b.orderCount || 0) - (a.orderCount || 0) || (b.rating || 0) - (a.rating || 0); }).slice(0, 8);
         var open = full.filter(function (r) { return r.isOpenNow; }).map(etaMin), eta = open.length ? Math.min.apply(null, open) : 0;
         /* 1. greeting + search across Tezkor */
-        var head = '<section class="sahead"><p class="sahi">' + t(greet) + (u ? ", <b>" + esc(u.name.split(" ")[0]) + "</b>" : "") + ' <span aria-hidden="true">👋</span></p>' +
+        var head = '<section class="sahead"><p class="sahi">' + t(greet) + (u ? ", <b>" + esc(u.name.split(" ")[0]) + "</b>" : "") + '</p>' +
           '<form class="sasearch" data-form="search" role="search">' + I("search", 20) + '<input name="q" placeholder="' + t("sa.searchPh") + '" aria-label="' + t("sa.searchPh") + '" enterkeyhint="search"><button class="sago" aria-label="' + t("btn.find") + '">' + I("chevR", 18) + "</button></form></section>";
         /* 2. big food banner first, then the restaurants' own ads; they slide by themselves and by finger */
         var hero = '<a class="banner sahero" href="#/food"><span class="shbg" style="background-image:url(' + SF.PHOTO.hero + ')" aria-hidden="true"></span><div><b class="sht">' + t("sa.heroT1") + " <em>" + t("sa.heroT2") + "</em> " + t("sa.heroT3") + "</b>" +
@@ -73,12 +73,42 @@
   function shopLogo(r, cls) { return r.logo ? '<span class="' + cls + '"><img src="' + esc(r.logo) + '" alt=""></span>' : '<span class="' + cls + '" style="--tone:' + esc(r.tone || "#E3ECFF") + '"><b>' + esc(tx(r.name).slice(0, 2).toUpperCase()) + "</b></span>"; }
   function shopFacts(r) { return '<span class="shfacts"><span>' + esc(tx(r.cuisine)) + "</span>" + (r.rating ? "<span>" + I("star", 13) + Number(r.rating).toFixed(1) + "</span>" : "") + "</span>" +
     '<span class="shfacts"><span>' + I("scooter", 13) + esc(r.eta) + " " + t("u.min") + "</span>" + (r.pickup ? "<span>" + I("store", 13) + t("sh.pickupOk") + "</span>" : "") + "</span>"; }
+  function shopTabs(cur) { return '<div class="segtabs shtabs" role="tablist">' + [["shops", "/shops", "sh.tabShops"], ["goods", "/shops/goods", "sh.tabGoods"]].map(function (x) { return '<a role="tab" aria-selected="' + (x[0] === cur) + '" class="segt' + (x[0] === cur ? " on" : "") + '" href="#' + x[1] + '">' + t(x[2]) + "</a>"; }).join("") + "</div>"; }
+  /* ---------- all goods of all shops: one feed with filters ---------- */
+  var GK = ["q", "cat", "brand", "min", "max", "sale", "sort"];
+  function gqs(o) { return GK.filter(function (k) { return o[k]; }).map(function (k) { return k + "=" + encodeURIComponent(o[k]); }).join("&"); }
+  function gcurQ() { return SF.match(SF.path()).query || {}; }
+  function gapi(q, off) { return "/shops/goods?cityId=" + encodeURIComponent(SF.state.cityId) + (q.q ? "&q=" + encodeURIComponent(q.q) : "") + (q.cat ? "&cat=" + q.cat : "") + (q.brand ? "&brand=" + encodeURIComponent(q.brand) : "") + (q.min ? "&priceMin=" + q.min : "") + (q.max ? "&priceMax=" + q.max : "") + (q.sale ? "&sale=1" : "") + (q.sort ? "&sort=" + q.sort : "") + "&offset=" + off + "&limit=20"; }
+  function goodCard(p) { return '<div class="gwrap">' + SF.prodCard(p) + '<a class="gshop" href="#/r/' + p.restaurant.id + '">' + I("store", 12) + esc(tx(p.restaurant.name)) + "</a></div>"; }
+  SF.route("/shops/goods", { title: "sv.shops", render: function (p, q) {
+    if (!SF.svcOn("shops") && !(SF.state.user && SF.state.user.role === "admin")) { SF.go("/"); return ""; }
+    return api().get(gapi(q, 0)).then(function (r) { SF.rememberProducts(r.list); var cats = (SF.state.shopCats || []).filter(function (c) { return r.cats[c.id]; }), nf = ["min", "max", "sale"].filter(function (k) { return q[k]; }).length;
+      return '<div class="svhead"><a class="svback" href="#/" aria-label="' + t("btn.back") + '">' + I("chevL", 20) + "</a><h1>" + t("sv.shops") + "</h1></div>" + shopTabs("goods") +
+        '<form class="sasearch slim" data-form="gdsearch" role="search">' + I("search", 20) + '<input name="q" value="' + esc(q.q || "") + '" placeholder="' + t("sh.goodsPh") + '" aria-label="' + t("sh.goodsPh") + '" enterkeyhint="search"><button class="sago" aria-label="' + t("btn.find") + '">' + I("chevR", 18) + "</button></form>" +
+        '<div class="adtools"><button type="button" class="btn ghost sm" data-act="gdfilters">' + I("sliders", 16) + t("af.title") + (nf ? ' <i class="num fbadge">' + nf + "</i>" : "") + '</button><label class="adsort"><select data-input="gdsort" aria-label="' + t("af.sort") + '">' + [["", "af.s.rel"], ["new", "af.s.new"], ["cheap", "ps.cheap"], ["dear", "ps.dear"]].map(function (o) { return '<option value="' + o[0] + '"' + ((q.sort || "") === o[0] ? " selected" : "") + ">" + t(o[1]) + "</option>"; }).join("") + "</select></label></div>" +
+        '<div class="chips adchips"><a class="fchip' + (q.cat ? "" : " on") + '" href="#/shops/goods?' + gqs(Object.assign({}, q, { cat: "", brand: "" })) + '">' + t("home.all") + ' <i class="num">' + r.all + "</i></a>" + cats.map(function (c) { return '<a class="fchip' + (q.cat === c.id ? " on" : "") + '" href="#/shops/goods?' + gqs(Object.assign({}, q, { cat: c.id, brand: "" })) + '">' + esc(tx(c.name)) + ' <i class="num">' + r.cats[c.id] + "</i></a>"; }).join("") + "</div>" +
+        (r.brands.length > 1 ? '<div class="chips adchips brandrow"><a class="fchip' + (q.brand ? "" : " on") + '" href="#/shops/goods?' + gqs(Object.assign({}, q, { brand: "" })) + '">' + t("sh.allBrands") + "</a>" + r.brands.map(function (b) { return '<a class="fchip' + (q.brand === b.b ? " on" : "") + '" href="#/shops/goods?' + gqs(Object.assign({}, q, { brand: b.b })) + '">' + esc(b.b) + ' <i class="num">' + b.n + "</i></a>"; }).join("") + "</div>" : "") +
+        '<p class="adtotal num">' + t("sh.goodsFound", { n: r.total }) + "</p>" +
+        (r.list.length ? '<div class="pgrid goodsgrid" id="goodsgrid">' + r.list.map(goodCard).join("") + "</div>" + (r.total > r.list.length ? '<button type="button" class="btn ghost block admore2" data-act="gdmore" data-off="' + r.list.length + '" data-total="' + r.total + '">' + t("af.more") + "</button>" : "")
+          : SF.empty("bag", t("sh.goodsNone"), t("sh.goodsNoneSub"), q.q || q.cat || q.brand || nf ? '<a class="btn ghost" href="#/shops/goods">' + t("af.reset") + "</a>" : "")) +
+        '<a class="adfab" href="#/shops">' + I("store", 18) + t("sh.tabShops") + "</a>";
+    });
+  } });
+  SF.forms.gdsearch = function (fd) { var q = gcurQ(); q.q = fd.q || ""; SF.go("/shops/goods?" + gqs(q)); };
+  SF.inputs.gdsort = function (v) { var q = gcurQ(); q.sort = v; SF.go("/shops/goods?" + gqs(q)); };
+  SF.actions.gdmore = function (el) { var q = gcurQ(), off = +el.dataset.off; return api().get(gapi(q, off)).then(function (r) { SF.rememberProducts(r.list); var box = document.getElementById("goodsgrid"); if (!box) return;
+    box.insertAdjacentHTML("beforeend", r.list.map(goodCard).join("")); off += r.list.length; el.dataset.off = off; if (off >= r.total || !r.list.length) el.remove(); }); };
+  SF.actions.gdfilters = function () { var q = gcurQ();
+    SF.modal('<button class="mx" data-act="closemodal" aria-label="' + t("btn.close") + '">' + I("x", 20) + '</button><form class="stack" data-form="gdfilter"><h2 class="h2">' + t("af.title") + "</h2>" +
+      '<div class="grid2"><label class="f">' + t("af.min") + '<input name="min" inputmode="numeric" value="' + esc(q.min || "") + '" placeholder="0"></label><label class="f">' + t("af.max") + '<input name="max" inputmode="numeric" value="' + esc(q.max || "") + '" placeholder="∞"></label></div>' +
+      '<label class="checkrow"><input type="checkbox" name="sale"' + (q.sale ? " checked" : "") + "><span>" + t("sh.onSale") + '</span></label><div class="row2"><a class="btn ghost" href="#/shops/goods?' + gqs({ q: q.q, cat: q.cat, brand: q.brand }) + '" data-act="closemodal">' + t("af.reset") + '</a><button class="btn primary">' + t("af.apply") + "</button></div></form>"); };
+  SF.forms.gdfilter = function (fd) { var q = gcurQ(); q.min = String(fd.min || "").replace(/\D/g, ""); q.max = String(fd.max || "").replace(/\D/g, ""); q.sale = fd.sale ? "1" : ""; SF.closeModal(); SF.go("/shops/goods?" + gqs(q)); };
   SF.route("/shops", { title: "sv.shops", render: function (p, q) {
     if (!SF.svcOn("shops") && !(SF.state.user && SF.state.user.role === "admin")) { setTimeout(function () { SF.actions.soon({ dataset: { k: "shops" } }); }, 0); SF.go("/"); return ""; }
     return api().get("/restaurants?kind=shop&cityId=" + encodeURIComponent(SF.state.cityId)).then(function (list) { var s = String(q.q || "").toLowerCase();
       var l = list.filter(function (r) { return !s || (tx(r.name) + " " + tx(r.cuisine)).toLowerCase().indexOf(s) >= 0; }), top = l.filter(function (r) { return r.pinned; }), rest = l.filter(function (r) { return !r.pinned; });
       return '<div class="svhead"><a class="svback" href="#/" aria-label="' + t("btn.back") + '">' + I("chevL", 20) + "</a><h1>" + t("sv.shops") + '</h1><span class="muted">' + t("sh.count", { n: list.length }) + "</span></div>" +
-        '<form class="sasearch slim" data-form="shsearch" role="search">' + I("search", 20) + '<input name="q" value="' + esc(q.q || "") + '" placeholder="' + t("sh.searchPh") + '" aria-label="' + t("sh.searchPh") + '"><button class="sago" aria-label="' + t("btn.find") + '">' + I("chevR", 18) + "</button></form>" +
+        shopTabs("shops") + '<form class="sasearch slim" data-form="shsearch" role="search">' + I("search", 20) + '<input name="q" value="' + esc(q.q || "") + '" placeholder="' + t("sh.searchPh") + '" aria-label="' + t("sh.searchPh") + '"><button class="sago" aria-label="' + t("btn.find") + '">' + I("chevR", 18) + "</button></form>" +
         top.map(function (r) { return '<a class="shbig" href="#/r/' + r.id + '"><span class="shcov" style="' + (r.cover ? "background-image:url(" + esc(r.cover) + ")" : "") + '"><em class="shpin">★ ' + t("sh.first") + '</em><em class="shopen ' + (r.isOpenNow ? "on" : "") + '">' + (r.isOpenNow ? t("rc.openTill", { to: r.hours.to }) : t("rest.closedUntil", { from: r.hours.from })) + "</em><b>" + esc(tx(r.name)) + "</b></span>" +
           '<span class="shbody">' + shopLogo(r, "shlogo") + '<span class="grow"><b>' + esc(tx(r.name)) + "</b>" + shopFacts(r) + "</span>" + I("chevR", 18) + "</span></a>"; }).join("") +
         (rest.length ? '<div class="shlist">' + rest.map(function (r) { return '<a class="shrow' + (r.isOpenNow ? "" : " closed") + '" href="#/r/' + r.id + '">' + shopLogo(r, "shlogo sm") + '<span class="grow"><b>' + esc(tx(r.name)) + "</b>" + shopFacts(r) + "</span>" + I("chevR", 18) + "</a>"; }).join("") + "</div>" : "") +

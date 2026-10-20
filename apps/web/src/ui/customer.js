@@ -23,8 +23,8 @@
   }
   function withArt(list, prods) { return list.map(function (r) { var ps = (prods || r.products || []).filter(function (p) { return p.restaurantId === r.id; });
     var ks = ps.filter(function (p) { return p.popular; }).concat(ps).map(function (p) { return p.kind; }); r.art1 = ks[0]; r.art2 = ks.filter(function (k) { return k !== ks[0]; })[0] || ks[1]; return r; }); }
-  /* 👍 92% once at least three people rated the dish */
-  function likeChip(p) { var n = (p.likes || 0) + (p.dislikes || 0); return n >= 3 ? ' <span class="likec">👍 ' + Math.round((p.likes || 0) / n * 100) + "%</span>" : ""; }
+  /* like 92% once at least three people rated the dish */
+  function likeChip(p) { var n = (p.likes || 0) + (p.dislikes || 0); return n >= 3 ? ' <span class="likec">' + I("thumbup", 12) + " " + Math.round((p.likes || 0) / n * 100) + "%</span>" : ""; }
   SF.likeChip = likeChip;
   function prodCard(p, compact) {
     var q = SF.cart.qty(p.id), off = SF.sale(p);
@@ -33,6 +33,7 @@
       '<div class="pbody">' + (p.brand ? '<small class="pbrand">' + esc(p.brand) + "</small>" : "") + '<b class="pname">' + esc(tx(p.name)) + likeChip(p) + "</b>" + (p.stock != null && p.available && p.stock <= 5 ? '<span class="stockl">' + t("sh.left", { n: p.stock }) + "</span>" : "") + (compact && p.restaurant ? '<span class="pdesc">' + esc(tx(p.restaurant.name)) + "</span>" : '<span class="pdesc">' + esc(tx(p.desc)) + "</span>") +
       '<div class="prow"><span class="price num">' + money(p.price) + (off ? "<s>" + money(p.oldPrice) + "</s>" : "") + (p.weight ? '<small>' + esc(p.weight) + "</small>" : "") + "</span>" + (p.available ? stepper(p, q) : '<span class="pill p-mut">' + t("prod.soldout") + "</span>") + "</div></div></div>";
   }
+  SF.prodCard = prodCard; SF.rememberProducts = remember;
   SF.actions.brandf = function (el) { SF.state.brandF = { r: el.dataset.r, b: el.dataset.v }; SF.render({ quiet: true }); };
   SF.actions.fav = function (el) { var u = SF.state.user; if (!u || u.role !== "customer") { SF.toast(t("fav.login"), "info"); SF.state.after = SF.path(); SF.go("/login"); return; }
     var on = !isFav(el.dataset.t, el.dataset.id); el.classList.toggle("on", on); el.setAttribute("aria-pressed", on);
@@ -270,26 +271,29 @@
       (ph ? '<p class="phask">' + t("ph.ask") + '</p><button type="button" class="btn ok block" data-act="call" data-name="' + esc(SF.brand() + " · " + t("ph.admin")) + '" data-phone="' + esc(ph) + '" data-sub="' + esc(t("ph.callSub")) + '">' + I("phone", 18) + t("ph.call") + " · " + esc(SF.phone(ph)) + "</button>" : "") +
       (rp ? '<button type="button" class="btn ghost block" data-act="call" data-name="' + esc(tx(o.restaurant.name)) + '" data-phone="' + esc(rp) + '" data-sub="' + esc(t("ph.callSub")) + '">' + I("store", 16) + t("ph.callRest") + "</button>" : "") + "</section>"; };
   /* transfer to the restaurant's card: number to copy, exact amount, receipt photo (required) */
+  function acctCards(r) { var pc = r.payCard; return (r.payAccounts && r.payAccounts.length ? r.payAccounts : [pc]).map(function (x, i) { var ph = x.kind === "phone", shown = ph ? SF.phone(x.number) : String(x.number).replace(/(\d{4})(?=\d)/g, "$1 "), raw = ph ? String(x.number).replace(/[^+\d]/g, "") : x.number;
+        return '<div class="tcard"><small>' + I(ph ? "phone" : "card", 13) + " " + t(ph ? "pa.phone" : "tr.card") + (x.bank ? " · " + esc(x.bank) : "") + '</small><code class="num"' + (i ? "" : ' id="callnum"') + ">" + esc(shown) + "</code>" + (x.holder ? "<span>" + esc(x.holder) + "</span>" : "") +
+          '<button type="button" class="btn sm ghost" data-act="copynum" data-v="' + esc(raw) + '">' + I("copy", 14) + t("cour.copy") + "</button></div>"; }).join(""); }
   function transferBox(r, qt) {
     var x = co(), pc = r.payCard, num = pc.number.replace(/(\d{4})(?=\d)/g, "$1 ");
     return '<div class="transfer"><ol class="tsteps"><li>' + t("tr.s1") + "</li><li>" + t("tr.s2") + "</li><li>" + t("tr.s3") + "</li></ol>" +
       /* every card / wallet number of the restaurant, each with its bank, to copy */
-      (r.payAccounts && r.payAccounts.length ? r.payAccounts : [pc]).map(function (x, i) { var ph = x.kind === "phone", shown = ph ? SF.phone(x.number) : String(x.number).replace(/(\d{4})(?=\d)/g, "$1 "), raw = ph ? String(x.number).replace(/[^+\d]/g, "") : x.number;
-        return '<div class="tcard"><small>' + I(ph ? "phone" : "card", 13) + " " + t(ph ? "pa.phone" : "tr.card") + (x.bank ? " · " + esc(x.bank) : "") + '</small><code class="num"' + (i ? "" : ' id="callnum"') + ">" + esc(shown) + "</code>" + (x.holder ? "<span>" + esc(x.holder) + "</span>" : "") +
-          '<button type="button" class="btn sm ghost" data-act="copynum" data-v="' + esc(raw) + '">' + I("copy", 14) + t("cour.copy") + "</button></div>"; }).join("") +
+      acctCards(r) +
       '<div class="tsum"><span>' + t("tr.amount") + '</span><b class="num">' + (qt.deliveryFee != null ? money(qt.total) : t("co.pinFirst")) + "</b></div>" +
-      '<label class="upload' + (x.receipt ? " done" : "") + '">' + (x.receipt ? '<img src="' + x.receipt + '" alt="' + t("tr.receipt") + '"><span>' + I("check", 16) + t("tr.uploaded") + "</span><small>" + t("tr.change") + "</small>" : I("receipt", 22) + "<b>" + t("tr.upload") + "</b><small>" + t("tr.uploadSub") + "</small>") +
+      '<label class="upload' + (x.receipt ? " done" : "") + '">' + (x.receipt ? '<img src="' + x.receipt + '" alt="' + t("tr.receipt") + '"><span>' + I("check", 16) + t("tr.uploaded") + "</span><small>" + t("tr.change") + "</small>" : I("receipt", 22) + "<b>" + t("tr.upload") + "</b><small>" + t("tr.uploadSub2") + "</small>") +
       '<input type="file" accept="image/*" data-input="receipt" id="receipt-file"></label>' + SF.payHelp({ restaurant: r }) + '</div>';
   }
   /* shrink the photo before upload: long side 1200 px, JPEG */
-  SF.inputs.receipt = function (v, el) {
+  function shrinkReceipt(el, done) {
     var f = el.files && el.files[0]; if (!f) return; if (!/^image\//.test(f.type)) { SF.toast(t("tr.notImage"), "err"); return; }
     var rd = new FileReader(); rd.onload = function () { var img = new Image(); img.onload = function () {
       var k = Math.min(1, 1200 / Math.max(img.width, img.height)), cv = document.createElement("canvas"); cv.width = Math.round(img.width * k); cv.height = Math.round(img.height * k);
       var g = cv.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, cv.width, cv.height); g.drawImage(img, 0, 0, cv.width, cv.height);
-      co().receipt = cv.toDataURL("image/jpeg", 0.75); SF.render({ quiet: true }); };
+      done(cv.toDataURL("image/jpeg", 0.75)); };
       img.onerror = function () { SF.toast(t("tr.notImage"), "err"); }; img.src = rd.result; }; rd.readAsDataURL(f);
-  };
+  }
+  SF.inputs.receipt = function (v, el) { shrinkReceipt(el, function (d) { co().receipt = d; SF.render({ quiet: true }); }); };
+  SF.inputs.payrc = function (v, el) { shrinkReceipt(el, function (d) { SF.state.payRc = SF.state.payRc || {}; SF.state.payRc[el.dataset.id] = d; SF.render({ quiet: true }); }); };
   SF.route("/checkout", { roles: ["customer"], title: "co.title", render: function () {
     var c = SF.cart.get(), x = co(); if (!SF.cart.count()) { SF.go("/cart"); return ""; }
     return api().get("/restaurants/" + c.restaurantId).then(function (r) {
@@ -360,7 +364,6 @@
     if (!pick && x.lat == null) { SF.toast(t("e.ADDRESS_PIN_REQUIRED"), "err"); return; }
     if (!pick && !inZone(x, x.cityId)) { var z = zoneOf(x.cityId); if (z.poly) { SF.toast(t("e.OUT_OF_AREA"), "err"); return; } SF.toast(t("e.OUT_OF_ZONE", { km: Math.round(SF.geo.km(z, x) * 10) / 10, max: z.km }), "err"); return; }
     if (!x.pay) { SF.toast(t("e.PAY_METHOD_OFF"), "err"); return; }
-    if (x.pay === "transfer" && !x.receipt) { SF.toast(t("e.RECEIPT_REQUIRED"), "err"); var up = document.querySelector(".upload"); if (up) { up.scrollIntoView({ block: "center" }); up.classList.remove("shake"); void up.offsetWidth; up.classList.add("shake"); } return; }
     var body = { restaurantId: c.restaurantId, items: Object.keys(c.items).map(function (k) { return { productId: k, qty: c.items[k] }; }), address: pick ? {} : { text: x.text, landmark: x.landmark, lat: x.lat, lng: x.lng }, pickup: pick || undefined,
       name: String(x.name || "").trim(), phone: x.phone, comment: x.comment, paymentMethod: x.pay, receipt: x.pay === "transfer" ? x.receipt : undefined, promoCode: SF.state.promo ? SF.state.promo.code : null };
     SF.state.placing = true; document.querySelectorAll("[data-act=placeorder]").forEach(function (b) { b.disabled = true; });
@@ -373,6 +376,7 @@
   SF.route("/pay/:id", { roles: ["customer"], title: "pay.title", render: function (p) {
     return api().get("/orders/" + p.id).then(function (o) {
       if (o.status !== "awaiting_payment") { SF.go("/o/" + o.id); return ""; }
+      if (o.payment.method === "transfer") return api().get("/restaurants/" + o.restaurantId).then(function (r) { return payTransfer(o, r); });
       var cd = SF.state.card || (SF.state.card = { num: "", exp: "", cvc: "", name: "" });
       return '<div class="paywrap"><h1 class="h2">' + t("pay.title") + '</h1><p class="muted">' + t("pay.sub", { n: o.number, sum: money(o.total) }) + "</p>" +
         '<div class="ccard"><div class="ccchip"></div><span class="ccnum num" id="ccnum">' + esc(fmtCard(cd.num) || "•••• •••• •••• ••••") + '</span><div class="ccrow"><span>' + esc(cd.name || t("pay.holder")) + '</span><span class="num">' + esc(cd.exp || "MM/YY") + '</span></div><span class="ccbrand">' + SF.mark(30) + "</span></div>" +
@@ -382,6 +386,17 @@
         '<button class="btn primary block lg">' + I("shield", 18) + t("pay.payBtn", { sum: money(o.total) }) + '</button><p class="fine">' + t("pay.test") + '</p><button type="button" class="link" data-act="paycancel" data-id="' + o.id + '">' + t("pay.cancel") + "</button></form></div>";
     });
   } });
+  /* «Оплата» for a transfer order: numbers to copy, the exact amount, the receipt photo → the restaurant is told */
+  function payTransfer(o, r) { var rc = (SF.state.payRc || {})[o.id], shop = r.kind === "shop"; SF.state.ctxShop = shop;
+    return '<div class="paywrap"><a class="backlink" href="#/o/' + o.id + '">' + I("chevL", 18) + "№" + o.number + "</a><h1 class=\"h2\">" + t("pay.title") + '</h1><p class="muted">' + esc(tx(r.name)) + '</p>' +
+      '<section class="card stack"><div class="paybig"><small>' + t("tr.amount") + '</small><b class="num">' + money(o.total) + "</b></div><ol class=\"tsteps\"><li>" + t("tr.s1") + "</li><li>" + t("tr.s2") + "</li><li>" + t("tr.s3") + "</li></ol>" + acctCards(r) +
+      '<label class="upload' + (rc ? " done" : "") + '">' + (rc ? '<img src="' + rc + '" alt="' + t("tr.receipt") + '"><span>' + I("check", 16) + t("tr.uploaded") + "</span><small>" + t("tr.change") + "</small>" : I("receipt", 22) + "<b>" + t("tr.upload") + "</b><small>" + t("tr.uploadSub") + "</small>") +
+      '<input type="file" accept="image/*" data-input="payrc" data-id="' + o.id + '"></label>' +
+      '<button type="button" class="btn primary block lg" data-act="paysend" data-id="' + o.id + '"' + (rc ? "" : " disabled") + ">" + I("check", 18) + t("pay.sent") + "</button>" +
+      SF.payHelp({ restaurant: o.restaurant }) +
+      '<button type="button" class="link" data-act="paycancel" data-id="' + o.id + '">' + t("pay.cancel") + "</button></section></div>"; }
+  SF.actions.paysend = function (el) { var rc = (SF.state.payRc || {})[el.dataset.id]; if (!rc) { SF.toast(t("e.RECEIPT_REQUIRED"), "err"); return; }
+    return api().post("/orders/" + el.dataset.id + "/receipt", { receipt: rc }).then(function () { delete SF.state.payRc[el.dataset.id]; SF.toast(t("pay.sentOk")); SF.go("/o/" + el.dataset.id); }); };
   function fmtCard(n) { return String(n || "").replace(/\D/g, "").slice(0, 16).replace(/(\d{4})(?=\d)/g, "$1 "); }
   SF.inputs.card = function (v, el) { var cd = SF.state.card; cd[el.dataset.k] = v; if (el.dataset.k === "num") { var f = fmtCard(v); if (f !== v) el.value = f; var n = document.getElementById("ccnum"); if (n) n.textContent = f || "•••• •••• •••• ••••"; } };
   SF.forms.pay = function (fd, form) { return api().post("/orders/" + form.dataset.id + "/pay", fd).then(function () { SF.state.card = null; SF.toast(t("pay.ok")); SF.go("/o/" + form.dataset.id); }); };
@@ -415,7 +430,7 @@
         (o.payment.method === "transfer" && o.payment.status === "review" ? '<div class="msg info">' + I("receipt", 16) + t("tr.checking") + "</div>" + SF.payHelp(o) : "") +
         (o.status === "rejected" && o.rejectReason ? '<div class="msg err">' + I("info", 16) + esc(o.rejectReason) + "</div>" : "") +
         (fin ? "" : '<ol class="steps">' + steps.map(function (s, i) { var st = i < cur || done ? "done" : i === cur ? "now" : ""; return '<li class="' + st + '"><span>' + I(st === "done" ? "check" : s[1], 16) + "</span><small>" + t(s[0]) + "</small></li>"; }).join("") + "</ol>") +
-        (o.status === "awaiting_payment" ? '<a class="btn primary block" href="#/pay/' + o.id + '">' + t("pay.payBtn", { sum: money(o.total) }) + "</a>" : "") +
+        (o.status === "awaiting_payment" ? '<div class="msg warn">' + I("wallet", 16) + t(o.payment.method === "transfer" ? "pay.waitRc" : "pay.waitCard") + '</div><a class="btn primary block lg paybtn" href="#/pay/' + o.id + '">' + I("wallet", 18) + t("pay.payBtn", { sum: money(o.total) }) + "</a>" : "") +
         (["pending", "awaiting_payment"].indexOf(o.status) >= 0 ? '<button class="btn ghost" data-act="cancelorder" data-id="' + o.id + '">' + t("track.cancel") + "</button>" : "") + "</div></section>";
       var fresh = SF.state.justPlaced === o.id && !fin && !done;
       var conf = fresh ? '<section class="card confirm2"><span class="okmark">' + I("check", 34) + '</span><div class="grow"><h1 class="h2">' + t("ok.title") + '</h1><p class="muted">' + t("ok.sub", { name: esc(tx(r.name)) }) + '</p></div><div class="onum"><small>' + t("ok.number") + '</small><b class="num">№' + o.number + "</b></div></section>" : "";
@@ -459,11 +474,11 @@
     return '<section class="card tline"><h3>' + t("tl.title") + '</h3><ol>' + ev.map(function (e, i) { return '<li class="' + (i === ev.length - 1 ? "last" : "") + '"><span class="num">' + SF.time(e.at) + "</span><b>" + esc(t(e.k, e.p)) + "</b></li>"; }).join("") + "</ol></section>";
   }
   function confetti() { var c = ["#E8590C", "#F7C948", "#1F7A4D", "#1F5FA8", "#fff"], h = '<div class="confetti" aria-hidden="true">'; for (var i = 0; i < 18; i++) h += '<i style="left:' + ((i * 37) % 100) + "%;background:" + c[i % 5] + ";animation-delay:" + ((i % 6) * 0.18).toFixed(2) + "s;animation-duration:" + (1.6 + (i % 4) * 0.3).toFixed(1) + 's"></i>'; return h + "</div>"; }
-  /* the review card, shared with the table page: stars for the food and the courier / waiter, 👍 / 👎 for each dish */
+  /* the review card, shared with the table page: stars for the food and the courier / waiter, like / dislike for each dish */
   SF.reviewForm = function (o, act) { return reviewForm(o, act); };
   function reviewForm(o, act) { var rv = SF.state.rv && SF.state.rv.o === o.id ? SF.state.rv : (SF.state.rv = { o: o.id, rating: 0, courierRating: 0, waiterRating: 0, likes: {}, comment: "" });
     function dishes() { var seen = {}; return '<div class="rvdishes"><p class="lbl">' + t("rv.dishes") + "</p>" + o.items.filter(function (it) { if (seen[it.productId]) return false; seen[it.productId] = 1; return true; }).map(function (it) { var v = rv.likes[it.productId] || 0;
-      return '<div class="rvdish"><span class="grow">' + esc(tx(it.name)) + '</span><button type="button" class="lk' + (v > 0 ? " on" : "") + '" data-act="rvlike" data-id="' + it.productId + '" data-v="1" aria-pressed="' + (v > 0) + '" aria-label="' + t("rv.like") + '">👍</button><button type="button" class="lk dn' + (v < 0 ? " on" : "") + '" data-act="rvlike" data-id="' + it.productId + '" data-v="-1" aria-pressed="' + (v < 0) + '" aria-label="' + t("rv.dislike") + '">👎</button></div>'; }).join("") + "</div>"; }
+      return '<div class="rvdish"><span class="grow">' + esc(tx(it.name)) + '</span><button type="button" class="lk' + (v > 0 ? " on" : "") + '" data-act="rvlike" data-id="' + it.productId + '" data-v="1" aria-pressed="' + (v > 0) + '" aria-label="' + t("rv.like") + '">' + I("thumbup", 20) + '</button><button type="button" class="lk dn' + (v < 0 ? " on" : "") + '" data-act="rvlike" data-id="' + it.productId + '" data-v="-1" aria-pressed="' + (v < 0) + '" aria-label="' + t("rv.dislike") + '">' + I("thumbdown", 20) + '</button></div>'; }).join("") + "</div>"; }
     function row(k, label) { return '<div class="rvrow"><span>' + label + '</span><div class="starbtns" role="radiogroup" aria-label="' + esc(label) + '">' + [1, 2, 3, 4, 5].map(function (n) { return '<button type="button" role="radio" aria-checked="' + (rv[k] === n) + '" class="' + (rv[k] >= n ? "on" : "") + '" data-act="star" data-k="' + k + '" data-v="' + n + '" aria-label="' + n + '">' + I("star", 26) + "</button>"; }).join("") + "</div></div>"; }
     return '<section class="card review"><h3>' + t("rv.title") + "</h3>" + row("rating", t("rv.food")) + (o.courier ? row("courierRating", t("rv.courier")) : "") + (o.waiter ? row("waiterRating", t("rv.waiter", { name: esc(o.waiter.name) })) : "") + dishes() +
       '<label class="f">' + t("rv.comment") + '<input data-input="rv" value="' + esc(rv.comment) + '" placeholder="' + t("rv.commentPh") + '"></label><button class="btn primary" data-act="' + (act || "sendreview") + '" data-id="' + o.id + '">' + t("rv.send") + "</button></section>"; }
@@ -481,7 +496,7 @@
       var act = list.filter(function (o) { return SomonRules.ACTIVE.indexOf(o.status) >= 0; }), past = list.filter(function (o) { return act.indexOf(o) < 0; });
       return '<h1 class="h2 pt">' + t("nav.orders") + "</h1>" + (!list.length ? SF.empty(SF.art("plov", 100), t("orders.none"), t("orders.noneSub"), '<a class="btn primary" href="#/food">' + t("cart.browse") + "</a>") : "") +
         (act.length ? '<div class="sect"><h2>' + t("orders.active") + '</h2></div><div class="olist">' + act.map(function (o) { var pr = { awaiting_payment: 5, pending: 15, cooking: 45, ready: 65, picked_up: 85 }[o.status];
-          return '<a class="ocard live" href="#/o/' + o.id + '"><span class="cim" style="--tone:' + esc(o.restaurant.tone) + '">' + SF.pic(o.items[0], 52) + '</span><div class="grow"><div class="rrow"><b>' + esc(tx(o.restaurant.name)) + "</b>" + SF.statusPill(o.status) + '</div><span class="muted num">№' + o.number + " · " + money(o.total) + '</span><span class="bar"><i style="width:' + pr + '%"></i></span></div>' + I("chevR", 18) + "</a>"; }).join("") + "</div>" : "") +
+          return '<a class="ocard live" href="#/o/' + o.id + '"><span class="cim" style="--tone:' + esc(o.restaurant.tone) + '">' + SF.pic(o.items[0], 52) + '</span><div class="grow"><div class="rrow"><b>' + esc(tx(o.restaurant.name)) + "</b>" + SF.statusPill(o.status) + '</div><span class="muted num">№' + o.number + " · " + money(o.total) + '</span>' + (o.status === "awaiting_payment" ? '<span class="paychip">' + I("wallet", 13) + t("pay.payNow") + "</span>" : '<span class="bar"><i style="width:' + pr + '%"></i></span>') + '</div>' + I("chevR", 18) + "</a>"; }).join("") + "</div>" : "") +
         (past.length ? '<div class="sect"><h2>' + t("orders.history") + '</h2></div><div class="olist">' + past.map(function (o) {
           return '<div class="ocard past"><a class="ohit" href="#/o/' + o.id + '" aria-label="№' + o.number + '"></a><span class="cim" style="--tone:' + esc(o.restaurant.tone) + '">' + SF.pic(o.items[0], 44) + '</span><div class="grow"><b class="oname">' + esc(tx(o.restaurant.name)) + '</b><span class="muted num">' + SF.dt(o.createdAt) + '</span><span class="ometa">' + SF.statusPill(o.status) + (o.review ? SF.stars(o.review.rating) : "") + "</span></div>" +
             '<div class="oside"><b class="num">' + money(o.total) + "</b>" + (o.status === "delivered" ? '<button class="btn sm ghost" data-act="reorder" data-id="' + o.id + '">' + I("route", 14) + t("orders.repeat") + "</button>" : "") + "</div></div>"; }).join("") + "</div>" : "");

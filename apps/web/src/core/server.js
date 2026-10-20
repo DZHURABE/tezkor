@@ -158,6 +158,7 @@
     function tick() { var t = clock(), ms = handoffMs(), changed = false;
       db.orders.forEach(function (o) { if (o.delivery === "mixed" && !o.handedOff && !o.courierId && !o.selfDelivery && (o.status === "cooking" || o.status === "ready") && o.cookingAt && t - o.cookingAt >= ms) {
         o.handedOff = true; changed = true; var r = find(db.restaurants, o.restaurantId); notify("couriers:" + o.cityId, "n.courierNew", { n: o.number, rest: r.name, km: o.km }, o.id); } });
+      db.orders.forEach(function (o) { if (o.status === "awaiting_payment" && o.payment && o.payment.method === "transfer" && t - o.createdAt > 2 * 3600000) { setStatus(o, "cancelled", null); o.cancelReason = "unpaid"; changed = true; } });
       if (changed) save();
       if (!db.meta.lastCleanup || t - db.meta.lastCleanup.at > DAY) cleanup(); }
 
@@ -366,6 +367,19 @@
     });
     route("GET", "/restaurants/:id", null, function (req, b, q, p) { var r = find(db.restaurants, p.id); if (!r || !live(r)) E(404, "NOT_FOUND");
       return Object.assign(pubRest(r), { products: by(db.products, "restaurantId", r.id) }); });
+    /* every good of every shop in one feed: search, category, brand, price range, in stock, sort, pages */
+    route("GET", "/shops/goods", null, function (req, b, q) { needSvc("shops", req); var s = str(q.q, 60).toLowerCase(), sm = {};
+      db.restaurants.filter(function (r) { return isShop(r) && live(r) && (!q.cityId || r.cityId === q.cityId); }).forEach(function (r) { sm[r.id] = r; });
+      var base = db.products.filter(function (p) { return sm[p.restaurantId] && (p.available || q.all) && (!s || (JSON.stringify(p.name) + " " + (p.brand || "") + " " + JSON.stringify(p.desc || "")).toLowerCase().indexOf(s) >= 0); });
+      var cats = {}, brands = {}; base.forEach(function (p) { cats[p.categoryId] = (cats[p.categoryId] || 0) + 1; });
+      var pmin = q.priceMin != null && q.priceMin !== "" ? Number(q.priceMin) : null, pmax = q.priceMax != null && q.priceMax !== "" ? Number(q.priceMax) : null;
+      var inCat = base.filter(function (p) { return !q.cat || p.categoryId === q.cat; }); inCat.forEach(function (p) { if (p.brand) brands[p.brand] = (brands[p.brand] || 0) + 1; });
+      var l = inCat.filter(function (p) { return (!q.brand || p.brand === q.brand) && (pmin == null || p.price >= pmin) && (pmax == null || p.price <= pmax) && (!q.sale || p.oldPrice > p.price); });
+      var rank = function (p) { return (sm[p.restaurantId].pinned ? 1e13 : 0) + (p.popular ? 5e12 : 0) + (p.createdAt || 0); };
+      l.sort(q.sort === "cheap" ? function (x, y) { return x.price - y.price; } : q.sort === "dear" ? function (x, y) { return y.price - x.price; } : q.sort === "new" ? function (x, y) { return (y.createdAt || 0) - (x.createdAt || 0); } : function (x, y) { return rank(y) - rank(x); });
+      var off = Math.max(0, int(q.offset || 0)), lim = Math.min(48, Math.max(1, int(q.limit || 20)));
+      return { total: l.length, all: base.length, cats: cats, brands: Object.keys(brands).sort(function (a, c) { return brands[c] - brands[a]; }).slice(0, 14).map(function (k) { return { b: k, n: brands[k] }; }),
+        list: l.slice(off, off + lim).map(function (p) { var r = sm[p.restaurantId]; return Object.assign({}, p, { restaurant: { id: r.id, name: r.name, tone: r.tone, pinned: !!r.pinned, cityId: r.cityId } }); }) }; });
     route("GET", "/products/popular", null, function (req, b, q) { var ids = db.restaurants.filter(function (r) { return orderable(r) && !isShop(r) && (!q.cityId || r.cityId === q.cityId); }).map(function (r) { return r.id; });
       /* «Popular»: what people like (👍) and buy most, plus the dishes a restaurant marks as hits */
       var score = function (p) { return (p.likes || 0) * 3 - (p.dislikes || 0) * 2 + Math.min(p.sold || 0, 200) * 0.5 + (p.popular ? 4 : 0); };
@@ -399,25 +413,26 @@
       var phone = Rules.normPhone(b.phone || req.user.phone); if (!phone) E(400, "BAD_PHONE");
       var method = ["card", "cash", "transfer"].indexOf(b.paymentMethod) >= 0 ? b.paymentMethod : "cash", t = clock();
       if (!payOn(method)) E(400, method === "card" ? "CARD_DISABLED" : "PAY_METHOD_OFF");
-      var receiptId = null;
+      var receiptId = null, later = false;
       if (method === "transfer") {
         if (!q.restaurant.payCard || !q.restaurant.payCard.number) E(409, "NO_PAY_CARD");
-        var rc = String(b.receipt || "");
-        if (!/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+\/=]+$/.test(rc)) E(400, "RECEIPT_REQUIRED");
+        var rc = String(b.receipt || ""); later = !rc;      /* no receipt yet: the order waits and the customer pays from the order page */
+        if (!later && !/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+\/=]+$/.test(rc)) E(400, "RECEIPT_REQUIRED");
         if (rc.length > 3500000) E(413, "RECEIPT_TOO_BIG");
       }
       db.meta.seq++; var o = { id: "o" + db.meta.seq, number: db.meta.seq, customerId: req.user.id, restaurantId: q.restaurant.id, courierId: null, cityId: q.restaurant.cityId,
         items: q.items, subtotal: q.subtotal, deliveryFee: q.deliveryFee, discount: q.discount, total: q.total, km: q.km, promoCode: q.promo ? q.promo.code : null,
         address: pick ? { text: q.restaurant.address ? (q.restaurant.address.tg || "") : "", landmark: "", lat: q.restaurant.lat, lng: q.restaurant.lng } : { text: str(a.text, 120), landmark: str(a.landmark, 120), lat: a.lat, lng: a.lng }, phone: phone, comment: str(b.comment, 200),
         pickup: pick || undefined, selfDelivery: pick ? { pickup: true, name: "" } : undefined,
-        payment: { method: method, status: method === "card" ? "pending" : method === "transfer" ? "review" : "none", provider: method === "card" ? (b.provider || "mock") : method },
+        payment: { method: method, status: method === "card" ? "pending" : method === "transfer" ? (later ? "waiting" : "review") : "none", provider: method === "card" ? (b.provider || "mock") : method },
         delivery: q.restaurant.delivery || "platform", sig: sig,
-        status: method === "card" ? "awaiting_payment" : "pending", prepMin: null, createdAt: t, updatedAt: t, history: [{ status: method === "card" ? "awaiting_payment" : "pending", at: t, by: req.user.id }] };
-      if (method === "transfer") { receiptId = "rc" + o.number; files.put(receiptId, String(b.receipt)); o.payment.receiptId = receiptId; o.payment.toCard = q.restaurant.payCard.number.slice(-4); }
+        status: method === "card" || later ? "awaiting_payment" : "pending", prepMin: null, createdAt: t, updatedAt: t, history: [{ status: method === "card" || later ? "awaiting_payment" : "pending", at: t, by: req.user.id }] };
+      if (method === "transfer") { if (!later) { receiptId = "rc" + o.number; files.put(receiptId, String(b.receipt)); o.payment.receiptId = receiptId; } o.payment.toCard = q.restaurant.payCard.number.slice(-4); }
       db.orders.unshift(o); if (q.promo) q.promo.uses++;
       /* goods with a counted stock: take them off the shelf (given back if the order is cancelled) */
       o.items.forEach(function (it) { var pr = find(db.products, it.productId); if (pr && pr.stock != null) { pr.stock = Math.max(0, pr.stock - it.qty); if (!pr.stock) pr.available = false; o.stockTaken = true; } });
       if (method === "card") db.payments.unshift({ id: "pay" + o.number, orderId: o.id, amount: o.total, method: "card", provider: o.payment.provider, status: "pending", createdAt: t });
+      else if (later) { /* the restaurant hears about it when the receipt arrives */ }
       else notify("rest:" + o.restaurantId, "n.newOrder", { n: o.number, sum: o.subtotal }, o.id);
       var u = req.user; u.addresses = u.addresses || []; if (!pick && !u.addresses.some(function (x) { return x.text === o.address.text; })) { u.addresses.unshift(o.address); u.addresses.length = Math.min(u.addresses.length, 5); }
       save(); return pubOrder(o, req.user);
@@ -431,6 +446,12 @@
       o.payment.status = "paid"; o.payment.last4 = num.slice(-4); db.payments.forEach(function (x) { if (x.orderId === o.id) { x.status = "paid"; x.last4 = num.slice(-4); } });
       setStatus(o, "pending", null); save(); return pubOrder(o, req.user);
     });
+    /* «Оплата» on the order: the customer sends the receipt of the transfer; only now the restaurant sees the order */
+    route("POST", "/orders/:id/receipt", ["customer"], function (req, b, q, p) { var o = orderFor(req, p.id);
+      if (o.payment.method !== "transfer" || o.status !== "awaiting_payment") E(409, "NOT_AWAITING_PAYMENT");
+      var rc = String(b.receipt || ""); if (!/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+\/=]+$/.test(rc)) E(400, "RECEIPT_REQUIRED"); if (rc.length > 3500000) E(413, "RECEIPT_TOO_BIG");
+      var rid = "rc" + o.number; files.put(rid, rc); o.payment.receiptId = rid; o.payment.status = "review"; o.payment.sentAt = clock();
+      setStatus(o, "pending", null); save(); return pubOrder(o, req.user); });
     /* the Node API reads the receipt bytes from its storage after this check */
     route("GET", "/orders/:id/receipt-ref", "*", function (req, b, q, p) { var o = orderFor(req, p.id); if (req.user.role === "courier") E(403, "FORBIDDEN"); if (!o.payment.receiptId) E(404, "NOT_FOUND"); return { receiptId: o.payment.receiptId }; });
     route("GET", "/orders/:id/receipt", "*", function (req, b, q, p) { var o = orderFor(req, p.id); if (req.user.role === "courier") E(403, "FORBIDDEN");
@@ -837,6 +858,27 @@
         r.paidUntil = clock() + td * DAY; r.trial = td > 0;
         db.subs.unshift({ id: id("s"), restaurantId: rid, kind: "trial", months: 0, days: td, amount: 0, note: "", from: clock(), until: r.paidUntil, at: clock(), by: req.user.id }); }
       db.users.push(owner); db.restaurants.push(r); save(); return Object.assign(pubRest(r), { login: { phone: phone, password: tmp } }); });
+    /* delete a place for good: its goods, tables, staff, own couriers, orders, receipts, access history — nothing is left behind */
+    function wipeRestaurant(r) { var oids = {}, n = { orders: 0, products: 0, people: 0 };
+      db.orders = db.orders.filter(function (o) { if (o.restaurantId !== r.id) return true; oids[o.id] = 1; n.orders++; if (o.payment && o.payment.receiptId) { try { if (files.del) files.del(o.payment.receiptId); } catch (e) {} } return false; });
+      db.payments = (db.payments || []).filter(function (x) { return !oids[x.orderId]; });
+      db.notifications = db.notifications.filter(function (x) { return !oids[x.orderId] && x.target !== "rest:" + r.id && x.target !== "own:" + r.id; });
+      var pids = {}; db.products = db.products.filter(function (p) { if (p.restaurantId !== r.id) return true; pids[p.id] = 1; n.products++; if (p.photo) { try { media.del(p.photo); } catch (e) {} } return false; });
+      var gone = {}; db.users = db.users.filter(function (u) { if (u.restaurantId === r.id || (u.courier && u.courier.restaurantId === r.id)) { gone[u.id] = 1; n.people++; return false; } return true; });
+      Object.keys(db.sessions).forEach(function (k) { if (gone[db.sessions[k].userId]) delete db.sessions[k]; });
+      db.users.forEach(function (u) { if (u.favs) Object.keys(u.favs).forEach(function (k) { if (Array.isArray(u.favs[k])) u.favs[k] = u.favs[k].filter(function (x) { return x !== r.id && !pids[x]; }); }); });
+      db.subs = (db.subs || []).filter(function (s) { return s.restaurantId !== r.id; }); db.banners = (db.banners || []).filter(function (x) { return x.restaurantId !== r.id; }); db.promos = (db.promos || []).filter(function (x) { return x.restaurantId !== r.id; });
+      [r.logo, r.cover].forEach(function (u) { if (u) { try { media.del(u); } catch (e) {} } }); db.restaurants = db.restaurants.filter(function (x) { return x !== r; }); return n; }
+    route("POST", "/admin/restaurants/:id/delete", ["admin"], function (req, b, q, p) { mainOnly(req); var r = find(db.restaurants, p.id); if (!r) E(404, "NOT_FOUND"); if (b.confirm !== true) E(400, "CONFIRM_REQUIRED");
+      var n = wipeRestaurant(r); save(); return n; });
+    /* empty a whole service: every restaurant (food) / every shop / every listing of a listing service — main admin, after a confirm */
+    function svcCount(k) { if (k === "food") return db.restaurants.filter(function (r) { return r.kind !== "shop"; }).length; if (k === "shops") return db.restaurants.filter(function (r) { return r.kind === "shop"; }).length; return LIST_SVC[k] ? adList().filter(function (a) { return svcOfAd(a) === k; }).length : 0; }
+    route("POST", "/admin/services/:key/clear", ["admin"], function (req, b, q, p) { mainOnly(req); var k = p.key; if (!SERVICES.some(function (s) { return s[0] === k; })) E(404, "NOT_FOUND"); if (b.confirm !== true) E(400, "CONFIRM_REQUIRED");
+      var n = { items: 0, orders: 0, products: 0, people: 0 };
+      if (k === "food" || k === "shops") { db.restaurants.filter(function (r) { return (r.kind === "shop") === (k === "shops"); }).forEach(function (r) { var x = wipeRestaurant(r); n.items++; n.orders += x.orders; n.products += x.products; n.people += x.people; }); }
+      else if (LIST_SVC[k]) { var del = adList().filter(function (a) { return svcOfAd(a) === k; }), ids = {}; del.forEach(function (a) { ids[a.id] = 1; (a.photos || []).forEach(function (u) { try { media.del(u); } catch (e) {} }); }); n.items = del.length;
+        db.ads = adList().filter(function (a) { return !ids[a.id]; }); db.adPays = adPays().filter(function (x) { return !ids[x.adId]; }); }
+      save(); return n; });
     route("POST", "/admin/restaurants/:id/template", ["admin"], function (req, b, q, p) { var r = find(db.restaurants, p.id); if (!r) E(404, "NOT_FOUND"); return fillMenu(r, str(b.key) || "tj-uz"); });
     route("PATCH", "/admin/restaurants/:id", ["admin"], function (req, b, q, p) { var r = find(db.restaurants, p.id); if (!r) E(404, "NOT_FOUND");
       if (b.delivery != null) { if (["platform", "own", "mixed"].indexOf(b.delivery) < 0) E(400, "BAD_DELIVERY"); r.delivery = b.delivery; }
@@ -987,7 +1029,7 @@
     function svcMap() { var s = db.settings.services || {}, o = {}; SERVICES.forEach(function (x) { o[x[0]] = x[0] === "food" ? s.food !== false : !!(x[1] && s[x[0]]); }); return o; }
     function svcOn(k) { return !!svcMap()[k]; }
     function needSvc(k, req) { if (!svcOn(k) && !(req && req.user && req.user.role === "admin")) E(403, "SERVICE_OFF", { service: k }); }
-    route("GET", "/admin/services", ["admin"], function () { var m = svcMap(), ph = db.settings.svcPhotos || {}; return SERVICES.map(function (x) { return { key: x[0], ready: !!x[1], on: m[x[0]], core: x[0] === "food", photo: ph[x[0]] || null }; }); });
+    route("GET", "/admin/services", ["admin"], function () { var m = svcMap(), ph = db.settings.svcPhotos || {}; return SERVICES.map(function (x) { return { key: x[0], ready: !!x[1], on: m[x[0]], core: x[0] === "food", photo: ph[x[0]] || null, count: svcCount(x[0]) }; }); });
     /* the admin's own photo for a service tile (a real taxi, a real shop…) */
     route("POST", "/admin/services/:key/photo", ["admin"], function (req, b, q, p) { if (!SERVICES.some(function (s) { return s[0] === p.key; })) E(404, "NOT_FOUND");
       var ph = db.settings.svcPhotos = db.settings.svcPhotos || {}; ph[p.key] = photoField(b.photo, ph[p.key] || null, "sv"); if (!ph[p.key]) delete ph[p.key]; save(); return ph; });
@@ -1011,9 +1053,9 @@
     function adList() { return db.ads || (db.ads = []); }
     function adPays() { return db.adPays || (db.adPays = []); }
     function adSweep() { var t = clock(), ch = false; adList().forEach(function (a) { if (a.status === "active" && a.until && a.until < t) { a.status = "archived"; a.archivedAt = t; ch = true; } }); if (ch) save(); }
-    function adRank(a) { var t = clock(); return (a.vipUntil > t ? 2e13 : 0) + Math.max(a.bumpAt && a.topUntil > t ? a.bumpAt : 0, a.publishedAt || a.createdAt); }
+    function adRank(a) { var t = clock(); return (a.vipUntil > t ? 2e13 : 0) + Math.max(a.bumpAt && a.topUntil > t ? a.bumpAt : 0, a.bumpedAt || 0, a.publishedAt || a.createdAt); }
     function pubAd(a, viewer) { var c = cityOf(a.cityId), u = find(db.users, a.userId), t = clock(), own = viewer && (viewer.id === a.userId || viewer.role === "admin");
-      var o = { id: a.id, svc: svcOfAd(a), cat: a.cat, title: a.title, desc: a.desc, price: a.price, cityId: a.cityId, city: c ? c.name : null, phone: a.phone, photos: a.photos || [], status: a.status, views: a.views || 0,
+      var o = { id: a.id, svc: svcOfAd(a), cat: a.cat, title: a.title, desc: a.desc, price: a.price, cityId: a.cityId, city: c ? c.name : null, phone: a.phone, photos: a.photos || [], status: a.status, views: a.views || 0, cond: a.cond || null, sold: !!a.sold, bumpedAt: a.bumpedAt || null, userKey: a.userId ? a.userId.slice(-6) : null,
         createdAt: a.createdAt, publishedAt: a.publishedAt || null, until: a.until || null, seller: u ? u.name : "", vip: a.vipUntil > t, color: a.colorUntil > t, top: a.topUntil > t };
       if (own) { o.reason = a.reason || null; o.mine = viewer.id === a.userId; o.updatedAt = a.updatedAt; var pp = adPays().filter(function (x) { return x.adId === a.id && x.status === "awaiting"; }); if (pp.length) o.awaiting = pp.map(function (x) { return { id: x.id, kind: x.kind, amount: x.amount }; });
         if (viewer.role === "admin") { o.userId = a.userId; o.userPhone = u ? u.phone : null; o.feeDue = !!a.feeDue; } }
@@ -1029,6 +1071,7 @@
       if (b.price !== undefined) { var pr = b.price === "" || b.price == null ? null : Number(b.price); if (pr != null && !(pr >= 0 && pr <= 1e8)) E(400, "BAD_PRICE"); a.price = pr == null ? null : Math.round(pr); }
       if (b.cityId !== undefined) { if (!find(db.cities, b.cityId)) E(400, "BAD_CITY"); a.cityId = b.cityId; }
       if (b.phone !== undefined) { var ph = Rules.normPhone(b.phone); if (!ph) E(400, "BAD_PHONE"); a.phone = ph; }
+      if (b.cond !== undefined) { if (["", "new", "used"].indexOf(b.cond || "") < 0) E(400, "BAD_COND"); a.cond = b.cond || null; }
       if (b.photos !== undefined) a.photos = adPhotos(b.photos, a.photos); }
     /* send to the admin (or straight live when the admin switched checking off) */
     function adSubmit(a) { var cfg = adCfg(), t = clock(); a.reason = null;
@@ -1041,6 +1084,43 @@
       l.sort(q.sort === "cheap" ? function (x, y) { return (x.price == null ? 1e9 : x.price) - (y.price == null ? 1e9 : y.price); } : q.sort === "dear" ? function (x, y) { return (y.price || 0) - (x.price || 0); } : function (x, y) { return adRank(y) - adRank(x); });
       return l.slice(0, 200).map(function (a) { return pubAd(a, req.user); }); });
     route("GET", "/ads/my", ["customer"], function (req, b, q) { adSweep(); return adList().filter(function (a) { return a.userId === req.user.id && (!q.svc || svcOfAd(a) === q.svc); }).sort(function (x, y) { return (y.updatedAt || y.createdAt) - (x.updatedAt || x.createdAt); }).map(function (a) { return pubAd(a, req.user); }); });
+    /* browse with filters, price range, sort and pages — and how many listings each category has */
+    route("GET", "/ads/search", null, function (req, b, q) { var sv = listSvc(q.svc); needSvc(sv, req); adSweep(); var s = str(q.q, 60).toLowerCase();
+      var base = adList().filter(function (a) { return a.status === "active" && svcOfAd(a) === sv && (!q.cityId || a.cityId === q.cityId) && (!s || (a.title + " " + a.desc).toLowerCase().indexOf(s) >= 0); });
+      var counts = {}; base.forEach(function (a) { counts[a.cat] = (counts[a.cat] || 0) + 1; });
+      var pmin = q.priceMin != null && q.priceMin !== "" ? Number(q.priceMin) : null, pmax = q.priceMax != null && q.priceMax !== "" ? Number(q.priceMax) : null;
+      var l = base.filter(function (a) { return (!q.cat || a.cat === q.cat) && (!q.cond || a.cond === q.cond) && (!q.photo || (a.photos || []).length) && (pmin == null || (a.price != null && a.price >= pmin)) && (pmax == null || (a.price != null && a.price <= pmax)); });
+      l.sort(q.sort === "cheap" ? function (x, y) { return (x.price == null ? 1e9 : x.price) - (y.price == null ? 1e9 : y.price); } : q.sort === "dear" ? function (x, y) { return (y.price || 0) - (x.price || 0); } : q.sort === "new" ? function (x, y) { return (y.publishedAt || y.createdAt) - (x.publishedAt || x.createdAt); } : function (x, y) { return adRank(y) - adRank(x); });
+      var off = Math.max(0, int(q.offset || 0)), lim = Math.min(50, Math.max(1, int(q.limit || 20)));
+      return { total: l.length, all: base.length, counts: counts, list: l.slice(off, off + lim).map(function (a) { return pubAd(a, req.user); }) }; });
+    route("GET", "/ads/:id/more", null, function (req, b, q, p) { adSweep(); var a = find(adList(), p.id); if (!a || a.status !== "active") E(404, "NOT_FOUND"); var sv = svcOfAd(a);
+      var rk = function (x, y) { return adRank(y) - adRank(x); }, u = find(db.users, a.userId);
+      var mine = adList().filter(function (x) { return x.userId === a.userId && x.id !== a.id && x.status === "active"; });
+      return { seller: mine.filter(function (x) { return svcOfAd(x) === sv; }).sort(rk).slice(0, 8).map(function (x) { return pubAd(x, req.user); }),
+        similar: adList().filter(function (x) { return x.status === "active" && svcOfAd(x) === sv && x.cat === a.cat && x.userId !== a.userId && x.cityId === a.cityId; }).sort(rk).slice(0, 8).map(function (x) { return pubAd(x, req.user); }),
+        sellerInfo: { name: u ? u.name : "", since: u ? u.createdAt : null, active: mine.length + 1, verified: !!(u && u.phoneVerified) } }; });
+    /* lift my listing to the top once a day (free); mark it sold */
+    route("POST", "/ads/:id/bump", ["customer"], function (req, b, q, p) { var a = adOf(req, p.id), t = clock(); if (a.status !== "active") E(409, "BAD_STATUS");
+      if (a.bumpedAt && t - a.bumpedAt < DAY_MS) E(429, "BUMP_WAIT", { hours: Math.ceil((DAY_MS - (t - a.bumpedAt)) / 3600000) }); a.bumpedAt = t; a.updatedAt = t; save(); return pubAd(a, req.user); });
+    route("POST", "/ads/:id/sold", ["customer"], function (req, b, q, p) { var a = adOf(req, p.id); if (a.status !== "active") E(409, "BAD_STATUS"); a.sold = true; a.status = "archived"; a.archivedAt = clock(); a.updatedAt = clock(); save(); return pubAd(a, req.user); });
+    /* «report»: three different people → the listing goes back to the admin's queue; the admin decides */
+    route("POST", "/ads/:id/report", ["customer"], function (req, b, q, p) { var a = find(adList(), p.id); if (!a || a.status !== "active") E(404, "NOT_FOUND"); if (a.userId === req.user.id) E(409, "OWN_AD");
+      var why = ["spam", "fraud", "wrong", "sold", "other"].indexOf(b.reason) >= 0 ? b.reason : "other"; db.complaints = db.complaints || [];
+      if (db.complaints.some(function (x) { return x.adId === a.id && x.userId === req.user.id; })) E(409, "ALREADY_REPORTED");
+      var c = { id: id("cp"), adId: a.id, userId: req.user.id, reason: why, text: str(b.text, 300), status: "new", at: clock() }; db.complaints.unshift(c);
+      var n = db.complaints.filter(function (x) { return x.adId === a.id && x.status === "new"; }).length; notify("admins", "n.adReport", { title: a.title });
+      if (n >= 3) { a.status = "pending"; a.reason = null; a.updatedAt = clock(); }
+      save(); return { ok: true }; });
+    route("GET", "/admin/complaints", ["admin"], function (req, b, q) { var l = (db.complaints || []).filter(function (c) { return !q.status || c.status === q.status; });
+      return { new: (db.complaints || []).filter(function (c) { return c.status === "new"; }).length, list: l.slice(0, 200).map(function (c) { var a = find(adList(), c.adId), u = find(db.users, c.userId), s = a && find(db.users, a.userId);
+        return { id: c.id, adId: c.adId, title: a ? a.title : "—", adStatus: a ? a.status : "deleted", svc: a ? svcOfAd(a) : null, reason: c.reason, text: c.text, status: c.status, at: c.at, from: u ? u.name : "—", fromPhone: u ? u.phone : "", seller: s ? s.name : "", sellerPhone: s ? s.phone : "" }; }) }; });
+    route("POST", "/admin/complaints/:id", ["admin"], function (req, b, q, p) { var c = find(db.complaints || [], p.id); if (!c) E(404, "NOT_FOUND"); var a = find(adList(), c.adId), t = clock();
+      if (b.action === "block") { if (a) { a.status = "blocked"; a.reason = str(b.reason, 300) || "Шикоят тасдиқ шуд"; a.updatedAt = t; notify("u:" + a.userId, "n.adBlocked", { title: a.title, reason: a.reason }); } (db.complaints || []).forEach(function (x) { if (x.adId === c.adId) { x.status = "done"; x.by = req.user.id; x.doneAt = t; } }); }
+      else if (b.action === "dismiss") { (db.complaints || []).forEach(function (x) { if (x.adId === c.adId && x.status === "new") { x.status = "dismissed"; x.by = req.user.id; x.doneAt = t; } }); if (a && a.status === "pending" && !a.feeDue) { a.status = "active"; a.updatedAt = t; } }
+      else E(400, "BAD_ACTION"); save(); return true; });
+    route("POST", "/admin/ads/approve-all", ["admin"], function (req, b) { var t = clock(), cfg = adCfg(), n = 0;
+      adList().forEach(function (a) { if (a.status === "pending" && !a.feeDue && (!b.svc || svcOfAd(a) === b.svc)) { a.status = "active"; a.reason = null; if (!a.publishedAt || a.until == null || a.until < t) { a.publishedAt = t; a.until = t + cfg.days * DAY_MS; } a.checkedBy = req.user.id; a.updatedAt = t; notify("u:" + a.userId, "n.adOk", { title: a.title }); n++; } });
+      save(); return { n: n }; });
     route("GET", "/ads/config", null, function () { var c = adCfg(); return c.paid ? c : { paid: false, days: c.days, moderation: c.moderation }; });
     route("GET", "/ads/:id", null, function (req, b, q, p) { adSweep(); var a = find(adList(), p.id), me = req.user;
       if (!a || (a.status !== "active" && !(me && (me.id === a.userId || me.role === "admin")))) E(404, "NOT_FOUND");
@@ -1048,8 +1128,10 @@
     route("POST", "/ads", ["customer"], function (req, b) { var sv = listSvc(b.svc); needSvc(sv, req); var u = req.user, t = clock();
       if (adList().filter(function (a) { return a.userId === u.id && a.status !== "archived"; }).length >= 50) E(409, "AD_LIMIT");
       if (adList().filter(function (a) { return a.userId === u.id && t - a.createdAt < DAY_MS; }).length >= 10) E(429, "AD_DAY_LIMIT");
+      if (b.cat !== undefined && LIST_SVC[sv].indexOf(b.cat) < 0) E(400, "BAD_AD_CAT");
       var a = { id: id("ad"), svc: sv, userId: u.id, cat: LIST_SVC[sv][LIST_SVC[sv].length - 1], title: "", desc: "", price: null, cityId: u.cityId || db.settings.defaultCityId, phone: u.phone, photos: [], status: "draft", views: 0, createdAt: t, updatedAt: t };
       adFields(a, Object.assign({ cat: b.cat, title: b.title }, b)); if (!a.title) E(400, "BAD_AD_TITLE");
+      var ttl = String(a.title || "").toLowerCase(); if (ttl && adList().some(function (a) { return a.userId === u.id && a.title.toLowerCase() === ttl && ["pending", "active", "draft"].indexOf(a.status) >= 0 && t - a.createdAt < 7 * DAY_MS; })) E(409, "AD_DUP");
       adList().unshift(a); if (!b.draft) adSubmit(a); save(); return pubAd(a, u); });
     route("PATCH", "/ads/:id", ["customer"], function (req, b, q, p) { var a = adOf(req, p.id); if (a.status === "blocked") E(409, "AD_BLOCKED");
       adFields(a, b); a.updatedAt = clock();

@@ -1,9 +1,15 @@
 /* SOMON FOOD — layouts: customer web app, partner dashboards, courier app, auth */
 (function () {
+  /* small drawn flags (emoji flags turn into plain letters on many phones) */
+  SF.flag = function (l) { var F = {
+    tg: '<rect width="24" height="16" fill="#fff"/><rect width="24" height="4.6" fill="#CC0000"/><rect y="11.4" width="24" height="4.6" fill="#006600"/><path d="M9.5 9.6h5l-.6-2.2-1.9 1-1.9-1z" fill="#F8C300"/>',
+    ru: '<rect width="24" height="16" fill="#fff"/><rect y="5.3" width="24" height="5.4" fill="#0039A6"/><rect y="10.7" width="24" height="5.3" fill="#D52B1E"/>',
+    en: '<rect width="24" height="16" fill="#012169"/><path d="M0 0l24 16M24 0L0 16" stroke="#fff" stroke-width="3"/><path d="M0 0l24 16M24 0L0 16" stroke="#C8102E" stroke-width="1.2"/><path d="M12 0v16M0 8h24" stroke="#fff" stroke-width="5"/><path d="M12 0v16M0 8h24" stroke="#C8102E" stroke-width="3"/>' };
+    return '<svg class="flagsvg" width="22" height="15" viewBox="0 0 24 16" aria-hidden="true" style="border-radius:3px;box-shadow:0 0 0 1px rgba(0,0,0,.12)">' + (F[l] || F.tg) + "</svg>"; };
   var t = SF.t, esc = SF.esc, I = SF.icon;
 
   function langSel() {
-    return '<label class="lang"><span class="sr">' + t("profile.lang") + '</span><span class="flag" aria-hidden="true">' + ({ tg: "🇹🇯", ru: "🇷🇺", en: "🇬🇧" }[SF.state.lang] || "🌐") + '</span><select data-input="lang" aria-label="' + t("profile.lang") + '">' +
+    return '<label class="lang"><span class="sr">' + t("profile.lang") + '</span><span class="flag" aria-hidden="true">' + SF.flag(SF.state.lang) + '</span><select data-input="lang" aria-label="' + t("profile.lang") + '">' +
       [["tg", "Тоҷ"], ["ru", "Рус"], ["en", "Eng"]].map(function (l) { return '<option value="' + l[0] + '"' + (SF.state.lang === l[0] ? " selected" : "") + ">" + l[1] + "</option>"; }).join("") + "</select></label>";
   }
   function bell() { if (!SF.state.user) return ""; var n = (SF.state.notes || []).length;
@@ -37,7 +43,7 @@
   SF.panelNav = {
     restaurant: [["/rest", "chart", "rest.dash"], ["/rest/orders", "receipt", "rest.orders"], ["/rest/hall", "map", "hl.nav"], ["/rest/pos", "cash", "pos.nav"], ["/rest/sales", "wallet", "sl.nav"], ["/rest/me", "user", "my.nav"], ["/rest/menu", "grid", "rest.menu"], ["/rest/promo", "gift", "rest.promo"], ["/rest/tables", "grid", "tb.nav"], ["/rest/history", "list", "rest.history"], ["/rest/staff", "users", "sf.nav"], ["/rest/settings", "store", "rest.settings"]],
     admin: [["/admin", "chart", "adm.dash"], ["/admin/orders", "receipt", "adm.orders"], ["/admin/restaurants", "store", "adm.restaurants"], ["/admin/couriers", "scooter", "adm.couriers"], ["/admin/users", "users", "adm.users"],
-      ["/admin/banners", "gift", "adm.banners"], ["/admin/ads", "megaphone", "adm.ads"], ["/admin/promos", "percent", "adm.promos"], ["/admin/cities", "city", "adm.cities"], ["/admin/services", "grid", "adm.services"], ["/admin/settings", "cog", "adm.settings"]]
+      ["/admin/banners", "gift", "adm.banners"], ["/admin/ads", "megaphone", "adm.ads"], ["/admin/complaints", "flag", "adm.complaints"], ["/admin/promos", "percent", "adm.promos"], ["/admin/cities", "city", "adm.cities"], ["/admin/services", "grid", "adm.services"], ["/admin/settings", "cog", "adm.settings"]]
   };
   SF.shells.panel = function (html, r) {
     /* a worker of the restaurant: orders, menu (in stock / out of stock), history. A branch manager sees everything. */

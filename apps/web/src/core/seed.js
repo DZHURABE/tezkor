@@ -169,7 +169,7 @@
     var SH = "r_shop1", sOwner = { id: "u_shop1", role: "restaurant", name: "Соҳиби мағоза", phone: "+992900000111", pass: hash("1234"), active: true, cityId: HOME, restaurantId: SH, createdAt: now, lang: "tg" };
     db.users.push(sOwner); var hc = db.cities.filter(function (c) { return c.id === HOME; })[0];
     db.restaurants.push({ id: SH, kind: "shop", pinned: true, pickup: true, name: L("Мағозаи намуна"), cityId: HOME, ownerId: sOwner.id, cuisine: L("Телефон ва аксессуар"), tone: "#E3ECFF", eta: "30–45", rating: 4.9, ratingCount: 31,
-      hours: { from: "09:00", to: "20:00" }, open: true, active: true, commissionPct: 10, minOrder: 20, lat: hc.lat + 0.002, lng: hc.lng + 0.003, address: L("Бозори марказӣ"), phone: sOwner.phone, createdAt: now, paidUntil: now + 365 * 864e5,
+      hours: { from: "08:00", to: "23:30" }, open: true, active: true, commissionPct: 10, minOrder: 20, lat: hc.lat + 0.002, lng: hc.lng + 0.003, address: L("Бозори марказӣ"), phone: sOwner.phone, createdAt: now, paidUntil: now + 365 * 864e5,
       payCard: { number: "4444555566667777", holder: "NAMUNA", bank: "Алиф Бонк" } });
     [["iPhone 15 128GB", 9450, "s1", "Кафолат 1 сол", 3, DEMO_AD_PH.iph], ["Samsung Galaxy A55 8/256", 4290, "s1", "Ранг: кабуд", 5], ["Redmi Note 13 8/256", 2350, "s1", "Нав, қуттӣ", 7], ["AirPods Pro 2", 2100, "s3", "Асл", 4],
       ["Зарядкаи тез 25W", 180, "s4", "USB-C", 20], ["Кабели USB-C 1 м", 45, "s4", "", 40], ["Ғилофи iPhone 15", 95, "s5", "Силикон", 15], ["Шишаи муҳофизатӣ", 40, "s5", "9H", 50]].forEach(function (x, i) {
