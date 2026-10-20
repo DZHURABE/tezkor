@@ -56,7 +56,7 @@
         var promo = sale ? '<a class="sapromo" href="#/food"><div><b>' + t("sa.saleT", { n: sale }) + "</b><span>" + t("sa.saleSub") + '</span><em class="shgo">' + t("sa.look") + I("chevR", 16) + '</em></div><img src="' + SF.PHOTO.burger + '" alt=""></a>' : "";
         /* 5. popular restaurants */
         var popH = pop.length ? '<section class="sasect"><div class="sect2"><div><h2>' + t("hs.popRest") + '</h2></div><a class="link" href="#/food">' + t("sa.allR") + "</a></div>" + '<div class="hscroll rrowscroll">' + pop.map(SF.restCard).join("") + "</div></section>" : "";
-        return '<div class="sahome">' + head + ban + svc + promo + popH + "</div>";
+        return '<div class="sahome">' + (SF.installBar ? SF.installBar() : "") + head + ban + svc + promo + popH + "</div>";
       });
     });
   } });

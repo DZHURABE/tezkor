@@ -36,6 +36,18 @@
       (apk ? '<a class="btn primary sm apklink" href="/tezkor.apk" download="tezkor.apk">' + I("download", 16) + t("apk.btn") + "</a>"
         : '<button type="button" class="btn primary sm" data-act="install">' + I("plus", 16) + t("pwa.btn") + "</button>") + "</section>";
   };
+  /* a slim bar on the home screen: «put Тезкор on your phone» — one tap; closed for a week when dismissed */
+  SF.installBar = function () {
+    if (inApk || standalone || (!enabled && !apkOn())) return "";
+    if (SF.ls.get("instx", 0) > Date.now()) return "";
+    return '<div class="instbar"><span class="iic">' + SF.mark(34) + '</span><div class="grow"><b>' + t("ib.t") + "</b><small>" + t("ib.s") + '</small></div><button type="button" class="btn primary sm" data-act="' + (apkOn() ? "apkgo" : "install") + '">' + I("download", 15) + t("ib.btn") + '</button><button type="button" class="iconbtn instx" data-act="instx" aria-label="' + t("btn.close") + '">' + I("x", 16) + "</button></div>"; };
+  SF.actions.instx = function (el) { SF.ls.set("instx", Date.now() + 7 * 864e5); var b = el.closest(".instbar"); if (b) b.remove(); };
+  SF.actions.apkgo = function () { var a = document.createElement("a"); a.href = "/tezkor.apk"; a.download = "tezkor.apk"; a.className = "apklink"; document.body.appendChild(a); a.click(); a.remove(); };
+  /* send the app to a friend: system share sheet, or copy the link */
+  SF.actions.shareapp = function () { var u = location.origin + "/", d = { title: SF.brand(), text: t("ib.share"), url: u };
+    if (navigator.share) return navigator.share(d).catch(function () {});
+    var done = function () { SF.toast(t("ib.copied")); };
+    if (navigator.clipboard) return navigator.clipboard.writeText(u).then(done, done); done(); };
   /* after the download starts: how to open an APK that is not from Play Market */
   document.addEventListener("click", function (e) { if (!e.target.closest(".apklink")) return;
     setTimeout(function () { SF.modal('<button class="mx" data-act="closemodal" aria-label="' + t("btn.close") + '">' + I("x", 20) + '</button><div class="stack"><h2 class="h2">' + t("apk.howTitle") + "</h2>" +

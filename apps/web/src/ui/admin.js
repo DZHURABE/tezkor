@@ -145,6 +145,7 @@
         inp("name", t(x.kind === "shop" ? "sh.name" : "adm.restName"), " required") +
         '<div class="grid2"><label class="f">' + t("profile.city") + '<select name="cityId" data-input="nrcity">' + (SF.state.cities || []).map(function (y) { return '<option value="' + y.id + '"' + (y.id === x.cityId ? " selected" : "") + ">" + esc(tx(y.name)) + "</option>"; }).join("") + "</select></label>" + inp("cuisine", t("adm.cuisine"), ' placeholder="' + t("adm.cuisinePh") + '"') + "</div>" +
         inp("address", t("adm.addrL"), ' placeholder="' + t("nr.addrPh") + '"') +
+        '<div class="lbl">' + t("dl.who") + '</div><div class="nrdel">' + [["platform", "scooter"], ["own", "store"], ["mixed", "route"]].map(function (m) { var on = (x.f.delivery || "platform") === m[0]; return '<label class="nrdl' + (on ? " on" : "") + '"><input type="radio" name="delivery" value="' + m[0] + '" data-input="nrf"' + (on ? " checked" : "") + ">" + I(m[1], 20) + "<b>" + t("dl.m." + m[0]) + "</b><small>" + t("dl.desc." + m[0], { n: (SF.state.pub && SF.state.pub.handoffMin) || 7 }) + "</small></label>"; }).join("") + "</div>" +
         '<label class="checkrow"><input type="checkbox" name="pinned"' + (x.f.pinned ? " checked" : "") + "><span>" + t("sh.pinned") + '<small class="muted">' + t("sh.pinnedHint") + "</small></span></label>" +
         '<label class="checkrow"><input type="checkbox" name="pickup"' + (x.f.pickup != null ? (x.f.pickup ? " checked" : "") : x.kind === "shop" ? " checked" : "") + "><span>" + t("sh.pickupSet") + '<small class="muted">' + t("sh.pickupSetSub") + "</small></span></label></section>" +
       '<section class="card stack"><h3><span class="num stepn">2</span>' + t("nr.manager") + '</h3><div class="grid2">' + inp("ownerName", t("nr.mName")) +
@@ -152,7 +153,7 @@
       '<section class="card stack"><h3><span class="num stepn">3</span>' + t("nr.map") + "</h3>" +
         '<div class="seg nrmode" role="group">' + [["pin", "pin", "nr.modePin"], ["zone", "edit", "nr.modeZone"]].map(function (m) { return '<button type="button" class="' + (x.mode === m[0] ? "on" : "") + '" aria-pressed="' + (x.mode === m[0]) + '" data-act="nrmode" data-v="' + m[0] + '">' + I(m[1], 16) + " " + t(m[2]) + "</button>"; }).join("") + "</div>" +
         '<p class="fine">' + t(x.mode === "pin" ? "nr.pinHow" : "nr.zoneHow") + "</p>" +
-        '<div class="zmap">' + SF.tmap({ key: "nrmap", center: x.pin || { lat: c.lat, lng: c.lng }, zoom: 14, free: true, label: t("nr.map"), markers: x.marks, edit: function () { return nr().pts; },
+        SF.mapFind("nrmap") + '<div class="zmap">' + SF.tmap({ key: "nrmap", center: x.pin || { lat: c.lat, lng: c.lng }, zoom: 14, free: true, label: t("nr.map"), markers: x.marks, edit: function () { return nr().pts; },
           onTap: function (pt) { var s = nr(); if (s.mode === "pin") { s.pin = pt; s.marks.length = 0; s.marks.push({ lat: pt.lat, lng: pt.lng, type: "rest", label: "R" }); } else if (s.pts.length < 200) s.pts.push(pt); nrInfo(); } }) + "</div>" +
         '<p class="zcount" id="nrinfo"></p>' +
         (x.mode === "zone" ? '<div class="zbtns"><button type="button" class="btn ghost" data-act="nrundo">' + I("chevL", 16) + t("zn.undo") + '</button><button type="button" class="btn ghost" data-act="nrclear">' + I("trash", 16) + t("zn.clear") + "</button></div>" : "") + "</section>" +
@@ -164,7 +165,14 @@
   function nrInfo() { var s = nr(), el = document.getElementById("nrinfo"); if (!el) return;
     el.innerHTML = (s.pin ? I("check", 14) + " " + t("nr.pinOk") : I("info", 14) + " " + t("nr.pinNo")) + " · " + (s.pts.length >= 3 ? t("zn.ok", { n: s.pts.length }) : s.pts.length ? t("zn.need", { n: s.pts.length }) : t("nr.zoneNo")); }
   SF.after.push(function () { if (document.getElementById("nrinfo")) nrInfo(); });
-  SF.inputs.nrf = function (v, el) { nr().f[el.name] = v; };
+  SF.inputs.nrf = function (v, el) { nr().f[el.name] = v; if (el.name === "delivery") SF.render({ quiet: true }); };
+  /* a found place: the pin goes there; if no town of ours is near, the town is added by itself (the app works town by town) */
+  SF.mapPick = SF.mapPick || {};
+  SF.mapPick.nrmap = function (pt, name) { var s = nr(); s.mode = "pin"; s.pin = pt; s.marks.length = 0; s.marks.push({ lat: pt.lat, lng: pt.lng, type: "rest", label: "R" });
+    var near = (SF.state.cities || []).filter(function (c) { return SF.geo.km(c, pt) <= 40; }).sort(function (a, b) { return SF.geo.km(a, pt) - SF.geo.km(b, pt); })[0];
+    if (near) { if (near.id !== s.cityId) { s.cityId = near.id; SF.toast(t("mf.townIs", { name: tx(near.name) })); SF.render({ quiet: true }); } SF.redrawMap("nrmap"); nrInfo(); return; }
+    var nm = String(name || "").trim(); if (nm.length < 2) { SF.redrawMap("nrmap"); nrInfo(); return; }
+    return api().post("/admin/cities", { name: nm, lat: pt.lat, lng: pt.lng }).then(function (c) { return api().get("/cities").then(function (cs) { SF.state.cities = cs; s.cityId = c.id; s.pts = []; SF.toast(t("mf.townAdded", { name: nm })); SF.render({ quiet: true }); }); }, function (e) { SF.toast(SF.err(e), "err"); }); };
   SF.inputs.nrcity = function (v) { var s = nr(); s.cityId = v; s.pin = null; s.pts = []; var c = (SF.state.cities || []).filter(function (y) { return y.id === v; })[0]; if (c) SF.tmapCenter("nrmap", { lat: c.lat, lng: c.lng }, 14); SF.render({ quiet: true }); };
   SF.actions.nrmode = function (el) { nr().mode = el.dataset.v; SF.render({ quiet: true }); };
   SF.actions.nracc = function (el) { nr().access = el.dataset.v; SF.render({ quiet: true }); };
@@ -174,7 +182,7 @@
   SF.actions.nrkind = function (el) { nr().kind = el.dataset.v; SF.render({ quiet: true }); };
   SF.forms.nrsave = function (fd) { var s = nr(), a = ACCESS.filter(function (x) { return x[0] === s.access; })[0];
     if (s.pts.length && s.pts.length < 3) { SF.toast(t("zn.need", { n: s.pts.length }), "err"); return; }
-    var body = { kind: s.kind || "food", pinned: !!fd.pinned, pickup: !!fd.pickup, name: fd.name, cityId: fd.cityId, cuisine: fd.cuisine, address: fd.address, ownerName: fd.ownerName, ownerPhone: fd.ownerPhone, commissionPct: fd.commissionPct ? Number(fd.commissionPct) : 0,
+    var body = { delivery: s.f.delivery || "platform", kind: s.kind || "food", pinned: !!fd.pinned, pickup: !!fd.pickup, name: fd.name, cityId: fd.cityId, cuisine: fd.cuisine, address: fd.address, ownerName: fd.ownerName, ownerPhone: fd.ownerPhone, commissionPct: fd.commissionPct ? Number(fd.commissionPct) : 0,
       lat: s.pin ? s.pin.lat : null, lng: s.pin ? s.pin.lng : null, zone: s.pts.length >= 3 ? s.pts : [] };
     if (a[2]) { body.months = a[2]; body.amount = Number(fd.amount || 0); } else body.trialDays = a[1];
     return api().post("/admin/restaurants", body).then(function (r) { SF.state.nr = null; SF.go("/admin/restaurants"); setTimeout(function () { creds(tx(r.name), r.login); }, 300); }); };
@@ -237,10 +245,12 @@
       return '<div class="toolbar"><div class="chips">' + [["", "adm.all"], ["customer", "role.customer"], ["restaurant", "role.restaurant"], ["courier", "role.courier"], ["admin", "role.admin"]].map(function (x) { return '<a class="chip' + (role === x[0] ? " on" : "") + '" href="#/admin/users?role=' + x[0] + '">' + t(x[1]) + "</a>"; }).join("") +
         '</div><form class="minisearch" data-form="ausearch">' + I("search", 16) + '<input name="q" value="' + esc(s) + '" placeholder="' + t("adm.searchUsers") + '" aria-label="' + t("adm.searchUsers") + '"></form></div>' +
         table([t("profile.name"), t("auth.phone"), t("adm.role"), t("profile.city"), t("adm.ordersN"), t("adm.since"), t("adm.activeL")], list.map(function (u) {
-          return '<tr><td><div class="tcell"><span class="avatar sm">' + esc(u.name.charAt(0)) + "</span><b>" + esc(u.name) + "</b>" + (u.phoneVerified ? '<span class="vok" title="' + t("vfa.verified") + '">' + I("check", 12) + "</span>" : "") + (u.pwResetAt ? '<span class="pill p-warn pwreq">' + I("shield", 12) + t("pw.asked") + "</span>" : "") + '</div></td><td class="num">' + esc(SF.phone(u.phone)) + '</td><td><span class="pill p-' + ({ admin: "brand", restaurant: "warn", courier: "info", customer: "mut" }[u.role]) + '">' + t("role." + u.role) + "</span></td><td>" + esc(cityName(u.cityId)) + '</td><td class="num">' + u.orderCount + '</td><td class="num">' + SF.date(u.createdAt) + "</td><td>" + (u.id === SF.state.user.id ? "—" : '<div class="tact">' + sw(u.active, "auser", u.id, t("adm.activeL")) + '<button class="btn sm ghost" data-act="apass" data-id="' + u.id + '" data-name="' + esc(u.name) + '">' + t("adm.newPass") + "</button></div>") + "</td></tr>"; }));
+          return '<tr><td><div class="tcell"><span class="avatar sm">' + esc(u.name.charAt(0)) + "</span><b>" + esc(u.name) + "</b>" + (u.phoneVerified ? '<span class="vok" title="' + t("vfa.verified") + '">' + I("check", 12) + "</span>" : "") + (u.pwResetAt ? '<span class="pill p-warn pwreq">' + I("shield", 12) + t("pw.asked") + "</span>" : "") + '</div></td><td class="num">' + esc(SF.phone(u.phone)) + '</td><td><span class="pill p-' + ({ admin: "brand", restaurant: "warn", courier: "info", customer: "mut" }[u.role]) + '">' + t("role." + u.role) + "</span></td><td>" + esc(cityName(u.cityId)) + '</td><td class="num">' + u.orderCount + '</td><td class="num">' + SF.date(u.createdAt) + "</td><td>" + (u.id === SF.state.user.id ? "—" : '<div class="tact">' + sw(u.active, "auser", u.id, t("adm.activeL")) + '<button class="btn sm ghost" data-act="apass" data-id="' + u.id + '" data-name="' + esc(u.name) + '">' + t("adm.newPass") + '</button>' + (u.role === "admin" ? "" : '<button class="btn sm ghost dgh" data-act="udel" data-id="' + u.id + '" data-name="' + esc(u.name) + '" aria-label="' + t("ud.btn") + '" title="' + t("ud.btn") + '">' + I("trash", 14) + "</button>") + "</div>") + "</td></tr>"; }));
     });
   } });
   SF.forms.ausearch = function (fd) { var q = SF.match(SF.path()).query; SF.go("/admin/users?role=" + (q.role || "") + "&q=" + encodeURIComponent(fd.q || "")); };
+  SF.actions.udel = function (el) { SF.modal('<button class="mx" data-act="closemodal" aria-label="' + t("btn.close") + '">' + I("x", 20) + '</button><div class="confirm"><span class="cic">' + I("trash", 26) + '</span><h2 class="h2">' + t("ud.t", { name: esc(el.dataset.name) }) + '</h2><p class="muted">' + t("ud.p") + '</p><button class="btn danger block" data-act="udelgo" data-id="' + el.dataset.id + '">' + t("ud.go") + '</button><button class="btn ghost block" data-act="closemodal">' + t("btn.cancel") + "</button></div>"); };
+  SF.actions.udelgo = function (el) { return api().del("/admin/users/" + el.dataset.id).then(function () { SF.closeModal(); SF.toast(t("ud.done")); SF.render({ quiet: true }); }); };
   SF.actions.auser = function (el) { return api().patch("/admin/users/" + el.dataset.id, { active: el.getAttribute("aria-checked") !== "true" }).then(function () { SF.render({ quiet: true }); }); };
 
   /* ---------- Products, categories ---------- */
@@ -350,7 +360,7 @@
     return '<a class="backlink" href="#' + o.back + '">' + I("chevL", 18) + esc(o.backLabel) + '</a><section class="card stack"><h3>' + t("zn.title") + " · " + esc(o.name) + '</h3><p class="fine">' + t(o.how) + "</p>" +
       /* a restaurant: two modes — move its place («R»), or draw its area */
       (o.pinUrl ? '<div class="seg nrmode" role="group">' + [["pin", "pin", "nr.modePin"], ["zone", "edit", "nr.modeZone"]].map(function (m) { return '<button type="button" class="' + (Z.mode === m[0] ? "on" : "") + '" aria-pressed="' + (Z.mode === m[0]) + '" data-act="zmode" data-v="' + m[0] + '">' + I(m[1], 16) + " " + t(m[2]) + "</button>"; }).join("") + '</div><p class="fine">' + t(Z.mode === "pin" ? "nr.pinHow" : "nr.zoneHow") + "</p>" : "") +
-      '<div class="zmap">' + SF.tmap({ key: o.key, center: o.center, zoom: 14, free: true, label: t("zn.title"), markers: Z.marks, edit: function () { return SF.state.zoneEdit ? SF.state.zoneEdit.pts : []; },
+      SF.mapFind(o.key) + '<div class="zmap">' + SF.tmap({ key: o.key, center: o.center, zoom: 14, free: true, label: t("zn.title"), markers: Z.marks, edit: function () { return SF.state.zoneEdit ? SF.state.zoneEdit.pts : []; },
         onTap: function (pt) { var z = SF.state.zoneEdit; if (!z) return; if (z.mode === "pin" && z.pinUrl) { z.pin = pt; z.moved = true; z.marks.length = 0; z.marks.push({ lat: pt.lat, lng: pt.lng, type: "rest", label: o.mark }); return; } if (z.pts.length >= 200) return; z.pts.push(pt); zcount(); } }) + "</div>" +
       '<p class="zcount" id="zcount"></p>' +
       '<div class="zbtns"><button type="button" class="btn ghost" data-act="zundo">' + I("chevL", 16) + t("zn.undo") + '</button><button type="button" class="btn ghost" data-act="zclear">' + I("trash", 16) + t("zn.clear") + "</button></div>" +

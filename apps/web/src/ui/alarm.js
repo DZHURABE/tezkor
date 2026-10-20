@@ -5,7 +5,7 @@
    Browsers only allow sound after the first tap, so partner screens show a one-tap "turn on sound" bar. */
 (function () {
   var t = SF.t, I = SF.icon, esc = SF.esc, tx = SF.tx, money = SF.money;
-  var KEYS = { restaurant: ["n.newOrder"], courier: ["n.courierNew"] };
+  var KEYS = { restaurant: ["n.newOrder"], courier: ["n.courierNew", "n.courierAuto"] };
   var OFFER_SEC = 40;
   var ac = null, ringTimer = null, ringStop = 0, cur = null, cdTimer = null, wake = null, busy = false;
   /* answered alerts, remembered per person (several roles can share one phone in the demo) */
@@ -51,7 +51,7 @@
       '<ul class="ic-items">' + o.items.map(function (it) { return '<li><b class="num">' + it.qty + "×</b><span>" + esc(tx(it.name)) + "</span></li>"; }).join("") + "</ul>" +
       (o.comment ? '<p class="ic-note">' + I("info", 14) + esc(o.comment) + "</p>" : "") +
       '<div class="ic-sum"><span>' + (o.dineIn ? t("tb.payTable") : t("pay." + o.payment.method)) + (o.payment.method === "transfer" ? " · " + t("ps." + o.payment.status) : "") + '</span><b class="num">' + money(o.subtotal) + "</b></div>" +
-      (!o.dineIn && (o.delivery || "platform") !== "platform" ? '<p class="ic-lbl">' + t("dl.who") + '</p><div class="ic-dl">' + SF.dlChoice(SF.state.inDeliv || "own", "indeliv") + "</div>" : "") +
+      (!o.dineIn && o.delivery === "mixed" ? '<p class="ic-lbl">' + t("dl.who") + '</p><div class="ic-dl">' + SF.dlChoice(SF.state.inDeliv || "own", "indeliv") + "</div>" : "") +
       '<p class="ic-lbl">' + t("rest.prep") + '</p><div class="ic-prep">' + [10, 15, 20, 30, 45].map(function (m) { return '<button type="button" class="' + (m === prep ? "on" : "") + '" data-act="inprep" data-v="' + m + '">' + m + "</button>"; }).join("") + "</div>" +
       (o.payment.method === "transfer" ? '<button type="button" class="btn ghost block ic-rcpt" data-act="rcpt" data-id="' + o.id + '">' + I("receipt", 16) + t("tr.receipt") + "</button>" : "") +
       '<div class="ic-acts"><button type="button" class="btn ic-no" data-act="indecline" data-id="' + o.id + '">' + I("x", 20) + t("rest.reject") + '</button><button type="button" class="btn ic-yes" data-act="inaccept" data-id="' + o.id + '">' + I("check", 22) + t(o.payment.method === "transfer" ? "tr.acceptPaid" : "rest.accept") + "</button></div>" +

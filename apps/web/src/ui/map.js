@@ -165,6 +165,26 @@
       var d = { ArrowLeft: [-s, 0], ArrowRight: [s, 0], ArrowUp: [0, -s], ArrowDown: [0, s] }[k]; if (!d) return; e.preventDefault();
       v.lng = lngOf(cx + d[0], v.z); v.lat = latOf(cy + d[1], v.z); clampView(o, v); draw(el); settle(el); });
   }
+  /* place search above a map: Nominatim (OpenStreetMap) finds towns, streets and houses; pick one and the map moves there */
+  SF.mapFind = function (key) {
+    /* a div, not a form: it also sits inside other forms */
+    return '<div class="mfind" data-mf="' + esc(key) + '" role="search"><span class="mfi">' + I("search", 18) + '</span><input name="mq" autocomplete="off" enterkeyhint="search" placeholder="' + t("mf.ph") + '" aria-label="' + t("mf.ph") + '"><button type="button" class="btn primary sm" data-act="mfgo" data-key="' + esc(key) + '">' + t("mf.go") + '</button></div><div class="mfres" data-mfres="' + esc(key) + '" hidden></div>'; };
+  document.addEventListener("keydown", function (e) { if (e.key !== "Enter") return; var i = e.target.closest && e.target.closest(".mfind input"); if (!i) return; e.preventDefault(); e.stopPropagation(); SF.actions.mfgo({ dataset: { key: i.closest(".mfind").dataset.mf } }); }, true);
+  SF.actions.mfgo = function (el) { var inp = document.querySelector('[data-mf="' + el.dataset.key + '"] input'); return inp ? find(el.dataset.key, inp.value) : null; };
+  function find(key, q0) {
+    var q = String(q0 || "").trim(), box = document.querySelector('[data-mfres="' + key + '"]'); if (q.length < 2 || !box) return;
+    var ll = SF.geo.parse(q); if (ll) { box.hidden = true; return pick(key, ll, q); }
+    box.hidden = false; box.innerHTML = '<p class="mfmsg">' + t("mf.search") + "</p>";
+    var url = (cfg.geocoder || "https://nominatim.openstreetmap.org/search") + "?format=jsonv2&limit=7&addressdetails=1&countrycodes=tj,uz,kg,kz&accept-language=" + (SF.state.lang === "tg" ? "tg,ru" : SF.state.lang || "ru") + "&q=" + encodeURIComponent(q);
+    return fetch(url, { headers: { Accept: "application/json" } }).then(function (r) { return r.json(); }).then(function (l) {
+      if (!l.length) { box.innerHTML = '<p class="mfmsg">' + t("mf.none") + "</p>"; return; }
+      box.innerHTML = l.map(function (x) { var nm = String(x.display_name || "").split(",").slice(0, 3).join(","), big = /city|town|village|suburb|administrative/.test((x.type || "") + " " + (x.addresstype || ""));
+        return '<button type="button" class="mfrow" data-act="mfpick" data-key="' + esc(key) + '" data-lat="' + x.lat + '" data-lng="' + x.lon + '" data-name="' + esc((x.name || nm.split(",")[0] || "").trim()) + '" data-big="' + (big ? 1 : 0) + '">' + I("pin", 16) + "<span><b>" + esc(nm.split(",")[0]) + "</b><small>" + esc(nm.split(",").slice(1).join(",").trim()) + "</small></span></button>"; }).join("");
+    }).catch(function () { box.innerHTML = '<p class="mfmsg">' + t("mf.fail") + "</p>"; });
+  };
+  function pick(key, p, name) { SF.tmapCenter(key, p, 16); var h = SF.mapPick && SF.mapPick[key]; if (h) h(p, name); }
+  SF.actions.mfpick = function (el) { var box = el.closest("[data-mfres]"); if (box) box.hidden = true; return pick(el.dataset.key, { lat: +el.dataset.lat, lng: +el.dataset.lng }, el.dataset.name); };
+  SF.mapPick = SF.mapPick || {};
   SF.zone = function (cityId) {
     var cs = SF.state.cities || [], c = cs.filter(function (x) { return x.id === cityId; })[0] || cs.filter(function (x) { return x.id === (SF.state.pub || {}).defaultCityId; })[0] || cs[0];
     if (!c) return null; var km = (SF.state.pub || {}).zoneKm || 5, poly = c.zone && c.zone.length > 2 ? c.zone : null;

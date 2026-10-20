@@ -11,8 +11,8 @@
   var ORDER_FLOW = {
     awaiting_payment: { pending: ["system", "admin"], cancelled: ["customer", "admin", "system"] },
     pending: { cooking: ["restaurant", "admin"], rejected: ["restaurant", "admin"], cancelled: ["customer", "admin"] },
-    cooking: { ready: ["restaurant", "admin"], cancelled: ["admin"] },
-    ready: { picked_up: ["courier", "admin", "restaurant"], cancelled: ["admin"] },      // restaurant: only for its own delivery (checked by the route)
+    cooking: { ready: ["restaurant", "admin"], cancelled: ["admin", "restaurant"] },
+    ready: { picked_up: ["courier", "admin", "restaurant"], cancelled: ["admin", "restaurant"] },      // restaurant: only for its own delivery (checked by the route)
     picked_up: { delivered: ["courier", "admin", "restaurant"] },
     delivered: {}, rejected: {}, cancelled: {}
   };
