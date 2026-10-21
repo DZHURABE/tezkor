@@ -51,7 +51,14 @@
       ["g4", "Шир ва тухм", "Молочные и яйца", "Dairy & eggs", "other", T_("grocery", "general")], ["g5", "Гӯшт ва мурғ", "Мясо и птица", "Meat & poultry", "other", T_("grocery", "general")], ["g6", "Сабзавот ва мева", "Овощи и фрукты", "Vegetables & fruit", "other", T_("grocery", "general")],
       ["g7", "Нон ва ширинӣ", "Хлеб и сладости", "Bread & sweets", "other", T_("grocery", "general")], ["g8", "Нӯшокиҳо", "Напитки", "Drinks", "other", T_("grocery", "general")], ["g9", "Консерва ва хушкмева", "Консервы и сухофрукты", "Canned & dried fruit", "other", T_("grocery", "general")], ["g10", "Хӯҷагӣ ва тозакунӣ", "Хозтовары и бытовая химия", "Household & cleaning", "other", T_("grocery", "home", "general")],
       ["c1", "Либоси мардона", "Мужская одежда", "Men's clothes", "clothes", T_("clothes", "general")], ["c2", "Либоси занона", "Женская одежда", "Women's clothes", "clothes", T_("clothes", "general")], ["c3", "Либоси кӯдакона", "Детская одежда", "Kids' clothes", "clothes", T_("clothes", "general")], ["c4", "Пойафзол", "Обувь", "Shoes", "clothes", T_("clothes", "general")],
-      ["h1", "Зарфу асбоби ошхона", "Посуда и кухня", "Dishes & kitchen", "other", T_("home", "general")], ["h2", "Мебел ва ороиш", "Мебель и декор", "Furniture & decor", "other", T_("home", "general")], ["h3", "Асбоби сохтмон", "Стройматериалы и инструменты", "Building & tools", "other", T_("home", "general")]];
+      ["h1", "Зарфу асбоби ошхона", "Посуда и кухня", "Dishes & kitchen", "other", T_("home", "general")], ["h2", "Мебел ва ороиш", "Мебель и декор", "Furniture & decor", "other", T_("home", "general")], ["h3", "Асбоби сохтмон", "Стройматериалы и инструменты", "Building & tools", "other", T_("home", "general")],
+      ["b1", "Ранг, лак ва ротбон", "Краски, лаки, смеси", "Paint, varnish & mixes", "other", T_("home", "general")], ["b2", "Сантехника", "Сантехника", "Plumbing", "other", T_("home", "general")], ["b3", "Барқ ва лампа", "Электрика и лампы", "Electrics & lamps", "other", T_("home", "general")],
+      ["b4", "ТВ, антенна ва монтаж", "ТВ, антенны и монтаж", "TV, dishes & mounting", "other", T_("home", "tech", "general")], ["b5", "Асбобҳо", "Инструменты", "Tools", "other", T_("home", "general")], ["b6", "Мих, шуруп ва маҳкамкунакҳо", "Крепёж", "Fasteners", "other", T_("home", "general")],
+      ["b0", "Масолеҳи сохтмон", "Строительные материалы", "Building materials", "other", T_("home", "general")], ["b7", "Қубур ва фитингҳо", "Трубы и фитинги", "Pipes & fittings", "other", T_("home", "general")], ["b8", "Розетка ва выключатель", "Розетки и выключатели", "Sockets & switches", "other", T_("home", "general")],
+      ["b9", "Лампочка ва равшанӣ", "Лампочки и освещение", "Lamps & lighting", "other", T_("home", "general")], ["b10", "Асбобҳои барқӣ", "Электроинструмент", "Power tools", "other", T_("home", "general")], ["b11", "Насосҳои об", "Водяные насосы", "Water pumps", "other", T_("home", "general")],
+      ["b12", "Обгармкунакҳо", "Водонагреватели", "Water heaters", "other", T_("home", "general")], ["b13", "Лавозимоти телевизор", "Аксессуары для ТВ", "TV accessories", "other", T_("home", "tech", "general")], ["b14", "Маҳсулоти Тоҷикистон", "Сделано в Таджикистане", "Made in Tajikistan", "other", T_("home", "grocery", "general")],
+      ["d1", "Оби Зулол", "Оби Зулол", "Oby Zulol", "other", T_("grocery", "home", "general")], ["d2", "Сиёма", "Сиёма", "Siyoma", "other", T_("grocery", "home", "general")], ["d3", "RC Cola", "RC Cola", "RC Cola", "other", T_("grocery", "home", "general")],
+      ["d4", "555 Cola", "555 Cola", "555 Cola", "other", T_("grocery", "home", "general")], ["d5", "Adrenaline Rush", "Adrenaline Rush", "Adrenaline Rush", "other", T_("grocery", "home", "general")], ["d6", "Нӯшокиҳои дигар", "Другие напитки", "Other drinks", "other", T_("grocery", "home", "general")]];
     (function shopCats() { if (!db || !db.categories) return; var ch = false; SHOP_CATS.forEach(function (c, i) { var ex = db.categories.filter(function (x) { return x.id === c[0]; })[0];
       if (!ex) { db.categories.push({ id: c[0], name: { tg: c[1], ru: c[2], en: c[3] }, icon: "box", shopIcon: c[4], shop: true, types: c[5], active: true, sort: 100 + i }); ch = true; } else if (!ex.types) { ex.types = c[5]; ch = true; } });
       (db.restaurants || []).forEach(function (r) { if (r.kind === "shop" && !r.shopType) { r.shopType = "general"; ch = true; } }); if (ch) store.save(db); })();
@@ -273,9 +280,9 @@
     /* goods with a counted stock leave the shelf (sizes count separately) and come back when the order is cancelled */
     function stockMove(it, dir) { var pr = baseOf(it); if (!pr) return false;
       if (it.variantId) { var v = (pr.variants || []).filter(function (x) { return x.id === it.variantId; })[0]; if (!v || v.stock == null) return false;
-        v.stock = dir < 0 ? Math.max(0, v.stock - it.qty) : v.stock + it.qty; if (dir < 0 && !v.stock) v.available = false; if (dir > 0 && v.stock > 0) v.available = true;
+        v.stock = dir < 0 ? Math.max(0, v.stock - it.qty) : v.stock + it.qty; ledger(pr, v, dir < 0 ? "sale" : "return", dir * it.qty, v.stock, null, null); if (dir < 0 && !v.stock) v.available = false; if (dir > 0 && v.stock > 0) v.available = true;
         var anyIn = pr.variants.some(function (x) { return x.available !== false && x.stock !== 0; }); if (dir < 0 && !anyIn) pr.available = false; if (dir > 0 && anyIn) pr.available = true; return true; }
-      if (pr.stock == null) return false; pr.stock = dir < 0 ? Math.max(0, pr.stock - it.qty) : pr.stock + it.qty; if (dir < 0 && !pr.stock) pr.available = false; if (dir > 0 && pr.stock > 0) pr.available = true; return true; }
+      if (pr.stock == null) return false; pr.stock = dir < 0 ? Math.max(0, pr.stock - it.qty) : pr.stock + it.qty; ledger(pr, null, dir < 0 ? "sale" : "return", dir * it.qty, pr.stock, null, null); if (dir < 0 && !pr.stock) pr.available = false; if (dir > 0 && pr.stock > 0) pr.available = true; return true; }
     function quote(req, b) {
       var r = find(db.restaurants, b.restaurantId); if (!r || !live(r)) E(404, "RESTAURANT_NOT_FOUND");
       if (!openNow(r)) E(409, "RESTAURANT_CLOSED");
@@ -444,7 +451,7 @@
       var base = db.products.filter(function (p) { return sm[p.restaurantId] && (!s || (JSON.stringify(p.name) + " " + (p.brand || "") + " " + JSON.stringify(p.desc || "")).toLowerCase().indexOf(s) >= 0); });
       var cats = {}, brands = {}; base.forEach(function (p) { cats[p.categoryId] = (cats[p.categoryId] || 0) + 1; });
       var pmin = q.priceMin != null && q.priceMin !== "" ? Number(q.priceMin) : null, pmax = q.priceMax != null && q.priceMax !== "" ? Number(q.priceMax) : null;
-      var inCat = base.filter(function (p) { return !q.cat || p.categoryId === q.cat; }); inCat.forEach(function (p) { if (p.brand) brands[p.brand] = (brands[p.brand] || 0) + 1; });
+      var cl = q.cat ? String(q.cat).split(",") : null, inCat = base.filter(function (p) { return !cl || cl.indexOf(p.categoryId) >= 0; }); inCat.forEach(function (p) { if (p.brand) brands[p.brand] = (brands[p.brand] || 0) + 1; });
       var l = inCat.filter(function (p) { return (!q.stock || p.available) && (!q.brand || p.brand === q.brand) && (pmin == null || p.price >= pmin) && (pmax == null || p.price <= pmax) && (!q.sale || p.oldPrice > p.price); });
       var rank = function (p) { return (p.available ? 1e14 : 0) + (sm[p.restaurantId].pinned ? 1e13 : 0) + (p.popular ? 5e12 : 0) + (p.createdAt || 0); };
       l.sort(q.sort === "cheap" ? function (x, y) { return (y.available - x.available) || x.price - y.price; } : q.sort === "dear" ? function (x, y) { return (y.available - x.available) || y.price - x.price; } : q.sort === "new" ? function (x, y) { return (y.available - x.available) || (y.createdAt || 0) - (x.createdAt || 0); } : function (x, y) { return rank(y) - rank(x); });
@@ -573,7 +580,7 @@
     function onlyKeys(b, ok) { return Object.keys(b || {}).every(function (k) { return ok.indexOf(k) >= 0; }); }
     route("GET", "/restaurant/me", ["restaurant"], function (req) { var r = myRest(req); return Object.assign(pubRest(r), { hasAd: !!myAd(r), subHistory: (db.subs || []).filter(function (s) { return s.restaurantId === r.id; }).slice(0, 12).map(function (s) { return { kind: s.kind, months: s.months, days: s.days, amount: s.amount, from: s.from, until: s.until, at: s.at }; }) }); });
     route("PATCH", "/restaurant/me", ["restaurant"], function (req, b) { var r = onlyKeys(b, ["open"]) ? myRest(req) : boss(req);
-      if (b.open != null) r.open = !!b.open;
+      if (b.open != null) r.open = !!b.open; if (b.allowNegative != null) r.allowNegative = !!b.allowNegative;
       if (b.areaId !== undefined) r.areaId = areaCheck(b.areaId || null, r.cityId);
       if (b.hours) { if (!/^\d{2}:\d{2}$/.test(b.hours.from) || !/^\d{2}:\d{2}$/.test(b.hours.to)) E(400, "BAD_HOURS"); r.hours = { from: b.hours.from, to: b.hours.to }; }
       if (b.eta != null) { if (!/^\d{1,3}–\d{1,3}$/.test(str(b.eta))) E(400, "BAD_ETA"); r.eta = str(b.eta); }
@@ -800,6 +807,9 @@
         else x.variants = []; }
       if (!partial || b.categoryId != null) { var cat = find(db.categories, b.categoryId); if (!cat) E(400, "BAD_CATEGORY");
         if (rest) { if ((rest.kind === "shop") !== !!cat.shop) E(400, "BAD_CATEGORY"); var st = rest.shopType || "general"; if (rest.kind === "shop" && st !== "general" && cat.types && cat.types.indexOf(st) < 0) E(400, "BAD_CATEGORY"); } x.categoryId = b.categoryId; }
+      /* catalogue fields of a real article (everything optional) */
+      if (b.model !== undefined) x.model = str(b.model, 60) || null; if (b.sku !== undefined) x.sku = str(b.sku, 40) || null; if (b.unit !== undefined) x.unit = str(b.unit, 12) || null; if (b.origin !== undefined) x.origin = str(b.origin, 40) || null; if (b.photoSource !== undefined) x.photoSource = str(b.photoSource, 200) || null;
+      if (b.barcode !== undefined) { var bc = str(b.barcode, 20).replace(/\s/g, ""); if (bc && !/^[0-9A-Za-z\-]{4,20}$/.test(bc)) E(400, "BAD_BARCODE"); if (bc && rest && db.products.some(function (o) { return o.restaurantId === rest.id && o.barcode === bc && o.id !== (b._id || ""); })) E(409, "BARCODE_USED"); x.barcode = bc || null; }
       if (b.desc != null) x.desc = L(str(b.desc, 140)); if (b.weight != null) x.weight = str(b.weight, 20); if (b.brand != null) x.brand = str(b.brand, 40) || null;
       if (b.kind != null) x.kind = KINDS.indexOf(b.kind) >= 0 ? b.kind : "plate";
       if (b.available != null) x.available = !!b.available; if (b.popular != null) x.popular = !!b.popular;
@@ -809,7 +819,16 @@
       if (b.oldPrice !== undefined) { var op = b.oldPrice ? int(b.oldPrice) : null; if (op !== null && !(op >= 1 && op <= 500000)) E(400, "BAD_PRICE"); x.oldPrice = op; }
       return x;
     }
-    function saveProduct(prod, b, partial) { var x = validProduct(b, partial, find(db.restaurants, prod.restaurantId)), ph = b.photo;
+    /* purchase price and minimum stock never leave the shop's own screens */
+    function priv(pid) { var m = db.prodPriv || (db.prodPriv = {}); return m[pid] || (m[pid] = {}); }
+    function ownP(p) { var v = (db.prodPriv || {})[p.id] || {}; return Object.assign({}, p, { cost: v.cost == null ? null : v.cost, minStock: v.minStock == null ? null : v.minStock }); }
+    function setPriv(pid, b) { var v = priv(pid);
+      if (b.cost !== undefined) { if (b.cost === null || b.cost === "") v.cost = null; else { var c = int(b.cost); if (!(c >= 0 && c <= 5000000)) E(400, "BAD_PRICE"); v.cost = c; } }
+      if (b.minStock !== undefined) { if (b.minStock === null || b.minStock === "") v.minStock = null; else { var m = int(b.minStock); if (!(m >= 0 && m <= 100000)) E(400, "BAD_STOCK"); v.minStock = m; } } }
+    /* the stock book: every receipt, write-off, correction and sale */
+    function ledger(pr, v, type, qty, after, note, who) { var m = db.stockMoves || (db.stockMoves = []); m.push({ id: id("sm"), restaurantId: pr.restaurantId, productId: pr.id, variantId: v ? v.id : null, label: v ? v.label : null, type: type, qty: qty, after: after, note: str(note, 80) || null, by: who || null, at: clock() }); if (m.length > 20000) db.stockMoves = m.slice(-20000); }
+    function flipAvail(pr) { var vs = pr.variants || []; if (vs.length) pr.available = vs.some(function (x) { return x.available !== false && x.stock !== 0; }); }
+    function saveProduct(prod, b, partial) { var x = validProduct(Object.assign({}, b, { _id: prod.id }), partial, find(db.restaurants, prod.restaurantId)), ph = b.photo; setPriv(prod.id, b);
       Object.assign(prod, x); if (prod.oldPrice && prod.oldPrice <= prod.price && !(prod.variants && prod.variants.length)) E(400, "OLD_PRICE_LOW");
       if (ph !== undefined) prod.photo = photoField(ph, prod.photo || null, "ph"); return prod;
     }
@@ -821,15 +840,49 @@
         var c = find(db.categories, d[0]); if (c && c.active === false) c.active = true; added++; });
       save(); return { added: added, total: by(db.products, "restaurantId", r.id).length }; }
     route("POST", "/restaurant/menu/template", ["restaurant"], function (req, b) { return fillMenu(boss(req), str(b.key) || "tj-uz"); });
-    route("GET", "/restaurant/products", ["restaurant"], function (req) { return by(db.products, "restaurantId", myRest(req).id); });
+    route("GET", "/restaurant/products", ["restaurant"], function (req) { return by(db.products, "restaurantId", myRest(req).id).map(ownP); });
+    /* the catalogue for thousands of goods: search (name, brand, model, article, barcode), section, filters, pages */
+    route("GET", "/restaurant/catalog", ["restaurant"], function (req, b, q) { var r = myRest(req), s = str(q.q, 60).toLowerCase(), lim = Math.max(5, Math.min(100, int(q.limit) || 30)), pg = Math.max(1, int(q.page) || 1);
+      var list = by(db.products, "restaurantId", r.id).filter(function (p) { var v = ownP(p);
+        if (q.cat && p.categoryId !== q.cat) return false; if (q.nophoto === "1" && p.photo) return false; if (q.low === "1") { var tot = (p.variants || []).length ? p.variants.some(function (x) { return x.stock != null && v.minStock != null && x.stock <= v.minStock; }) : (p.stock != null && v.minStock != null && p.stock <= v.minStock); if (!tot) return false; }
+        if (!s) return true; if (p.barcode && p.barcode.toLowerCase() === s) return true;
+        return [p.name && p.name.tg, p.name && p.name.ru, p.brand, p.model, p.sku, p.barcode].join(" ").toLowerCase().indexOf(s) >= 0; });
+      list.sort(function (a, c) { return String(a.name && a.name.tg).localeCompare(String(c.name && c.name.tg)); });
+      var total = list.length, pages = Math.max(1, Math.ceil(total / lim)); if (pg > pages) pg = pages;
+      var catCount = {}; by(db.products, "restaurantId", r.id).forEach(function (p) { catCount[p.categoryId] = (catCount[p.categoryId] || 0) + 1; });
+      return { items: list.slice((pg - 1) * lim, pg * lim).map(ownP), total: total, page: pg, pages: pages, catCount: catCount, noPhoto: by(db.products, "restaurantId", r.id).filter(function (p) { return !p.photo; }).length }; });
+    /* receipt / write-off / correction of the counted stock, with a line in the stock book */
+    route("POST", "/restaurant/products/:id/stock", ["restaurant"], function (req, b, q, p) { var r = boss(req), pr = find(db.products, p.id); if (!pr || pr.restaurantId !== r.id) E(404, "NOT_FOUND");
+      var vs = pr.variants || [], v = null; if (vs.length) { v = vs.filter(function (x) { return x.id === b.variantId; })[0]; if (!v) E(400, "VARIANT_REQUIRED", { name: pr.name }); }
+      var tgt = v || pr, cur = tgt.stock, n = int(b.qty), type = b.type === "out" ? "out" : b.type === "set" ? "set" : "in";
+      if (!(n >= 0 && n <= 1000000) || (type !== "set" && n < 1)) E(400, "BAD_STOCK");
+      if (type === "out" && cur == null) E(400, "NO_STOCK_COUNT");
+      var next = type === "set" ? n : type === "in" ? (cur || 0) + n : cur - n; if (next < 0 && !r.allowNegative) E(400, "NEGATIVE_STOCK", { left: cur });
+      tgt.stock = next; if (v) { v.available = next > 0 ? true : false; flipAvail(pr); } else pr.available = next > 0;
+      ledger(pr, v, type === "set" ? "adjust" : type, type === "out" ? -n : type === "in" ? n : next - (cur || 0), next, b.note, req.user.name || req.user.id); save(); return ownP(pr); });
+    route("GET", "/restaurant/stock-moves", ["restaurant"], function (req, b, q) { var r = myRest(req); return (db.stockMoves || []).filter(function (m) { return m.restaurantId === r.id && (!q.productId || m.productId === q.productId); }).slice(-Math.min(200, int(q.limit) || 50)).reverse(); });
+    /* import from CSV/Excel (the client turns the sheet into rows): update by barcode, article or name, otherwise create */
+    route("POST", "/restaurant/products/import", ["restaurant"], function (req, b) { var r = boss(req), rows = Array.isArray(b.rows) ? b.rows : []; if (!rows.length || rows.length > 500) E(400, "BAD_ROWS");
+      var cats = db.categories.filter(function (c) { return c.shop; }), out = { created: 0, updated: 0, errors: [] }, mine = by(db.products, "restaurantId", r.id);
+      rows.forEach(function (row, i) { try { var nm = str(row.name, 60), bc = str(row.barcode, 20).replace(/\s/g, ""), sku = str(row.sku, 40), cat = null;
+          if (row.category) { var key = String(row.category).trim().toLowerCase(); cat = cats.filter(function (c) { return c.id.toLowerCase() === key || [c.name.tg, c.name.ru, c.name.en].some(function (x) { return String(x).toLowerCase() === key; }); })[0]; if (!cat) E(400, "BAD_CATEGORY"); }
+          var ex = (bc && mine.filter(function (p) { return p.barcode === bc; })[0]) || (sku && mine.filter(function (p) { return p.sku === sku; })[0]) || (nm && mine.filter(function (p) { return String(p.name && p.name.tg).toLowerCase() === nm.toLowerCase() && (p.brand || "") === str(row.brand, 40); })[0]);
+          var body = {}; ["name", "brand", "model", "barcode", "sku", "unit", "origin", "desc", "weight", "photoSource"].forEach(function (k) { if (row[k] !== undefined && row[k] !== "") body[k] = row[k]; });
+          if (cat) body.categoryId = cat.id; if (row.price !== undefined && row.price !== "") body.price = Number(String(row.price).replace(/\s/g, "").replace(",", ".")); if (row.stock !== undefined && row.stock !== "") body.stock = Number(row.stock);
+          if (row.cost !== undefined && row.cost !== "") body.cost = Number(String(row.cost).replace(/\s/g, "")); if (row.minStock !== undefined && row.minStock !== "") body.minStock = Number(row.minStock);
+          if (ex) { var keep = JSON.parse(JSON.stringify(ex)), was = ex.stock; try { saveProduct(ex, body, true); } catch (e) { Object.assign(ex, keep); throw e; } if (body.stock !== undefined && ex.stock !== was) ledger(ex, null, "adjust", (ex.stock || 0) - (was || 0), ex.stock, "import", req.user.name); out.updated++; }
+          else { if (!body.categoryId) E(400, "BAD_CATEGORY"); var prod = saveProduct({ id: id(r.id + "p"), restaurantId: r.id, desc: L(""), weight: "", kind: "box", available: true, popular: false, photo: null, oldPrice: null, createdAt: clock() }, body, false);
+            db.products.push(prod); mine.push(prod); if (prod.stock != null) ledger(prod, null, "in", prod.stock, prod.stock, "import", req.user.name); out.created++; }
+        } catch (e) { out.errors.push({ row: i + 1, code: (e && e.code) || (e && e.message) || "ERROR" }); } });
+      save(); return out; });
     route("POST", "/restaurant/products", ["restaurant"], function (req, b) { var r = boss(req);
       var prod = saveProduct({ id: id(r.id + "p"), restaurantId: r.id, desc: L(""), weight: "", kind: "plate", available: true, popular: false, photo: null, oldPrice: null, createdAt: clock() }, b, false);
-      db.products.push(prod); save(); return prod; });
+      db.products.push(prod); if (prod.stock != null) ledger(prod, null, "in", prod.stock, prod.stock, "start", req.user.name); save(); return prod; });
     route("PATCH", "/restaurant/products/:id", ["restaurant"], function (req, b, q, p) { var r = onlyKeys(b, ["available"]) && req.user.staffRole !== "waiter" ? myRest(req) : boss(req), prod = find(db.products, p.id);
       if (!prod || prod.restaurantId !== r.id) E(404, "NOT_FOUND"); var keep = JSON.parse(JSON.stringify(prod));
-      try { saveProduct(prod, b, true); } catch (e) { Object.assign(prod, keep); throw e; } save(); return prod; });
+      try { saveProduct(prod, b, true); } catch (e) { Object.assign(prod, keep); throw e; } if (b.stock !== undefined && prod.stock !== keep.stock && !(prod.variants || []).length) ledger(prod, null, "adjust", (prod.stock || 0) - (keep.stock || 0), prod.stock, "edit", req.user.name); save(); return prod; });
     route("DELETE", "/restaurant/products/:id", ["restaurant"], function (req, b, q, p) { var r = boss(req), prod = find(db.products, p.id);
-      if (!prod || prod.restaurantId !== r.id) E(404, "NOT_FOUND"); if (prod.photo) media.del(prod.photo); db.products = db.products.filter(function (x) { return x.id !== prod.id; }); save(); return true; });
+      if (!prod || prod.restaurantId !== r.id) E(404, "NOT_FOUND"); if (prod.photo) media.del(prod.photo); if (db.prodPriv) delete db.prodPriv[prod.id]; db.products = db.products.filter(function (x) { return x.id !== prod.id; }); save(); return true; });
     route("GET", "/restaurant/stats", ["restaurant"], function (req) { return statsFor(shopOrders(myRest(req).id), true); });
     /* the restaurant's own ad on the customer home page: one per restaurant, live at once, the admin can switch it off */
     function myAd(r) { return db.banners.filter(function (x) { return x.own && x.restaurantId === r.id; })[0] || null; }

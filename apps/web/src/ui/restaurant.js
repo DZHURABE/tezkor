@@ -2,7 +2,7 @@
 (function () {
   var t = SF.t, esc = SF.esc, I = SF.icon, tx = SF.tx, money = SF.money, api = function () { return SF.api; };
   var P = { roles: ["restaurant"], shell: function (h, r, m) { return SF.shells.panel(h, r, m); } };
-  function R(path, o) { SF.route(path, Object.assign({}, P, o)); }
+  function R(path, o) { SF.route(path, Object.assign({}, P, o)); } SF.restRoute = R;
 
   /* chart: bars drawn to one scale */
   SF.bars = function (series, fmt, label) {
@@ -295,7 +295,7 @@
       var inCat = function (p, c) { return c.id === "_" ? !cats.some(function (k) { return k.id === p.categoryId; }) : p.categoryId === c.id; };
       /* one category at a time (tabs with counts), compact rows */
       var cur = SF.state.mcat && cats.some(function (c) { return c.id === SF.state.mcat; }) ? SF.state.mcat : (cats[0] || {}).id; var show = cats.filter(function (c) { return c.id === cur; });
-      return '<div class="toolbar"><p class="muted">' + t("menu.count", { n: list.length, off: list.filter(function (p) { return !p.available; }).length }) + '</p>' + (worker() ? "" : '<button class="btn primary" data-act="prodnew">' + I("plus", 18) + t("menu.add") + "</button>") + "</div>" +
+      return '<div class="toolbar"><p class="muted">' + t("menu.count", { n: list.length, off: list.filter(function (p) { return !p.available; }).length }) + '</p>' + (worker() ? "" : (isShopU() ? '<a class="btn ghost" href="#/rest/catalog">' + I("box", 18) + t("cat.btn") + '</a><a class="btn ghost" href="#/rest/starter">' + I("grid", 18) + t("st.btn") + "</a>" : "") + '<button class="btn primary" data-act="prodnew">' + I("plus", 18) + t("menu.add") + "</button>") + "</div>" +
         (cats.length > 1 ? '<div class="chips mcats" role="tablist">' + cats.map(function (c) { var n = list.filter(function (p) { return inCat(p, c); }), off = n.filter(function (p) { return !p.available; }).length;
           return '<button type="button" role="tab" aria-selected="' + (c.id === cur) + '" class="chip' + (c.id === cur ? " on" : "") + '" data-act="mcat" data-v="' + c.id + '">' + esc(c.name) + ' <i class="num">' + n.length + (off ? " · " + off + "✕" : "") + "</i></button>"; }).join("") + "</div>" : "") +
         (list.length ? show.map(function (c) { return '<section class="msec mcompact"><div class="mtable">' + list.filter(function (p) { return inCat(p, c); }).map(function (p) {
@@ -328,6 +328,7 @@
       '' + (shop ? varBox(p) : "") + '<div class="grid3"><label class="f vplain">' + t("menu.price") + '<input name="price" inputmode="numeric"' + ((p.variants || []).length ? "" : " required") + ' value="' + esc(p.price) + '"></label><label class="f">' + t("menu.oldPrice") + '<input name="oldPrice" inputmode="numeric" placeholder="' + t("menu.oldPriceHint") + '" value="' + esc(p.oldPrice || "") + '"></label><label class="f">' + t(shop ? sCfg().spec : "menu.weight") + (shop ? ' <small class="muted">(' + t("sh.optional") + ")</small>" : "") + '<input name="weight" maxlength="20" value="' + esc(p.weight) + '" placeholder="' + (shop ? sCfg().specPh : "350 г") + '"></label>' +
       (shop ? '<label class="f">' + t("sh.stock") + '<input name="stock" inputmode="numeric" value="' + esc(p.stock == null ? "" : p.stock) + '" placeholder="' + t("sh.stockPh") + '"></label>' : "") +
       '<label class="f">' + t("menu.category") + '<select name="categoryId">' + myCats().map(function (c) { return '<option value="' + c.id + '"' + (c.id === p.categoryId ? " selected" : "") + ">" + esc(tx(c.name)) + "</option>"; }).join("") + "</select></label></div>" +
+      (shop ? catFields(p) : "") +
       (shop ? "" : '<p class="lbl">' + t("ml.label") + '</p><div class="mealpick">' + ["b", "l", "d", "n"].map(function (m) { return '<label><input type="checkbox" name="meal_' + m + '"' + ((p.meals || []).indexOf(m) >= 0 ? " checked" : "") + "><span>" + t("ml." + m) + "</span></label>"; }).join("") + '</div><p class="fine">' + t("ml.hint") + "</p>") +
       '<label class="check"><input type="checkbox" name="popular"' + (p.popular ? " checked" : "") + "><span>" + t("menu.popular") + '</span></label><input type="hidden" name="kind" id="pkind" value="' + esc(p.kind) + '"><button class="btn primary block lg">' + t("btn.save") + "</button></form>", "wide");
   }
@@ -341,6 +342,11 @@
     var last = rows.lastChild, i = el.dataset.v ? last.querySelector(".vp") : last.querySelector(".vl"); if (i) i.focus(); };
   SF.actions.vdel = function (el) { var f = el.closest("form"); el.closest(".vrow").remove(); vSync(f); };
   SF.after.push(function () { var f = document.querySelector("form[data-form=prod]"); if (f && f.querySelector("#vrows")) vSync(f); });
+  /* article details of a real shop item (all optional): model, barcode, article, unit, origin, purchase price, minimum stock, photo source */
+  function catFields(p) { function f(n, lb, v, ex) { return '<label class="f">' + t(lb) + '<input name="' + n + '" ' + (ex || "") + ' value="' + esc(v == null ? "" : v) + '"></label>'; }
+    return '<details class="catmore"' + (p.barcode || p.sku || p.model || p.cost != null || p.unit || p.origin ? " open" : "") + "><summary>" + t("cf.more") + '</summary><div class="grid2">' + f("model", "cf.model", p.model, 'maxlength="60"') + f("barcode", "cf.barcode", p.barcode, 'maxlength="20" inputmode="numeric"') + f("sku", "cf.sku", p.sku, 'maxlength="40"') +
+      '<label class="f">' + t("cf.unit") + '<select name="unit">' + ["", "шт", "кг", "л", "м", "уп", "компл", "пара"].map(function (u) { return '<option value="' + u + '"' + ((p.unit || "") === u ? " selected" : "") + ">" + (u || "—") + "</option>"; }).join("") + "</select></label>" +
+      f("cost", "cf.cost", p.cost, 'inputmode="numeric"') + f("minStock", "cf.min", p.minStock, 'inputmode="numeric"') + f("origin", "cf.origin", p.origin, 'maxlength="40"') + f("photoSource", "cf.psrc", p.photoSource, 'maxlength="200"') + "</div></details>"; }
   function photoBox() { var ph = SF.state.pphoto;
     return '<label class="upload ph' + (ph ? " done" : "") + '">' + (ph ? '<img src="' + esc(ph) + '" alt="">' + "<span>" + I("check", 16) + t("menu.photoSet") + "</span><small>" + t("tr.change") + "</small>" : I("plus", 22) + "<b>" + t("menu.photo") + "</b><small>" + t("menu.photoSub") + "</small>") +
       '<input type="file" accept="image/*" data-input="pphoto"></label>' + (ph ? '<button type="button" class="btn sm ghost" data-act="pphotodel">' + I("trash", 14) + t("btn.remove") + "</button>" : ""); }
@@ -354,6 +360,7 @@
     Array.prototype.forEach.call(el.parentNode.children, function (b) { var on = b === el; b.classList.toggle("on", on); b.setAttribute("aria-checked", on); }); };
   SF.forms.prod = function (fd, f) { var body = { name: fd.name, desc: fd.desc, price: Number(fd.price), weight: fd.weight, categoryId: fd.categoryId, kind: fd.kind, popular: !!fd.popular,
       oldPrice: fd.oldPrice ? Number(fd.oldPrice) : null, photo: SF.state.pphoto || null, meals: ["b", "l", "d", "n"].filter(function (m) { return fd["meal_" + m]; }) };
+    if (isShopU()) { ["model", "barcode", "sku", "unit", "origin", "photoSource"].forEach(function (k) { body[k] = fd[k] || ""; }); ["cost", "minStock"].forEach(function (k) { var v = String(fd[k] || "").replace(/\D/g, ""); body[k] = v === "" ? null : Number(v); }); }
     if (isShopU()) { body.kind = "box"; body.brand = fd.brand || ""; body.stock = String(fd.stock || "").trim() === "" ? null : Number(String(fd.stock).replace(/\D/g, "")); }
     if (isShopU()) { var vr = Array.prototype.map.call(f.querySelectorAll(".vrow"), function (row) { var vs = row.querySelector("[data-vs]").value.replace(/\D/g, ""); return { id: row.querySelector("[data-vi]").value || undefined, label: row.querySelector("[data-vl]").value.trim(), price: Number(row.querySelector("[data-vp]").value.replace(/\D/g, "")), stock: vs === "" ? null : Number(vs) }; });
       body.variants = vr; if (vr.length) delete body.price; }
