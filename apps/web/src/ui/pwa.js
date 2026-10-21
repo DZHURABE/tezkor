@@ -26,7 +26,8 @@
   /* inside the Android app (APK) there is nothing to install */
   var inApk = /TezkorApp\//.test(navigator.userAgent);
   SF.inApk = inApk;
-  function apkOn() { return !!(SF.state.pub && SF.state.pub.apk) && !ios; }
+  /* the browser install (no «dangerous file» warning) always wins; the APK is only the fallback when the browser cannot install */
+  function apkOn() { return !!(SF.state.pub && SF.state.pub.apk) && !ios && !enabled; }
   /* the card is shown on the home screen and in profiles; hidden inside the installed app */
   SF.installCard = function () {
     if (inApk || standalone || (!enabled && !apkOn())) return "";

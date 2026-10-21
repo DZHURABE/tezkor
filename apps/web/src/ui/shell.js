@@ -14,7 +14,7 @@
   }
   function bell() { if (!SF.state.user) return ""; var n = (SF.state.notes || []).length;
     return '<button class="iconbtn" data-act="notes" aria-label="' + t("n.title") + '">' + I("bell") + (n ? '<span class="dot">' + n + "</span>" : "") + "</button>"; }
-  function cityName() { var c = (SF.state.cities || []).filter(function (x) { return x.id === SF.state.cityId; })[0]; return c ? SF.tx(c.name) : ""; }
+  function cityName() { var c = (SF.state.cities || []).filter(function (x) { return x.id === SF.state.cityId; })[0], a = (SF.state.areas || []).filter(function (x) { return x.id === SF.state.areaId && x.cityId === SF.state.cityId; })[0]; return c ? SF.tx(c.name) + (a ? " · " + SF.tx(a.name) : "") : ""; }
   SF.langSel = langSel; SF.bell = bell;
 
   /* customer web app */

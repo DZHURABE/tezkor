@@ -5,7 +5,7 @@
   function remember(list) { (list || []).forEach(function (p) { cache[p.id] = p; }); }
   function cartSum() { var c = SF.cart.get(); return Object.keys(c.items).reduce(function (s, k) { return s + (cache[k] ? cache[k].price * c.items[k] : 0); }, 0); }
   SF.cartSum = cartSum;
-  function cityQ() { return "cityId=" + encodeURIComponent(SF.state.cityId); }
+  function cityQ() { return "cityId=" + encodeURIComponent(SF.state.cityId) + SF.areaQ(); }
 
   /* ---------- cards ---------- */
   function isFav(ty, id) { var u = SF.state.user, f = u && u.favs; return !!(f && (f[ty] || []).indexOf(id) >= 0); }

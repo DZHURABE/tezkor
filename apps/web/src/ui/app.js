@@ -36,11 +36,16 @@
   SF.forms.search = function (fd) { SF.state.q = fd.q || ""; if (SF.addRecent) SF.addRecent(fd.q); SF.go("/search?q=" + encodeURIComponent(fd.q || "")); };
   SF.inputs.lang = function (v) { SF.state.lang = v; SF.ls.set("lang", v); document.documentElement.lang = v; if (SF.state.user) SF.api.patch("/auth/me", { lang: v }).catch(function () {}); SF.render({ quiet: true }); };
   SF.actions.drawer = function () { SF.state.drawer = !SF.state.drawer; var p = document.querySelector(".panel"); if (p) p.classList.toggle("open", SF.state.drawer); };
+  /* where I am looking: the whole town (everything in it) or one village of it */
+  SF.areaQ = function () { var a = (SF.state.areas || []).filter(function (x) { return x.id === SF.state.areaId && x.cityId === SF.state.cityId; })[0]; return a ? "&areaId=" + encodeURIComponent(a.id) : ""; };
   SF.actions.city = function () {
+    var ar = (SF.state.areas || []).filter(function (x) { return x.cityId === SF.state.cityId; }), cur = SF.areaQ() ? SF.state.areaId : "";
     SF.modal('<button class="mx" data-act="closemodal" aria-label="' + t("btn.close") + '">' + I("x", 20) + '</button><h2 class="h2">' + t("profile.city") + '</h2><div class="citylist">' + SF.state.cities.map(function (c) {
-      return '<button class="cityopt' + (c.id === SF.state.cityId ? " on" : "") + '" data-act="setcity" data-id="' + c.id + '">' + I("pin", 18) + "<b>" + esc(SF.tx(c.name)) + "</b>" + (c.id === SF.state.cityId ? I("check", 18) : "") + "</button>"; }).join("") + "</div>");
+      return '<button class="cityopt' + (c.id === SF.state.cityId && !cur ? " on" : "") + '" data-act="setcity" data-id="' + c.id + '">' + I("pin", 18) + "<b>" + esc(SF.tx(c.name)) + (c.id === SF.state.cityId && ar.length ? ' <small class="muted">· ' + t("ar.all") + "</small>" : "") + "</b>" + (c.id === SF.state.cityId && !cur ? I("check", 18) : "") + "</button>" +
+        (c.id === SF.state.cityId ? ar.map(function (x) { return '<button class="cityopt sub' + (x.id === cur ? " on" : "") + '" data-act="setarea" data-id="' + x.id + '"><b>' + esc(SF.tx(x.name)) + "</b>" + (x.id === cur ? I("check", 18) : "") + "</button>"; }).join("") : ""); }).join("") + "</div>" + (ar.length ? '<p class="fine">' + t("ar.pickHint") + "</p>" : ""));
   };
-  SF.actions.setcity = function (el) { SF.state.cityId = el.dataset.id; SF.ls.set("city", el.dataset.id); SF.closeModal(); if (SF.state.user && SF.state.user.role === "customer") SF.api.patch("/auth/me", { cityId: el.dataset.id }).catch(function () {}); SF.go("/"); };
+  SF.actions.setarea = function (el) { SF.state.areaId = el.dataset.id; SF.ls.set("area", el.dataset.id); SF.closeModal(); SF.go("/"); };
+  SF.actions.setcity = function (el) { SF.state.areaId = ""; SF.ls.set("area", ""); SF.state.cityId = el.dataset.id; SF.ls.set("city", el.dataset.id); SF.closeModal(); if (SF.state.user && SF.state.user.role === "customer") SF.api.patch("/auth/me", { cityId: el.dataset.id }).catch(function () {}); SF.go("/"); };
   SF.actions.notes = function () {
     var list = SF.state.notes || [];
     SF.modal('<button class="mx" data-act="closemodal" aria-label="' + t("btn.close") + '">' + I("x", 20) + '</button><h2 class="h2">' + t("n.title") + "</h2>" + (list.length ? '<div class="nlist">' + list.map(function (n) {
@@ -80,8 +85,8 @@
   /* ---------- boot ---------- */
   var tok = SF.ls.get("token", null);
   if (tok) SF.api.setToken(tok);
-  Promise.all([SF.api.get("/cities"), SF.api.get("/categories"), SF.api.get("/settings/public"), SF.api.get("/categories?shop=1").catch(function () { return []; }), tok ? SF.api.get("/auth/me").catch(function () { SF.api.setToken(null); SF.ls.set("token", null); return null; }) : null]).then(function (a) {
-    SF.state.cities = a[0]; SF.state.categories = a[1]; SF.state.pub = a[2]; SF.state.shopCats = a[3]; SF.state.user = a[4];
+  Promise.all([SF.api.get("/cities"), SF.api.get("/categories"), SF.api.get("/settings/public"), SF.api.get("/categories?shop=1").catch(function () { return []; }), tok ? SF.api.get("/auth/me").catch(function () { SF.api.setToken(null); SF.ls.set("token", null); return null; }) : null, SF.api.get("/areas").catch(function () { return []; })]).then(function (a) {
+    SF.state.cities = a[0]; SF.state.categories = a[1]; SF.state.pub = a[2]; SF.state.shopCats = a[3]; SF.state.user = a[4]; SF.state.areas = a[5] || []; SF.state.areaId = SF.ls.get("area", "") || "";
     var saved = SF.ls.get("city", null); SF.state.cityId = a[0].some(function (c) { return c.id === saved; }) ? saved : a[2].defaultCityId;
     if (SF.state.user) { SF.poll(true); }
     if (SF.state.pub.demo) { var fab = document.createElement("button"); fab.className = "demofab"; fab.setAttribute("data-act", "demo"); fab.innerHTML = I("users", 18) + "<span>Demo</span>"; document.body.appendChild(fab); }

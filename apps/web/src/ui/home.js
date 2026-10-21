@@ -35,7 +35,7 @@
   function etaMin(r) { return parseInt(String(r.eta || "").split(/[–-]/)[0], 10) || 99; }
   SF.route("/", { title: "nav.home", render: function (p, q) {
     if (q.cat) { setTimeout(function () { SF.go("/food?cat=" + q.cat); }, 0); return ""; }       // old links
-    var cq = "cityId=" + encodeURIComponent(SF.state.cityId), soft = function (u) { return api().get(u).catch(function () { return null; }); };
+    var cq = "cityId=" + encodeURIComponent(SF.state.cityId) + SF.areaQ(), soft = function (u) { return api().get(u).catch(function () { return null; }); };
     return Promise.all([api().get("/banners"), api().get("/restaurants?" + cq), SF.svcOn("ads") ? soft("/ads/search?svc=ads&limit=4&" + cq) : null, SF.svcOn("shops") ? soft("/shops/goods?limit=8&" + cq) : null]).then(function (res) {
       var banners = res[0], rests = res[1], newAds = res[2], newGoods = res[3];
       return Promise.all(rests.slice(0, 12).map(function (r) { return api().get("/restaurants/" + r.id).then(function (f) { return Object.assign(f, { orderCount: r.orderCount, hasSale: r.hasSale, isNew: r.isNew }); }); })).then(function (full) {
@@ -85,7 +85,7 @@
   var GK = ["q", "cat", "brand", "min", "max", "sale", "sort"];
   function gqs(o) { return GK.filter(function (k) { return o[k]; }).map(function (k) { return k + "=" + encodeURIComponent(o[k]); }).join("&"); }
   function gcurQ() { return SF.match(SF.path()).query || {}; }
-  function gapi(q, off) { return "/shops/goods?cityId=" + encodeURIComponent(SF.state.cityId) + (q.q ? "&q=" + encodeURIComponent(q.q) : "") + (q.cat ? "&cat=" + q.cat : "") + (q.brand ? "&brand=" + encodeURIComponent(q.brand) : "") + (q.min ? "&priceMin=" + q.min : "") + (q.max ? "&priceMax=" + q.max : "") + (q.sale ? "&sale=1" : "") + (q.sort ? "&sort=" + q.sort : "") + "&offset=" + off + "&limit=20"; }
+  function gapi(q, off) { return "/shops/goods?cityId=" + encodeURIComponent(SF.state.cityId) + SF.areaQ() + (q.q ? "&q=" + encodeURIComponent(q.q) : "") + (q.cat ? "&cat=" + q.cat : "") + (q.brand ? "&brand=" + encodeURIComponent(q.brand) : "") + (q.min ? "&priceMin=" + q.min : "") + (q.max ? "&priceMax=" + q.max : "") + (q.sale ? "&sale=1" : "") + (q.sort ? "&sort=" + q.sort : "") + "&offset=" + off + "&limit=20"; }
   SF.goodCard = function (p) { return goodCard(p); };
   function goodCard(p) { return '<div class="gwrap">' + SF.prodCard(p) + '<a class="gshop" href="#/r/' + p.restaurant.id + '">' + I("store", 12) + esc(tx(p.restaurant.name)) + "</a></div>"; }
   SF.route("/shops/goods", { title: "sv.shops", render: function (p, q) {
@@ -113,7 +113,7 @@
   SF.forms.gdfilter = function (fd) { var q = gcurQ(); q.min = String(fd.min || "").replace(/\D/g, ""); q.max = String(fd.max || "").replace(/\D/g, ""); q.sale = fd.sale ? "1" : ""; SF.closeModal(); SF.go("/shops/goods?" + gqs(q)); };
   SF.route("/shops", { title: "sv.shops", render: function (p, q) {
     if (!SF.svcOn("shops") && !(SF.state.user && SF.state.user.role === "admin")) { setTimeout(function () { SF.actions.soon({ dataset: { k: "shops" } }); }, 0); SF.go("/"); return ""; }
-    return api().get("/restaurants?kind=shop&cityId=" + encodeURIComponent(SF.state.cityId)).then(function (list) { var s = String(q.q || "").toLowerCase();
+    return api().get("/restaurants?kind=shop&cityId=" + encodeURIComponent(SF.state.cityId) + SF.areaQ()).then(function (list) { var s = String(q.q || "").toLowerCase();
       var l = list.filter(function (r) { return !s || (tx(r.name) + " " + tx(r.cuisine)).toLowerCase().indexOf(s) >= 0; }), top = l.filter(function (r) { return r.pinned; }), rest = l.filter(function (r) { return !r.pinned; });
       return '<div class="svhead"><a class="svback" href="#/" aria-label="' + t("btn.back") + '">' + I("chevL", 20) + "</a><h1>" + t("sv.shops") + '</h1><span class="muted">' + t("sh.count", { n: list.length }) + "</span></div>" +
         shopTabs("shops") + '<form class="sasearch slim" data-form="shsearch" role="search">' + I("search", 20) + '<input name="q" value="' + esc(q.q || "") + '" placeholder="' + t("sh.searchPh") + '" aria-label="' + t("sh.searchPh") + '"><button class="sago" aria-label="' + t("btn.find") + '">' + I("chevR", 18) + "</button></form>" +
