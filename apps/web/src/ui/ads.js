@@ -205,6 +205,7 @@
     var body = { svc: d.svc, cat: d.cat, title: d.title, desc: d.desc, price: String(d.price).replace(/\D/g, ""), cityId: d.cityId, areaId: d.areaId || "", phone: d.phone, photos: d.photos, cond: d.cond || "", addr: d.addr || "", lat: d.lat == null ? null : d.lat, lng: d.lng == null ? null : d.lng, draft: isDraft };
     return (d.id ? api().patch("/ads/" + d.id, body) : api().post("/ads", body)).then(function (a) { SF.state.adf = null;
       if (isDraft) { SF.toast(t("ads.draftSaved")); SF.go(B + "/my?tab=draft"); return; }
+      if (a.awaiting && a.awaiting[0]) { SF.state.curad = a; SF.go(B + "/my?tab=pending"); setTimeout(function () { payModal(a.awaiting[0]); }, 300); return; }
       if ((SF.state.adcfg || {}).paid && ["active", "pending"].indexOf(a.status) >= 0) { SF.go(B + "/" + a.id + "/promote"); return; }
       SF.toast(t(a.status === "active" ? "ads.published" : "ads.sent")); SF.go(B + "/my?tab=" + (a.status === "active" ? "active" : "pending")); }); };
   SF.actions.adpk = function (el) { SF.state.adpk = el.dataset.v; SF.render({ quiet: true }); };

@@ -21,7 +21,7 @@
     var f = q.status || "", s = q.q || "";
     return api().get("/admin/orders?status=" + f + "&q=" + encodeURIComponent(s)).then(function (list) {
       SF.state.aorders = list;
-      var help = list.filter(function (o) { return o.escalated && o.status === "pending"; });
+      var help = list.filter(function (o) { return o.escalated && !o.byAdmin && (o.status === "pending" || o.status === "cooking"); });
       return (help.length ? '<section class="card stack helpbox"><h3>' + I("bell", 18) + " " + t("esc.title", { n: help.length }) + "</h3>" + help.map(function (o) {
         return '<div class="payrow"><span class="grow"><b>№' + o.number + " · " + esc(tx(o.restaurant.name)) + "</b><small>" + t(o.escalWhy === "nostock" ? "esc.nostock" : "esc.late") + " · " + esc(o.address.text || "") + '</small></span><b class="num">' + money(o.total) + '</b><button class="btn sm ok" data-act="atakeopen" data-id="' + o.id + '">' + t("esc.take") + "</button></div>"; }).join("") + "</section>" : "") +
       '<div class="toolbar"><div class="chips">' + [["", "adm.all"], ["active", "adm.active"], ["pending", "st.pending"], ["cooking", "st.cooking"], ["ready", "st.ready"], ["picked_up", "st.picked_up"], ["delivered", "st.delivered"], ["cancelled", "st.cancelled"], ["rejected", "st.rejected"]].map(function (x) {
@@ -40,7 +40,7 @@
       '<div class="line"><span>' + t("cart.delivery") + '</span><span class="num">' + money(o.deliveryFee) + '</span></div><div class="line tot"><span>' + t("cart.total") + '</span><b class="num">' + money(o.total) + "</b></div>" +
       (o.commission != null ? '<div class="line muted"><span>' + t("adm.commission") + " / " + t("k.platform") + '</span><span class="num">' + money(o.commission) + " / " + money(o.platform) + "</span></div>" : "") +
       (o.byAdmin ? '<p class="note ok">' + I("check", 16) + "<span>" + t("esc.byAdmin") + (o.sourceNote ? " · " + esc(o.sourceNote) : "") + "</span></p>" : "") +
-      (o.status === "pending" ? '<button type="button" class="btn ok block" data-act="atakeopen" data-id="' + o.id + '">' + I("check", 16) + t("esc.take") + "</button>" : "") +
+      ((o.status === "pending" || (o.escalated && !o.byAdmin && o.status === "cooking")) ? '<button type="button" class="btn ok block" data-act="atakeopen" data-id="' + o.id + '">' + I("check", 16) + t("esc.take") + "</button>" : "") +
       '<p class="lbl">' + t("adm.history") + '</p><ol class="hist">' + o.history.map(function (h) { return '<li><span class="num">' + SF.dt(h.at) + "</span>" + SF.statusPill(h.status) + "</li>"; }).join("") + "</ol>" +
       (next.length ? '<p class="lbl">' + t("adm.changeStatus") + '</p><div class="tags">' + next.map(function (s) { return '<button class="btn sm ' + (s === "cancelled" || s === "rejected" ? "danger" : "ghost") + '" data-act="aset" data-id="' + o.id + '" data-v="' + s + '">' + t("st." + s) + "</button>"; }).join("") + "</div>" : "") + "</div>", "wide"); };
   /* take the order over for the shop: where I buy it, and I deliver it myself */

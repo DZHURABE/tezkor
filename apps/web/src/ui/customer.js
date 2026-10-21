@@ -2,7 +2,13 @@
 (function () {
   var t = SF.t, esc = SF.esc, I = SF.icon, tx = SF.tx, money = SF.money, api = function () { return SF.api; };
   var cache = SF.state.prod = SF.state.prod || {};
-  function remember(list) { (list || []).forEach(function (p) { cache[p.id] = p; }); }
+  /* a product with sizes also gets one virtual line per size («id~size») so the cart, totals and steppers work per size */
+  function remember(list) { (list || []).forEach(function (p) { cache[p.id] = p;
+    (p.variants || []).forEach(function (v) { var o = {}; for (var k in p) o[k] = p[k]; o.id = p.id + "~" + v.id; o.baseId = p.id; o.variants = null; o.price = v.price; o.oldPrice = v.oldPrice || null; o.stock = v.stock == null ? null : v.stock;
+      o.available = p.available && v.available !== false && v.stock !== 0; o.weight = v.label; o.name = {}; ["tg", "ru", "en"].forEach(function (l) { o.name[l] = (tx(p.name)) + " · " + v.label; }); cache[o.id] = o; }); }); }
+  function hasV(p) { return !!(p.variants && p.variants.length); }
+  function vFrom(p) { return Math.min.apply(null, p.variants.map(function (v) { return v.price; })); }
+  function varBtn(p) { return '<button class="btn sm primary vchoose" data-act="prod" data-id="' + p.id + '">' + t("var.choose") + "</button>"; }
   function cartSum() { var c = SF.cart.get(); return Object.keys(c.items).reduce(function (s, k) { return s + (cache[k] ? cache[k].price * c.items[k] : 0); }, 0); }
   SF.cartSum = cartSum;
   function cityQ() { return "cityId=" + encodeURIComponent(SF.state.cityId) + SF.areaQ(); }
@@ -31,7 +37,7 @@
     return '<div class="pcard' + (p.available ? "" : " off") + (compact ? " mini" : "") + '">' + favBtn("p", p.id) + '<button class="pimg' + (p.photo ? " hasph" : "") + '" style="--tone:' + esc(p.restaurant ? p.restaurant.tone : SF.state.tone || "#F2EFEA") + '" data-act="prod" data-id="' + p.id + '" aria-label="' + esc(tx(p.name)) + '">' + SF.pic(p, compact ? 92 : 118) +
       (off ? '<span class="chip sale">−' + off + "%</span>" : p.popular ? '<span class="chip hot">' + I("fire", 12) + t("prod.hit") + "</span>" : "") + "</button>" +
       '<div class="pbody">' + (p.brand ? '<small class="pbrand">' + esc(p.brand) + "</small>" : "") + '<b class="pname">' + esc(tx(p.name)) + likeChip(p) + "</b>" + (p.stock != null && p.available && p.stock <= 5 ? '<span class="stockl">' + t("sh.left", { n: p.stock }) + "</span>" : "") + (compact && p.restaurant ? '<span class="pdesc">' + esc(tx(p.restaurant.name)) + "</span>" : '<span class="pdesc">' + esc(tx(p.desc)) + "</span>") +
-      '<div class="prow"><span class="price num">' + money(p.price) + (off ? "<s>" + money(p.oldPrice) + "</s>" : "") + (p.weight ? '<small>' + esc(p.weight) + "</small>" : "") + "</span>" + (p.available ? stepper(p, q) : '<span class="pill p-mut">' + t("prod.soldout") + "</span>") + "</div></div></div>";
+      '<div class="prow"><span class="price num">' + (hasV(p) ? '<small class="vfrom">' + t("var.from") + "</small> " : "") + money(p.price) + (off ? "<s>" + money(p.oldPrice) + "</s>" : "") + (p.weight && !hasV(p) ? '<small>' + esc(p.weight) + "</small>" : "") + "</span>" + (p.available ? (hasV(p) ? varBtn(p) : stepper(p, q)) : '<span class="pill p-mut">' + t("prod.soldout") + "</span>") + "</div></div></div>";
   }
   SF.prodCard = prodCard; SF.rememberProducts = remember;
   SF.actions.brandf = function (el) { SF.state.brandF = { r: el.dataset.r, b: el.dataset.v }; SF.render({ quiet: true }); };
@@ -212,12 +218,21 @@
   SF.actions.prod = function (el) {
     var p = cache[el.dataset.id]; if (!p) return; SF.state.mq = 1; openProd(p);
   };
+  function vSel(p) { var v = SF.state.vsel; return p.variants.filter(function (x) { return x.id === v; })[0]; }
+  function vChips(p) { return '<div class="vchips" role="radiogroup" aria-label="' + t("var.pick") + '">' + p.variants.map(function (v) { var out = !p.available || v.available === false || v.stock === 0, on = v.id === SF.state.vsel;
+      return '<button type="button" class="vchip' + (on ? " on" : "") + (out ? " off" : "") + '" role="radio" aria-checked="' + on + '"' + (out ? " disabled" : "") + ' data-act="vsel" data-v="' + v.id + '"><b>' + esc(v.label) + '</b><span class="num">' + money(v.price) + "</span>" +
+        (v.oldPrice ? "<s>" + money(v.oldPrice) + "</s>" : "") + (out ? "<em>" + t("prod.soldout") + "</em>" : v.stock != null && v.stock <= 5 ? "<em>" + t("sh.left", { n: v.stock }) + "</em>" : "") + "</button>"; }).join("") + "</div>"; }
+  SF.actions.vsel = function (el) { var p = cache[SF.state.vprod]; if (!p) return; SF.state.vsel = el.dataset.v; var v = vSel(p);
+    Array.prototype.forEach.call(el.parentNode.children, function (b) { var on = b === el; b.classList.toggle("on", on); b.setAttribute("aria-checked", on); });
+    var q = cache[p.id + "~" + v.id]; SF.state.mq = Math.min(SF.state.mq, q && q.stock != null ? Math.max(1, q.stock) : 50); document.getElementById("mqv").textContent = SF.state.mq; document.getElementById("mqs").textContent = money(v.price * SF.state.mq);
+    var b = document.querySelector("[data-act=addmq]"); if (b) b.dataset.id = p.id + "~" + v.id; };
   function openProd(p) {
-    var tone = p.restaurant ? p.restaurant.tone : SF.state.tone || "#F2EFEA";
+    var tone = p.restaurant ? p.restaurant.tone : SF.state.tone || "#F2EFEA", cur = p;
+    if (hasV(p)) { SF.state.vprod = p.id; var fv = p.variants.filter(function (x) { return x.available !== false && x.stock !== 0; })[0] || p.variants[0]; SF.state.vsel = fv.id; cur = cache[p.id + "~" + fv.id] || p; SF.state.mq = Math.min(SF.state.mq, cur.stock != null ? Math.max(1, cur.stock) : 50); }
     SF.modal('<button class="mx" data-act="closemodal" aria-label="' + t("btn.close") + '">' + I("x", 20) + '</button><div class="phero' + (p.photo ? " hasph" : "") + '" style="--tone:' + esc(tone) + '">' + SF.pic(p, 220) + "</div>" +
-      '<div class="pinfo"><h2 class="h2">' + esc(tx(p.name)) + '</h2><p class="muted">' + esc(tx(p.desc)) + "</p>" + (p.weight ? '<span class="chip">' + esc(p.weight) + "</span>" : "") +
+      '<div class="pinfo"><h2 class="h2">' + esc(tx(p.name)) + '</h2><p class="muted">' + esc(tx(p.desc)) + "</p>" + (p.weight && !hasV(p) ? '<span class="chip">' + esc(p.weight) + "</span>" : "") + (hasV(p) ? vChips(p) : "") +
       (p.available ? '<div class="pbuy"><div class="stepper big"><button data-act="mq" data-v="-1" aria-label="' + t("a.less") + '">' + I("minus", 18) + '</button><b class="num" id="mqv">' + SF.state.mq + '</b><button data-act="mq" data-v="1" aria-label="' + t("a.more") + '">' + I("plus", 18) + "</button></div>" +
-        '<button class="btn primary grow" data-act="addmq" data-id="' + p.id + '">' + t("prod.add") + ' · <span class="num" id="mqs">' + money(p.price * SF.state.mq) + "</span></button></div>" : '<div class="msg err">' + t("prod.soldout") + "</div>") + "</div>", "prod");
+        '<button class="btn primary grow" data-act="addmq" data-id="' + cur.id + '">' + t("prod.add") + ' · <span class="num" id="mqs">' + money(cur.price * SF.state.mq) + "</span></button></div>" : '<div class="msg err">' + t("prod.soldout") + "</div>") + "</div>", "prod");
   }
   SF.actions.mq = function (el) { var p = cache[(document.querySelector("[data-act=addmq]") || {}).dataset.id]; SF.state.mq = Math.max(1, Math.min(50, SF.state.mq + (+el.dataset.v)));
     document.getElementById("mqv").textContent = SF.state.mq; if (p) document.getElementById("mqs").textContent = money(p.price * SF.state.mq); };

@@ -18,7 +18,7 @@
       var head = '<section class="chero' + (c.online ? " on" : "") + '"><span class="avatar">' + esc(me.name.charAt(0)) + '</span><div class="grow"><b>' + esc(me.name) + "</b><span>" + SF.stars(c.rating) + ' <small class="num">(' + (c.ratingCount || 0) + ")</small> · " + t("veh." + c.vehicle) + "</span></div>" +
         '<button class="switch big' + (c.online ? " on" : "") + '" role="switch" aria-checked="' + c.online + '" data-act="online" aria-label="' + t("cour.online") + '"></button><p class="cstate">' + (c.online ? (act ? t("cour.st.busy") : t("cour.st.online")) : t("cour.st.offline")) + "</p></section>" +
         '<div class="kpis k3">' + SF.kpi("wallet", t("cour.today"), money(e.today)) + SF.kpi("box", t("cour.delivered"), e.todayCount) + SF.kpi("star", t("k.rating"), c.rating == null ? "—" : Number(c.rating).toFixed(1)) + "</div>";
-      head = SF.soundBar() + head;
+      head = (SF.pushCard ? SF.pushCard() : "") + SF.soundBar() + head;
       if (act) return head + activeCard(act);
       if (!c.online) return head + SF.empty("scooter", t("cour.offTitle"), t("cour.offSub"), '<button class="btn primary" data-act="online">' + t("cour.goOnline") + "</button>");
       return head + '<div class="sect"><h2>' + t("cour.available") + '</h2><span class="muted num">' + open.length + "</span></div>" + (open.length ? '<div class="stack">' + open.map(function (o) {

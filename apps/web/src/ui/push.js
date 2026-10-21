@@ -23,8 +23,23 @@
       else if (Notification.permission === "default" && (SF.ls.get("pushx", 0) || 0) < Date.now())
         bar('<div class="grow"><b>' + t("push.t") + "</b><small>" + t(me.role === "customer" ? "push.s.c" : "push.s") + '</small></div><button type="button" class="btn primary sm" data-act="pushon">' + t("push.on") + '</button><button type="button" class="btn ghost sm" data-act="pushx">' + t("push.later") + "</button>"); });
   }
+  /* a card on the shop / courier screen: is this phone connected, and a test button */
+  SF.pushCard = function () {
+    var me = SF.state.user; if (!me) return "";
+    var inApk = SF.inApk, row = function (cls, ic, title, sub, btn) { return '<section class="pushcard ' + cls + '"><span class="sb-ic">' + I(ic, 22) + '</span><div class="grow"><b>' + title + "</b><small>" + sub + "</small></div>" + (btn || "") + "</section>"; };
+    if (!sup) return row("bad", "info", t(inApk ? "push.apkT" : "push.noT"), t(inApk ? "push.apkS" : ios && !standalone ? "push.ios" : "push.noS"));
+    if (SF.state.pushKey === undefined) { key().then(function (k) { SF.state.pushKey = k || null; SF.render({ quiet: true }); }); return ""; }
+    if (!SF.state.pushKey) return "";
+    if (Notification.permission === "denied") return row("bad", "info", t("push.blockedT"), t("push.blockedS"));
+    if (Notification.permission !== "granted") return row("warn", "bell", t("push.t"), t("push.s"), '<button type="button" class="btn primary sm" data-act="pushon">' + t("push.on") + "</button>");
+    if (SF.state.pushOk === undefined) { SF.state.pushOk = null; navigator.serviceWorker.ready.then(function (r) { return r.pushManager.getSubscription(); }).then(function (s) { SF.state.pushOk = !!s; SF.render({ quiet: true }); }).catch(function () {}); }
+    if (!SF.state.pushOk) return row("warn", "bell", t("push.t"), t("push.s"), '<button type="button" class="btn primary sm" data-act="pushre">' + t("push.on") + "</button>");
+    return row("ok", "check", t("push.okT"), t("push.okS"), '<button type="button" class="btn ghost sm" data-act="pushtest">' + t("push.testBtn") + "</button>");
+  };
+  SF.actions.pushre = function () { return subscribe().then(function () { SF.state.pushOk = true; SF.toast(t("push.done")); SF.render({ quiet: true }); }, function () { SF.toast(t("push.denied"), "err"); }); };
+  SF.actions.pushtest = function () { return SF.api.post("/push/test").then(function (r) { SF.toast(t(r && r.subs ? "push.testSent" : "push.noSubs"), r && r.subs ? "info" : "err"); }, function () { SF.toast(t("push.noSubs"), "err"); }); };
   SF.actions.pushon = function () { if (busy) return; busy = true;
-    Notification.requestPermission().then(function (p) { bar(""); if (p === "granted") return subscribe().then(function () { SF.toast(t("push.done")); }); if (p === "denied") SF.toast(t("push.denied")); })
+    Notification.requestPermission().then(function (p) { bar(""); if (p === "granted") return subscribe().then(function () { SF.state.pushOk = true; SF.toast(t("push.done")); SF.render({ quiet: true }); }); if (p === "denied") SF.toast(t("push.denied")); })
       .catch(function () {}).then(function () { busy = false; }); };
   SF.actions.pushx = function () { SF.ls.set("pushx", Date.now() + 3 * 864e5); bar(""); };
   /* sign-out: the phone stops getting this person's alerts */
