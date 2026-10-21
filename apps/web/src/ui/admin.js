@@ -21,7 +21,10 @@
     var f = q.status || "", s = q.q || "";
     return api().get("/admin/orders?status=" + f + "&q=" + encodeURIComponent(s)).then(function (list) {
       SF.state.aorders = list;
-      return '<div class="toolbar"><div class="chips">' + [["", "adm.all"], ["active", "adm.active"], ["pending", "st.pending"], ["cooking", "st.cooking"], ["ready", "st.ready"], ["picked_up", "st.picked_up"], ["delivered", "st.delivered"], ["cancelled", "st.cancelled"], ["rejected", "st.rejected"]].map(function (x) {
+      var help = list.filter(function (o) { return o.escalated && o.status === "pending"; });
+      return (help.length ? '<section class="card stack helpbox"><h3>' + I("bell", 18) + " " + t("esc.title", { n: help.length }) + "</h3>" + help.map(function (o) {
+        return '<div class="payrow"><span class="grow"><b>№' + o.number + " · " + esc(tx(o.restaurant.name)) + "</b><small>" + t(o.escalWhy === "nostock" ? "esc.nostock" : "esc.late") + " · " + esc(o.address.text || "") + '</small></span><b class="num">' + money(o.total) + '</b><button class="btn sm ok" data-act="atakeopen" data-id="' + o.id + '">' + t("esc.take") + "</button></div>"; }).join("") + "</section>" : "") +
+      '<div class="toolbar"><div class="chips">' + [["", "adm.all"], ["active", "adm.active"], ["pending", "st.pending"], ["cooking", "st.cooking"], ["ready", "st.ready"], ["picked_up", "st.picked_up"], ["delivered", "st.delivered"], ["cancelled", "st.cancelled"], ["rejected", "st.rejected"]].map(function (x) {
         return '<a class="chip' + (f === x[0] ? " on" : "") + '" href="#/admin/orders?status=' + x[0] + '">' + t(x[1]) + "</a>"; }).join("") + '</div><form class="minisearch" data-form="aosearch">' + I("search", 16) + '<input name="q" value="' + esc(s) + '" placeholder="' + t("adm.searchOrders") + '" aria-label="' + t("adm.searchOrders") + '"></form></div>' +
         (list.length ? table(["№", t("tb.time"), t("adm.restaurant"), t("role.customer"), t("role.courier"), t("tb.sum"), t("tb.pay"), t("tb.status"), ""], list.map(function (o) {
           return '<tr><td class="num">' + o.number + '</td><td class="num">' + SF.dt(o.createdAt) + "</td><td>" + esc(tx(o.restaurant.name)) + "</td><td>" + esc(o.customer ? o.customer.name : o.dineIn ? t("tb.table", { n: o.tableName }) : "—") + "</td><td>" + esc(o.courier ? o.courier.name : "—") + '</td><td class="num">' + money(o.total) + "</td><td>" + t("pay." + o.payment.method) + "<small class=\"muted\"> · " + t("ps." + o.payment.status) + "</small></td><td>" + SF.statusPill(o.status) + '</td><td><button class="btn sm ghost" data-act="aorder" data-id="' + o.id + '">' + I("eye", 14) + t("btn.open") + "</button></td></tr>"; })) : SF.empty("receipt", t("adm.noOrders")));
@@ -29,15 +32,26 @@
   } });
   SF.forms.aosearch = function (fd) { var q = SF.match(SF.path()).query; SF.go("/admin/orders?status=" + (q.status || "") + "&q=" + encodeURIComponent(fd.q || "")); };
   SF.actions.aorder = function (el) { var o = SF.state.aorders.filter(function (x) { return x.id === el.dataset.id; })[0]; if (!o) return;
-    var next = Object.keys(SomonRules.ORDER_FLOW[o.status] || {}).filter(function (s) { return SomonRules.canTransition(o.status, s, "admin") && !(s === "picked_up" && !o.courierId); });
+    var next = Object.keys(SomonRules.ORDER_FLOW[o.status] || {}).filter(function (s) { return SomonRules.canTransition(o.status, s, "admin") && !(s === "picked_up" && !o.courierId && !o.selfDelivery); });
     SF.modal('<button class="mx" data-act="closemodal" aria-label="' + t("btn.close") + '">' + I("x", 20) + '</button><div class="stack"><h2 class="h2">№' + o.number + " " + SF.statusPill(o.status) + "</h2>" +
       '<div class="line"><span>' + t("adm.restaurant") + "</span><b>" + esc(tx(o.restaurant.name)) + '</b></div><div class="line"><span>' + t("role.customer") + "</span><span>" + (o.customer ? esc(o.customer.name) + ' · <span class="num">' + esc(SF.phone(o.phone || o.customer.phone)) + "</span>" : esc(t("tb.table", { n: o.tableName || "" }) + (o.guestName ? " · " + o.guestName : ""))) + '</span></div><div class="line"><span>' + t("co.address") + '</span><span class="right">' + esc(o.address.text) + "</span></div>" +
       o.items.map(function (i) { return '<div class="line muted"><span>' + esc(tx(i.name)) + " ×" + i.qty + '</span><span class="num">' + money(i.qty * i.price) + "</span></div>"; }).join("") +
       '<div class="line"><span>' + t("co.payment") + "</span><span>" + t("pay." + o.payment.method) + " · " + t("ps." + o.payment.status) + (o.payment.receiptId ? ' <button type="button" class="btn sm ghost" data-act="rcpt" data-id="' + o.id + '">' + t("tr.receipt") + "</button>" : "") + "</span></div>" +
       '<div class="line"><span>' + t("cart.delivery") + '</span><span class="num">' + money(o.deliveryFee) + '</span></div><div class="line tot"><span>' + t("cart.total") + '</span><b class="num">' + money(o.total) + "</b></div>" +
       (o.commission != null ? '<div class="line muted"><span>' + t("adm.commission") + " / " + t("k.platform") + '</span><span class="num">' + money(o.commission) + " / " + money(o.platform) + "</span></div>" : "") +
+      (o.byAdmin ? '<p class="note ok">' + I("check", 16) + "<span>" + t("esc.byAdmin") + (o.sourceNote ? " · " + esc(o.sourceNote) : "") + "</span></p>" : "") +
+      (o.status === "pending" ? '<button type="button" class="btn ok block" data-act="atakeopen" data-id="' + o.id + '">' + I("check", 16) + t("esc.take") + "</button>" : "") +
       '<p class="lbl">' + t("adm.history") + '</p><ol class="hist">' + o.history.map(function (h) { return '<li><span class="num">' + SF.dt(h.at) + "</span>" + SF.statusPill(h.status) + "</li>"; }).join("") + "</ol>" +
       (next.length ? '<p class="lbl">' + t("adm.changeStatus") + '</p><div class="tags">' + next.map(function (s) { return '<button class="btn sm ' + (s === "cancelled" || s === "rejected" ? "danger" : "ghost") + '" data-act="aset" data-id="' + o.id + '" data-v="' + s + '">' + t("st." + s) + "</button>"; }).join("") + "</div>" : "") + "</div>", "wide"); };
+  /* take the order over for the shop: where I buy it, and I deliver it myself */
+  SF.actions.atakeopen = function (el) { var o = (SF.state.aorders || []).filter(function (x) { return x.id === el.dataset.id; })[0]; if (!o) return;
+    SF.modal('<button class="mx" data-act="closemodal" aria-label="' + t("btn.close") + '">' + I("x", 20) + '</button><form class="stack" data-form="atake" data-id="' + o.id + '"><h2 class="h2">№' + o.number + " · " + esc(tx(o.restaurant.name)) + "</h2>" +
+      o.items.map(function (i) { return '<div class="line muted"><span>' + esc(tx(i.name)) + " ×" + i.qty + '</span><span class="num">' + money(i.qty * i.price) + "</span></div>"; }).join("") +
+      '<div class="line"><span>' + t("co.address") + '</span><span class="right">' + esc(o.address.text) + "</span></div>" +
+      '<label class="f">' + t("esc.source") + '<input name="source" placeholder="' + t("esc.sourcePh") + '" maxlength="120"></label>' +
+      '<label class="checkrow"><input type="checkbox" name="self" checked><span>' + t("esc.self") + '<small class="muted">' + t("esc.selfHint") + "</small></span></label>" +
+      '<button class="btn primary block lg">' + I("check", 18) + t("esc.takeBtn") + "</button></form>"); };
+  SF.forms.atake = function (fd, f) { return api().post("/admin/orders/" + f.dataset.id + "/takeover", { source: fd.source || "", self: !!fd.self }).then(function () { SF.closeModal(); SF.toast(t("esc.taken")); SF.render({ quiet: true }); }, function (e) { SF.toast(SF.err(e), "err"); }); };
   SF.actions.aset = function (el) { return api().post("/admin/orders/" + el.dataset.id + "/status", { status: el.dataset.v }).then(function () { SF.closeModal(); SF.toast(t("btn.saved")); SF.render({ quiet: true }); }); };
 
   /* ---------- Restaurants ---------- */
