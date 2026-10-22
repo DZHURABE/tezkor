@@ -173,7 +173,7 @@
         '<label class="sortsel">' + I("sort", 16) + '<select data-input="psort" aria-label="' + t("rs.label") + '">' + PS.map(function (x) { return '<option value="' + x[0] + '"' + (x[0] === so ? " selected" : "") + ">" + t(x[1]) + "</option>"; }).join("") + "</select></label></div>" +
         (rests.length ? sect(t("home.restaurants"), t("cat.rests", { n: rests.length })) + '<div class="rgrid2">' + rests.map(restCard).join("") + "</div>" : "") +
         (prods.length ? sect(t("search.dishes"), t("cat.dishes", { n: prods.length })) + '<div class="pgrid">' + prods.map(function (x) { return prodCard(x, true); }).join("") + "</div>" : "") + gHtml + lists +
-        (!rests.length && !prods.length && !gHtml && !lists ? SF.empty("search", t("search.none"), t("search.noneSub"), '<button class="btn" data-act="qclear">' + t("sr.clear") + "</button>") : ""); });
+        (!rests.length && !prods.length && !gHtml && !lists ? SF.empty("search", t("search.none"), t("search.noneSub"), '<button class="btn" data-act="qclear">' + t("sr.clear") + "</button>") + (SF.missNote ? SF.missNote(s) + SF.soonBlock() : "") : ""); });
   } });
   var qT = null;
   SF.inputs.liveq = function (v) { clearTimeout(qT); qT = setTimeout(function () { var h = "#/search?q=" + encodeURIComponent(v.trim());
@@ -343,8 +343,8 @@
         '<div class="line muted"><span>' + t("cart.delivery") + (qt.km != null ? " · " + qt.km + " " + t("u.km") : "") + '</span><span class="num">' + (qt.deliveryFee != null ? money(qt.deliveryFee) : t("co.pinFirst")) + "</span></div>" + (qt.heavyFee ? '<div class="line muted"><span>' + t("hv.line", { kg: qt.weightKg }) + '</span><span class="num">' + money(qt.heavyFee) + "</span></div>" : "") +
         (qt.discount ? '<div class="line ok"><span>' + t("cart.discount") + '</span><span class="num">−' + money(qt.discount) + "</span></div>" : "") +
         '<div class="line tot"><span>' + t("cart.total") + '</span><b class="num">' + money(qt.total) + "</b></div>" +
-        '<button class="btn primary block lg" data-act="placeorder">' + (x.pay === "card" ? t("co.payOrder") : t("co.placeOrder")) + "</button><p class=\"fine\">" + t("co.fine") + "</p></aside></div>" +
-        '<div class="cobar"><span><small>' + t("cart.total") + '</small><b class="num">' + money(qt.total) + '</b></span><button class="btn primary lg" data-act="placeorder">' + (x.pay === "card" ? t("co.payOrder") : t("co.placeOrder")) + "</button></div>";
+        (qt.tooHeavy ? '<div class="msg err">' + I("info", 16) + "<span>" + t("e.TOO_HEAVY", { max: qt.tooHeavy }) + "</span></div>" : "") + '<button class="btn primary block lg" data-act="placeorder"' + (qt.tooHeavy ? " disabled" : "") + ">" + (x.pay === "card" ? t("co.payOrder") : t("co.placeOrder")) + "</button><p class=\"fine\">" + t("co.fine") + "</p></aside></div>" +
+        '<div class="cobar"><span><small>' + t("cart.total") + '</small><b class="num">' + money(qt.total) + '</b></span><button class="btn primary lg" data-act="placeorder"' + (qt.tooHeavy ? " disabled" : "") + ">" + (x.pay === "card" ? t("co.payOrder") : t("co.placeOrder")) + "</button></div>";
     });
     function payOpt(v, icon, title, sub) { var on = co().pay === v; return '<button class="payopt' + (on ? " on" : "") + '" data-act="paym" data-v="' + v + '" aria-pressed="' + on + '"><span class="pic">' + I(icon, 22) + "</span><span><b>" + title + "</b><small>" + sub + "</small></span><i></i></button>"; }
   } });

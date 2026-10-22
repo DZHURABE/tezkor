@@ -1,0 +1,61 @@
+/* ADMIN — «My shop»: one tidy page with everything the owner needs, and the «Coming soon» list */
+(function () {
+  var t = SF.t, esc = SF.esc, I = SF.icon, api = function () { return SF.api; };
+  function big(href, ic, title, sub, badge) { return '<a class="mhbtn" href="#' + href + '"><span class="mhi">' + I(ic, 26) + "</span><b>" + title + "</b>" + (sub ? "<small>" + sub + "</small>" : "") + (badge ? '<i class="badge">' + badge + "</i>" : "") + "</a>"; }
+  SF.adminRoute("/admin/my", { title: "mh.nav", live: true, render: function () {
+    var u = SF.state.user;
+    if (!u.restaurantId) return '<section class="card stack mhcreate"><h2 class="h2">' + t("mh.create") + "</h2><p class=\"muted\">" + t("mh.createSub") + '</p><button class="btn primary lg block" data-act="mhcreate">' + I("store", 18) + t("mh.create") + "</button></section>" +
+      '<div class="mhgrid">' + big("/admin/services", "grid", t("mh.more"), t("mh.moreSub")) + "</div>";
+    return Promise.all([api().get("/restaurant/me"), api().get("/restaurant/orders").catch(function () { return []; })]).then(function (a) { var r = a[0], os = a[1] || [], nw = os.filter(function (o) { return o.status === "pending"; }).length, act = os.filter(function (o) { return ["pending", "cooking", "ready", "picked_up"].indexOf(o.status) >= 0; }).length;
+      return '<div class="mhpage"><section class="card mhhead"><div><h2 class="h2">' + esc(SF.tx(r.name)) + "</h2><p class=\"muted\">" + t("mh.sub") + '</p></div><label class="switchrow"><span>' + t("mh.open") + '</span><button class="switch' + (r.open ? " on" : "") + '" role="switch" aria-checked="' + !!r.open + '" data-act="ropen" aria-label="' + t("mh.open") + '"></button></label></section>' +
+        '<div class="mhgrid">' + big("/rest/orders", "receipt", t("mh.orders"), act ? t("mh.ordersNew", { n: nw }) + " · " + act : "", nw || "") + big("/rest/menu", "plus", t("mh.add"), "") + big("/rest/catalog", "box", t("mh.catalog"), "") + big("/rest/starter", "list", t("mh.ready"), "") + big("/admin/books", "wallet", t("mh.books"), "") + big("/admin/prices", "scooter", t("pr.nav"), "") + big("/admin/pay", "card", t("pr.payNav"), "") + big("/admin/soon", "flag", t("mh.soon"), t("mh.soonSub")) + "</div>" +
+        '<p class="msg info mhnote">' + I("scooter", 16) + "<span>" + t("mh.deliv", { n: (SF.state.pub && SF.state.pub.handoffMin) || 7 }) + "</span></p>" +
+        '<a class="mhmore" href="#/admin/services">' + I("cog", 18) + "<span><b>" + t("mh.more") + "</b><small>" + t("mh.moreSub") + "</small></span>" + I("chevR", 18) + "</a></div>"; }); } });
+  SF.actions.mhcreate = function () { return api().post("/admin/own-shop", {}).then(function () { return api().get("/auth/me"); }).then(function (me) { SF.state.user = me; SF.render({ quiet: true }); }, function (e) { SF.toast(SF.err(e), "err"); }); };
+
+  SF.adminRoute("/admin/soon", { title: "soon.nav", render: function () {
+    return api().get("/admin/soon").then(function (d) {
+      return '<div class="mhpage"><section class="card stack"><h3>' + t("soon.add") + '</h3><form class="soonform" data-form="soonadd"><label class="upload sm soonph' + (SF.state.soonPhoto ? " done" : "") + '">' + (SF.state.soonPhoto ? '<img src="' + esc(SF.state.soonPhoto) + '" alt="">' : I("plus", 18)) + "<b>" + t(SF.state.soonPhoto ? "soon.photoSet" : "soon.photo") + '</b><input type="file" accept="image/*" data-input="soonphoto"></label><input name="name" maxlength="60" required placeholder="' + t("soon.ph") + '" aria-label="' + t("soon.ph") + '"><button class="btn primary">' + I("plus", 16) + t("soon.add") + "</button></form><p class=\"fine\">" + t("soon.hint") + "</p></section>" +
+        '<section class="card stack"><h3>' + t("soon.list") + "</h3>" + (d.soon.length ? '<div class="soonrows">' + d.soon.map(function (x) { return '<div class="soonrow">' + (x.photo ? '<img class="soonthumb" src="' + esc(x.photo) + '" alt="">' : "") + '<span class="soontag">' + t("soon.t") + "</span><b>" + esc(x.name) + '</b><label class="btn sm ghost soonup">' + t("soon.photo") + '<input type="file" accept="image/*" data-input="soonphotoset" data-id="' + x.id + '" hidden></label><button class="btn sm ghost" data-act="soondel" data-id="' + x.id + '">' + t("soon.drop") + "</button></div>"; }).join("") + "</div>" : '<p class="muted">' + t("soon.none") + "</p>") + "</section>" +
+        '<section class="card stack"><h3>' + t("soon.misses") + "</h3>" + (d.misses.length ? '<div class="soonrows">' + d.misses.map(function (m) { return '<div class="soonrow"><b>' + esc(m.q) + '</b><span class="muted">' + t("soon.times", { n: m.n }) + '</span><button class="btn sm primary" data-act="soonmiss" data-q="' + esc(m.q) + '" data-add="1">' + t("soon.make") + '</button><button class="btn sm ghost" data-act="soonmiss" data-q="' + esc(m.q) + '">' + I("x", 14) + "</button></div>"; }).join("") + "</div>" : '<p class="muted">' + t("soon.noMiss") + "</p>") + "</section></div>"; }); } });
+  SF.inputs.soonphoto = function (v, el) { SF.pickPhoto(el, 700, function (d) { SF.state.soonPhoto = d; SF.render({ quiet: true }); }); };
+  SF.inputs.soonphotoset = function (v, el) { var id = el.dataset.id; SF.pickPhoto(el, 700, function (d) { api().patch("/admin/soon/" + id, { photo: d }).then(function () { SF.render({ quiet: true }); }, function (e) { SF.toast(SF.err(e), "err"); }); }); };
+  SF.forms.soonadd = function (fd) { var ph = SF.state.soonPhoto || null; return api().post("/admin/soon", { name: fd.name, photo: ph }).then(function () { SF.state.soonPhoto = null; SF.toast(t("btn.saved")); SF.render({ quiet: true }); }, function (e) { SF.toast(SF.err(e), "err"); }); };
+  SF.actions.soondel = function (el) { return api().del("/admin/soon/" + el.dataset.id).then(function () { SF.render({ quiet: true }); }); };
+  SF.actions.soonmiss = function (el) { return api().post("/admin/soon/miss", { q: el.dataset.q, add: !!el.dataset.add }).then(function () { SF.render({ quiet: true }); }); };
+
+  /* delivery prices: six numbers, a table of typical orders, three starting suggestions */
+  var PRESETS = [{ deliveryBase: 3, deliveryPerKm: 2, deliveryMin: 5, heavyFreeKg: 20, heavyStepKg: 25, heavyStepFee: 3 }, { deliveryBase: 5, deliveryPerKm: 3, deliveryMin: 7, heavyFreeKg: 20, heavyStepKg: 25, heavyStepFee: 5 }, { deliveryBase: 7, deliveryPerKm: 4, deliveryMin: 10, heavyFreeKg: 10, heavyStepKg: 20, heavyStepFee: 8 }];
+  var PF = [["deliveryBase", "pr.f.base"], ["deliveryPerKm", "pr.f.km"], ["deliveryMin", "pr.f.min"], ["heavyFreeKg", "pr.f.free"], ["heavyStepKg", "pr.f.step"], ["heavyStepFee", "pr.f.fee"], ["maxOrderKg", "pr.f.max"]];
+  function ptable(d) { var KEY = { 5: "pr.r5", 9: "pr.r9", 25: "pr.r25", 50: "pr.r50", 250: "pr.r250", 500: "pr.r500" };
+    return '<table class="prtab"><thead><tr><th></th>' + d.kms.map(function (k) { return "<th>" + t("pr.km", { n: k }) + "</th>"; }).join("") + "</tr></thead><tbody>" + d.rows.map(function (r) { return "<tr><td>" + t(KEY[r.kg]) + "</td>" + r.fees.map(function (f) { return '<td class="num"><b>' + SF.money(f) + "</b></td>"; }).join("") + "</tr>"; }).join("") + "</tbody></table>"; }
+  function pvals(f) { var o = {}; PF.forEach(function (x) { o[x[0]] = f.querySelector("[name=" + x[0] + "]").value; }); return o; }
+  var pvT = null;
+  function prefresh(f) { clearTimeout(pvT); pvT = setTimeout(function () { api().post("/admin/delivery-preview", pvals(f)).then(function (d) { var box = document.getElementById("prtable"); if (box) box.innerHTML = ptable(d); }); }, 250); }
+  SF.adminRoute("/admin/prices", { title: "pr.nav", render: function () { return api().post("/admin/delivery-preview", {}).then(function (d) {
+    return '<div class="mhpage"><p class="muted">' + t("pr.sub") + '</p><form class="card stack prform" data-form="prices"><div class="grid2">' + PF.map(function (x) { return '<label class="f">' + t(x[1]) + '<input name="' + x[0] + '" inputmode="numeric" data-input="prchg" value="' + esc(d.cfg[x[0]]) + '"></label>'; }).join("") + "</div>" +
+      '<p class="lbl">' + t("pr.presets") + '</p><div class="chips">' + [1, 2, 3].map(function (i) { return '<button type="button" class="chip" data-act="prpreset" data-v="' + (i - 1) + '">' + t("pr.p" + i) + "</button>"; }).join("") + "</div>" +
+      '<h3>' + t("pr.table") + '</h3><div id="prtable">' + ptable(d) + '</div><p class="fine">' + t("pr.maxHint") + '</p><p class="fine">' + t("pr.how") + '</p><p class="fine">' + t("pr.hint") + '</p><button class="btn primary block lg">' + t("pr.save") + "</button></form></div>"; }); } });
+  SF.inputs.prchg = function (v, el) { prefresh(el.closest("form")); };
+  SF.actions.prpreset = function (el) { var f = el.closest("form"), p = PRESETS[+el.dataset.v]; PF.forEach(function (x) { if (p[x[0]] != null) f.querySelector("[name=" + x[0] + "]").value = p[x[0]]; }); prefresh(f); };
+  SF.forms.prices = function (fd) { var b = {}; PF.forEach(function (x) { b[x[0]] = fd[x[0]]; }); return api().patch("/admin/settings", b).then(function () { SF.toast(t("pr.saved")); SF.render({ quiet: true }); }, function (e) { SF.toast(SF.err(e), "err"); }); };
+
+
+  /* the shop's own showcase on the home screen: a new visitor sees at once what it is and can order without hunting for the «Shops» section */
+  SF.ownShopHero = function (r) { if (!r || !r.own) return ""; var ps = (r.products || []).filter(function (x) { return x.available; }); if (!ps.length) return "";
+    ps = ps.filter(function (x) { return x.popular; }).concat(ps.filter(function (x) { return !x.popular; })).slice(0, 8); SF.rememberProducts(r.products);
+    var cnt = {}; (r.products || []).forEach(function (x) { if (x.available) cnt[x.categoryId] = (cnt[x.categoryId] || 0) + 1; });
+    var seen = {}, cats = (SF.state.shopCats || []).concat(SF.state.categories || []).filter(function (c) { if (!cnt[c.id] || seen[c.id]) return false; seen[c.id] = 1; return true; }).slice(0, 8), open = r.isOpenNow !== false;
+    return '<section class="sasect ownshop"><a class="osbanner" href="#/r/' + r.id + '"><span class="osb1"></span><span class="osb2"></span><div class="osl"><span class="oslogo">' + I("store", 22) + "</span><div><b>" + esc(SF.tx(r.name)) + "</b><small><i class=\"pulse" + (open ? "" : " off") + "\"></i>" + t(open ? "os.open" : "os.closed") + (r.eta ? " · " + esc(r.eta) + " " + t("u.min") : "") + "</small></div></div>" +
+      "<p>" + t("os.lead") + '</p><span class="oscta">' + t("os.cta") + I("chevR", 18) + "</span></a>" +
+      (cats.length ? '<div class="oscats">' + cats.map(function (c, i) { return '<a class="oscat" style="--i:' + i + '" href="#/shops/goods?cat=' + c.id + '">' + esc(SF.tx(c.name)) + " <i class=\"num\">" + cnt[c.id] + "</i></a>"; }).join("") + "</div>" : "") +
+      '<div class="hscroll osrow">' + ps.map(function (p, i) { return '<div class="osi" style="--i:' + i + '">' + SF.prodCard(p) + "</div>"; }).join("") + "</div></section>"; };
+  /* where customers send money: cards and e-wallet phone numbers of several banks */
+  SF.adminRoute("/admin/pay", { title: "pr.payNav", render: function () { return api().get("/restaurant/me").then(function (r) { return '<div class="mhpage">' + SF.payAccForm(r) + "</div>"; }); } });
+
+  /* people see what is coming soon; a search that finds nothing is remembered for the owner */
+  SF.soonBlock = function () { var l = (SF.state.pub && SF.state.pub.soon) || []; if (!l.length) return "";
+    return '<section class="sasect soonsec"><div class="sect2"><div><h2>' + t("soon.t") + "</h2><span class=\"muted\">" + t("soon.sub") + '</span></div></div><div class="hscroll soonscroll">' + l.map(function (x) { var n = x.name || x;
+      return '<div class="sooncard' + (x.photo ? "" : " noimg") + '"><div class="sooncimg">' + (x.photo ? '<img src="' + esc(x.photo) + '" alt="">' : '<span class="snn">' + esc(n) + "</span>") + "<b>" + t("soon.t") + "</b></div>" + (x.photo ? "<span>" + esc(n) + "</span>" : "") + "</div>"; }).join("") + "</div></section>"; };
+  SF.missNote = function (q) { q = String(q || "").trim(); if (q.length < 3) return ""; SF.state.missSent = SF.state.missSent || {}; if (!SF.state.missSent[q.toLowerCase()]) { SF.state.missSent[q.toLowerCase()] = 1; api().post("/search-miss", { q: q }).catch(function () {}); } return '<p class="msg info soonmiss">' + I("check", 16) + "<span>" + t("soon.miss") + "</span></p>"; };
+})();

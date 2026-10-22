@@ -14,7 +14,7 @@
   function cityName(id) { return tx(((SF.state.allCities || SF.state.cities || []).filter(function (c) { return c.id === id; })[0] || {}).name); }
 
   /* no dashboard: the admin lands on «Services», where everything is switched on and off */
-  R("/admin", { title: "adm.services", render: function () { setTimeout(function () { SF.go("/admin/services"); }, 0); return ""; } });
+  R("/admin", { title: "adm.services", render: function () { setTimeout(function () { SF.go("/admin/my"); }, 0); return ""; } });
 
   /* ---------- Orders ---------- */
   /* «all orders to me» button with a timer, the closed-shop switch and the admin's own warehouse-shop */

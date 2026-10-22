@@ -36,8 +36,9 @@
   SF.route("/", { title: "nav.home", render: function (p, q) {
     if (q.cat) { setTimeout(function () { SF.go("/food?cat=" + q.cat); }, 0); return ""; }       // old links
     var cq = "cityId=" + encodeURIComponent(SF.state.cityId) + SF.areaQ(), soft = function (u) { return api().get(u).catch(function () { return null; }); };
-    return Promise.all([api().get("/banners"), api().get("/restaurants?" + cq), SF.svcOn("ads") ? soft("/ads/search?svc=ads&limit=4&" + cq) : null, SF.svcOn("shops") ? soft("/shops/goods?limit=8&" + cq) : null]).then(function (res) {
-      var banners = res[0], rests = res[1], newAds = res[2], newGoods = res[3];
+    return Promise.all([api().get("/banners"), api().get("/restaurants?" + cq), SF.svcOn("ads") ? soft("/ads/search?svc=ads&limit=4&" + cq) : null, SF.svcOn("shops") ? soft("/shops/goods?limit=8&" + cq) : null,
+      SF.svcOn("shops") ? soft("/restaurants?kind=shop&" + cq).then(function (l) { var o = (l || []).filter(function (x) { return x.own; })[0]; return o ? soft("/restaurants/" + o.id) : null; }) : null]).then(function (res) {
+      var banners = res[0], rests = res[1], newAds = res[2], newGoods = res[3], ownShop = res[4];
       return Promise.all(rests.slice(0, 12).map(function (r) { return api().get("/restaurants/" + r.id).then(function (f) { return Object.assign(f, { orderCount: r.orderCount, hasSale: r.hasSale, isNew: r.isNew }); }); })).then(function (full) {
         full.forEach(function (r) { var ps = (r.products || []).filter(function (x) { return x.available; }), ks = ps.filter(function (x) { return x.popular; }).concat(ps).map(function (x) { return x.kind; }); r.art1 = ks[0]; });
         var u = SF.state.user, h = new Date().getHours(), greet = h < 12 ? "home.morning" : h < 18 ? "home.day" : "home.evening";
@@ -63,7 +64,7 @@
         var adsH = newAds && newAds.list && newAds.list.length ? '<section class="sasect"><div class="sect2"><div><h2>' + t("sa.newAds") + '</h2></div><a class="link" href="#/ads">' + t("sa.allR") + '</a></div><div class="adlist">' + newAds.list.map(function (x) { return SF.adRow(x); }).join("") + "</div></section>" : "";
         if (newGoods && newGoods.list) SF.rememberProducts(newGoods.list);
         var gdH = newGoods && newGoods.list && newGoods.list.length ? '<section class="sasect"><div class="sect2"><div><h2>' + t("sa.newGoods") + '</h2></div><a class="link" href="#/shops/goods">' + t("sa.allR") + '</a></div><div class="hscroll goodsrow">' + newGoods.list.map(goodCard).join("") + "</div></section>" : "";
-        return '<div class="sahome">' + (SF.installBar ? SF.installBar() : "") + head + svc + ban + adsH + gdH + promo + popH + "</div>";
+        return '<div class="sahome">' + (SF.installBar ? SF.installBar() : "") + head + (SF.ownShopHero ? SF.ownShopHero(ownShop) : "") + svc + ban + (SF.soonBlock ? SF.soonBlock() : "") + adsH + gdH + promo + popH + "</div>";
       });
     });
   } });
@@ -99,9 +100,9 @@
         '<div class="chips adchips grpchips">' + GROUPS.map(function (g) { var n = g[2].reduce(function (a, id) { return a + (r.cats[id] || 0); }, 0), key = g[2].join(","); if (!n) return ""; return '<a class="fchip grp' + (q.cat === key ? " on" : "") + '" href="#/shops/goods?' + gqs(Object.assign({}, q, { cat: q.cat === key ? "" : key, brand: "" })) + '">' + t(g[1]) + ' <i class="num">' + n + "</i></a>"; }).join("") + "</div>" +
         '<div class="chips adchips"><a class="fchip' + (q.cat ? "" : " on") + '" href="#/shops/goods?' + gqs(Object.assign({}, q, { cat: "", brand: "" })) + '">' + t("home.all") + ' <i class="num">' + r.all + "</i></a>" + cats.filter(function (c) { return !q.cat || q.cat.indexOf(",") < 0 || q.cat.split(",").indexOf(c.id) >= 0; }).map(function (c) { return '<a class="fchip' + (q.cat === c.id ? " on" : "") + '" href="#/shops/goods?' + gqs(Object.assign({}, q, { cat: c.id, brand: "" })) + '">' + esc(tx(c.name)) + ' <i class="num">' + r.cats[c.id] + "</i></a>"; }).join("") + "</div>" +
         (r.brands.length > 1 ? '<div class="chips adchips brandrow"><a class="fchip' + (q.brand ? "" : " on") + '" href="#/shops/goods?' + gqs(Object.assign({}, q, { brand: "" })) + '">' + t("sh.allBrands") + "</a>" + r.brands.map(function (b) { return '<a class="fchip' + (q.brand === b.b ? " on" : "") + '" href="#/shops/goods?' + gqs(Object.assign({}, q, { brand: b.b })) + '">' + esc(b.b) + ' <i class="num">' + b.n + "</i></a>"; }).join("") + "</div>" : "") +
-        '<p class="adtotal num">' + t("sh.goodsFound", { n: r.total }) + "</p>" +
+        (!q.q && !q.cat && !q.brand && !nf && SF.soonBlock ? SF.soonBlock() : "") + '<p class="adtotal num">' + t("sh.goodsFound", { n: r.total }) + "</p>" +
         (r.list.length ? '<div class="pgrid goodsgrid" id="goodsgrid">' + r.list.map(goodCard).join("") + "</div>" + (r.total > r.list.length ? '<button type="button" class="btn ghost block admore2" data-act="gdmore" data-off="' + r.list.length + '" data-total="' + r.total + '">' + t("af.more") + "</button>" : "")
-          : SF.empty("bag", t("sh.goodsNone"), t("sh.goodsNoneSub"), q.q || q.cat || q.brand || nf ? '<a class="btn ghost" href="#/shops/goods">' + t("af.reset") + "</a>" : "")) +
+          : SF.empty("bag", t("sh.goodsNone"), t("sh.goodsNoneSub"), q.q || q.cat || q.brand || nf ? '<a class="btn ghost" href="#/shops/goods">' + t("af.reset") + "</a>" : "")) + (!r.list.length && q.q && SF.missNote ? SF.missNote(q.q) + SF.soonBlock() : "") +
         '<a class="adfab" href="#/shops">' + I("store", 18) + t("sh.tabShops") + "</a>";
     });
   } });

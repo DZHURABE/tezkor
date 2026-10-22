@@ -3,7 +3,7 @@
   "scripts": {
     "build": "cd apps/web && node build.mjs",
     "start": "npm run build && node apps/api/src/index.js",
-    "test": "cd apps/web && node test/api.test.js && node test/ads.test.js && node test/hall.test.js && node test/shop.test.js && node test/own.test.js && node test/market.test.js && node test/push.test.js && node test/areas.test.js && node test/escal.test.js && node test/variants.test.js && node test/catalog.test.js && node test/direct.test.js && node test/books.test.js && node test/pause.test.js",
+    "test": "cd apps/web && node test/api.test.js && node test/ads.test.js && node test/hall.test.js && node test/shop.test.js && node test/own.test.js && node test/market.test.js && node test/push.test.js && node test/areas.test.js && node test/escal.test.js && node test/variants.test.js && node test/catalog.test.js && node test/direct.test.js && node test/books.test.js && node test/pause.test.js && node test/soon.test.js",
     "test:ui": "cd apps/web && node build.mjs && node test/ui.smoke.cjs && node test/ui.e2e.cjs && node test/ads.e2e.cjs && node test/hall.e2e.cjs && node test/shop.e2e.cjs && node test/own.e2e.cjs && node test/prod.e2e.cjs && node test/password.e2e.cjs && node test/channels.int.cjs && node test/verify.e2e.cjs && node test/site.e2e.cjs && node test/cleanup.int.cjs && node test/pg.int.cjs && node test/audit.cjs"
   },
   "engines": { "node": ">=18" } }
