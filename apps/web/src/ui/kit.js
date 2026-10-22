@@ -127,7 +127,8 @@ var SF = (function () {
   /* goods without a photo: a clean icon of their kind (phone, laptop, headphones…) instead of a box */
   SF.SHOP_IC = { s1: "mobile", s2: "laptop", s3: "headset", s4: "bolt", s5: "shield", s6: "tag", s7: "home", s8: "shirt", s9: "heart", s10: "bag" };
   SF.pic = function (p, s) { if (p && p.photo) return '<img class="ph" src="' + SF.esc(p.photo) + '" alt="" loading="lazy" decoding="async">';
-    if (p && SF.SHOP_IC[p.categoryId]) return '<span class="shic">' + SF.icon(SF.SHOP_IC[p.categoryId], Math.round((s || 90) * 0.5)) + "</span>"; return SF.art(p && p.kind, s); };
+    /* no photo yet: say so plainly — never a drawing of another thing */
+    if (p && (p.kind === "box" || SF.SHOP_IC[p.categoryId])) return '<span class="nophoto2">' + SF.t("cat.nophoto") + "</span>"; return SF.art(p && p.kind, s); };
   SF.sale = function (p) { return p && p.oldPrice > p.price ? Math.round((1 - p.price / p.oldPrice) * 100) : 0; };
   /* shrink a picked photo in the phone before upload: long side `max` px, JPEG */
   SF.shrinkImage = function (file, max, q) { return new Promise(function (ok, no) {
