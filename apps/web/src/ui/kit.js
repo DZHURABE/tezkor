@@ -193,7 +193,7 @@ var SF = (function () {
     opts = opts || {}; var path = SF.path(), m = SF.match(path), u = SF.state.user, seq = ++SF.renderSeq;
     if (!m) { SF.go(SF.homeOf(u)); return Promise.resolve(); }
     var r = m.route;
-    if (r.roles) { if (!u) { SF.state.after = path; SF.go("/login"); return Promise.resolve(); } if (r.roles.indexOf(u.role) < 0) { SF.go(SF.homeOf(u)); return Promise.resolve(); } }
+    if (r.roles) { if (!u) { SF.state.after = path; SF.go("/login"); return Promise.resolve(); } if (r.roles.indexOf(u.role) < 0 && !(u.role === "admin" && u.restaurantId && r.roles.indexOf("restaurant") >= 0)) { SF.go(SF.homeOf(u)); return Promise.resolve(); } }
     if (r.guest && u) { SF.go(SF.homeOf(u)); return Promise.resolve(); }
     var app = document.getElementById("app");
     if (!opts.quiet && app && !app.firstChild) app.innerHTML = '<div class="boot">' + SF.mark(56) + "</div>";

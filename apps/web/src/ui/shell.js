@@ -42,7 +42,7 @@
   /* partner dashboards (restaurant, admin) */
   SF.panelNav = {
     restaurant: [["/rest", "chart", "rest.dash"], ["/rest/orders", "receipt", "rest.orders"], ["/rest/hall", "map", "hl.nav"], ["/rest/pos", "cash", "pos.nav"], ["/rest/sales", "wallet", "sl.nav"], ["/rest/me", "user", "my.nav"], ["/rest/menu", "grid", "rest.menu"], ["/rest/promo", "gift", "rest.promo"], ["/rest/tables", "grid", "tb.nav"], ["/rest/history", "list", "rest.history"], ["/rest/staff", "users", "sf.nav"], ["/rest/settings", "store", "rest.settings"]],
-    admin: [["/admin/services", "grid", "adm.services"], ["/admin/orders", "receipt", "adm.orders"], ["/admin/restaurants", "store", "adm.restaurants"], ["/admin/couriers", "scooter", "adm.couriers"], ["/admin/users", "users", "adm.users"],
+    admin: [["/admin/services", "grid", "adm.services"], ["/admin/orders", "receipt", "adm.orders"], ["/admin/books", "wallet", "bk.nav"], ["/admin/restaurants", "store", "adm.restaurants"], ["/admin/couriers", "scooter", "adm.couriers"], ["/admin/users", "users", "adm.users"],
       ["/admin/banners", "gift", "adm.banners"], ["/admin/ads", "megaphone", "adm.ads"], ["/admin/complaints", "flag", "adm.complaints"], ["/admin/promos", "percent", "adm.promos"], ["/admin/cities", "city", "adm.cities"], ["/admin/settings", "cog", "adm.settings"]]
   };
   SF.shells.panel = function (html, r) {
@@ -50,9 +50,13 @@
     var u = SF.state.user, path = SF.path().split("?")[0], worker = u.staff && u.staffRole !== "manager";
     /* waiter: orders + his own page; worker: + menu (in stock) and history; owner / manager: everything (his own page only for staff) */
     var WORK = u.staffRole === "waiter" ? ["/rest/orders", "/rest/hall", "/rest/pos", "/rest/me"] : ["/rest", "/rest/orders", "/rest/hall", "/rest/pos", "/rest/menu", "/rest/history", "/rest/me"];
-    var nav = (SF.panelNav[u.role] || []).filter(function (n) { if (n[0] === "/rest/me") return !!u.staff; if (u.restKind === "shop" && (n[0] === "/rest/hall" || n[0] === "/rest/tables")) return false; return !worker || WORK.indexOf(n[0]) >= 0; });
+    /* the admin who runs his own warehouse-shop (one phone): the shop screens open inside the same panel */
+    var onRest = u.role === "admin" && u.restaurantId && path.indexOf("/rest") === 0, adminNav = SF.panelNav[onRest ? "restaurant" : u.role] || [];
+    if (onRest) adminNav = adminNav.filter(function (n) { return ["/rest/orders", "/rest/menu", "/rest/sales", "/rest/pos", "/rest/promo"].indexOf(n[0]) >= 0; }).concat([["/rest/catalog", "box", "cat.btn"], ["/admin/orders", "cog", "own.back"]]);
+    else if (u.role === "admin" && u.restaurantId) adminNav = adminNav.concat([["/rest/menu", "box", "own.goods"], ["/rest/catalog", "box", "cat.btn"], ["/rest/orders", "receipt", "own.orders"]]);
+    var nav = adminNav.filter(function (n) { if (n[0] === "/rest/me") return !!u.staff; if (u.restKind === "shop" && (n[0] === "/rest/hall" || n[0] === "/rest/tables")) return false; return !worker || WORK.indexOf(n[0]) >= 0; });
     /* a shop: «Goods» instead of «Menu» */
-    if (u.restKind === "shop") nav = nav.map(function (n) { return n[0] === "/rest/menu" ? [n[0], "box", "sh.goods"] : n; });
+    if (u.restKind === "shop" && (u.role !== "admin" || onRest)) nav = nav.map(function (n) { return n[0] === "/rest/menu" ? [n[0], "box", "sh.goods"] : n; });
     if (worker && u.role === "restaurant" && WORK.indexOf(path) < 0) setTimeout(function () { SF.go("/rest/orders"); }, 0);
     var cur = nav.filter(function (n) { return n[0] === path; })[0] || nav.filter(function (n) { return path.indexOf(n[0]) === 0 && n[0] !== "/rest" && n[0] !== "/admin"; })[0] || nav[0];
     return '<div class="panel' + (SF.state.drawer ? " open" : "") + '"><aside class="side"><div class="sidehead">' + SF.logo() + '<span class="rolebadge">' + t("role." + u.role) + "</span></div>" +
