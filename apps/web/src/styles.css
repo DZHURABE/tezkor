@@ -2416,3 +2416,6 @@ body{font-size:15.5px;letter-spacing:-.005em;-webkit-font-smoothing:antialiased;
 :root[data-theme="dark"] :is(.mhbtn small,.mhmore small){color:var(--muted)}
 :root[data-theme="dark"] :is(.pausebar,.stockl,.unver){background:var(--gold-soft);color:var(--gold-text)}
 :root[data-theme="dark"] .slbar{background:var(--surface-2)}
+/* real map tiles are never dimmed; the satellite photo keeps its true colours in the dark theme too */
+.tm-real .tm-tiles{filter:none}
+.tm-sat .tm-tiles img{filter:none}

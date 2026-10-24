@@ -71,6 +71,7 @@
     var o = specs[el.dataset.tmap], v = SF.state.tmv[o.key]; if (!o || !v) return;
     var w = el.clientWidth, h = el.clientHeight, z = v.z, cx = wx(v.lng, z), cy = wy(v.lat, z), ox = cx - w / 2, oy = cy - h / 2;
     var tl = el.querySelector(".tm-tiles");
+    el.classList.toggle("tm-real", !!cfg.tiles); el.classList.toggle("tm-sat", !!cfg.tiles && sat());
     if (cfg.tiles) {
       var need = {}, n = Math.pow(2, z);
       for (var tx = Math.floor(ox / T); tx <= Math.floor((ox + w) / T); tx++) for (var ty = Math.floor(oy / T); ty <= Math.floor((oy + h) / T); ty++) {
