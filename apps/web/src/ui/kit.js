@@ -71,7 +71,7 @@ var SF = (function () {
     ticket: '<path d="M3 8a2 2 0 002-2h14a2 2 0 002 2v2a2 2 0 000 4v2a2 2 0 00-2 2H5a2 2 0 00-2-2v-2a2 2 0 000-4z"/><path d="M10 6v12" stroke-dasharray="2 2"/>',
     briefcase: '<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2M3 13h18"/>', help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 114 2c-1 .6-1.5 1.2-1.5 2.3M12 17h.01"/>',
     lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/>', sort: '<path d="M7 4v16M3 16l4 4 4-4M17 20V4M13 8l4-4 4 4"/>',
-    sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>', send: '<path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/>'
+    moon: '<path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/>', sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>', send: '<path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/>'
   };
   SF.icon = function (n, s) { return '<svg class="ic" width="' + (s || 20) + '" height="' + (s || 20) + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (P[n] || "") + "</svg>"; };
 
@@ -215,7 +215,7 @@ var SF = (function () {
       var scroller = document.scrollingElement, y = scroller ? scroller.scrollTop : 0;
       app.innerHTML = shell; app.setAttribute("data-role", u ? u.role : "guest");
       /* the restaurant panel is always light (easier to read in the kitchen), whatever the phone's dark mode */
-      if (u && u.role === "restaurant") document.documentElement.setAttribute("data-theme", "light"); else document.documentElement.removeAttribute("data-theme"); app.classList.toggle("noanim", !!opts.quiet);
+      SF.applyTheme(); app.classList.toggle("noanim", !!opts.quiet);
       if (opts.quiet && scroller) scroller.scrollTop = y; else if (scroller && SF._lastPath !== path) scroller.scrollTop = 0;
       SF._lastPath = path; SF.live = !!r.live;
       document.title = (r.title ? SF.t(r.title) + " · " : "") + SF.brand();
@@ -223,6 +223,21 @@ var SF = (function () {
     }).catch(function (e) { if (e && e.status === 401) { SF.logout(true); return; } if (app) app.innerHTML = SF.shells.bare('<div class="page center"><div class="empty">' + SF.icon("info", 40) + "<b>" + SF.esc(SF.err(e)) + '</b><button class="btn" data-go="' + SF.homeOf(u) + '">' + SF.t("btn.home") + "</button></div></div>"); if (typeof console !== "undefined") console.error(e); });
   };
   SF.shells = {};
+
+  /* ---------- day / night: the person's own choice (saved), otherwise the phone's setting ---------- */
+  SF.themePref = function () { var v = SF.ls.get("theme", ""); return v === "dark" || v === "light" ? v : ""; };
+  SF.isDark = function () { var v = SF.themePref(); if (v) return v === "dark"; try { return !!(root.matchMedia && root.matchMedia("(prefers-color-scheme: dark)").matches); } catch (e) { return false; } };
+  SF.applyTheme = function () { var u = SF.state.user, d = document.documentElement, v = SF.themePref();
+    /* the restaurant panel stays light (easier to read in the kitchen) unless the owner picked night himself */
+    if (u && u.role === "restaurant" && !v) v = "light";
+    if (v) d.setAttribute("data-theme", v); else d.removeAttribute("data-theme");
+    var m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute("content", SF.isDark() && !(u && u.role === "restaurant" && !SF.themePref()) ? "#0F1312" : "#E8590C"); };
+  SF.themeBtn = function (cls) { var dk = SF.isDark();
+    return '<button type="button" class="iconbtn themebtn' + (cls ? " " + cls : "") + '" data-act="theme" aria-label="' + SF.t(dk ? "th.day" : "th.night") + '" title="' + SF.t(dk ? "th.day" : "th.night") + '"><span class="thi">' + SF.icon(dk ? "sun" : "moon", 20) + "</span></button>"; };
+  SF.actions.theme = function () { var next = SF.isDark() ? "light" : "dark", d = document.documentElement;
+    SF.ls.set("theme", next); d.classList.add("themefade"); SF.applyTheme();
+    [].forEach.call(document.querySelectorAll(".themebtn"), function (b) { b.outerHTML = SF.themeBtn(b.className.replace(/\b(iconbtn|themebtn)\b/g, "").trim()); });
+    setTimeout(function () { d.classList.remove("themefade"); }, 450); };
 
   /* ---------- cart ---------- */
   SF.cart = {

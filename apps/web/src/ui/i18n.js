@@ -694,6 +694,7 @@ SF.I18N = {};
   K("e.AD_UNPAID", "Ҳаққи ҷойгиркунӣ ҳанӯз пардохт нашудааст", "Плата за размещение ещё не получена", "The posting fee is not paid yet"); K("e.REASON_REQUIRED", "Сабабро нависед", "Укажите причину", "Write the reason"); K("e.BAD_KIND", "Нодуруст", "Неверно", "Invalid");
   /* short names for the home tiles */
   K("svs.food", "Расонидани таом", "Доставка еды", "Food delivery"); K("svs.taxi", "Такси", "Такси", "Taxi"); K("svs.shops", "Мағозаҳо", "Магазины", "Shops"); K("svs.ads", "Эълонҳо", "Объявления", "Classifieds");
+  K("th.day", "Ҳолати рӯз", "Дневной режим", "Day mode"); K("th.night", "Ҳолати шаб", "Ночной режим", "Night mode"); K("hm.svOpen", "Кушодан", "Открыть", "Open");
   K("svs.masters", "Устоҳо", "Мастера", "Pros"); K("svs.jobs", "Кор", "Работа", "Jobs"); K("svs.grocery", "Маҳсулот", "Продукты", "Groceries"); K("svs.pharmacy", "Дорухона", "Аптеки", "Pharmacy"); K("svs.realty", "Амвол", "Жильё", "Real estate");
   K("sa.live", "Фаъол", "Работает", "Live");
   /* pros & services, jobs, real estate — same listing engine, their own words */
