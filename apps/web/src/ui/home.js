@@ -68,10 +68,19 @@
            4. the newest listings as squares · 5. other shops' goods · 6. food */
         var first = u ? esc(u.name.split(" ")[0]) : "";
         var svOn = SF.SERVICES.filter(function (x) { return SF.svcOn(x[0]) && x[3]; });
-        var hero = '<section class="hm-hero"><i class="hm-orn" aria-hidden="true"></i>' +
+        var city = (SF.state.cities || []).filter(function (c) { return c.id === SF.state.cityId; })[0];
+        /* the top row lives inside the green hero on phones (the empty white header bar is gone): logo · town · day/night · bell */
+        var hbar = '<div class="hm-bar"><a href="#/" class="hm-logo" aria-label="' + esc(SF.brand()) + '">' + SF.mark(40) + "</a>" +
+          '<button type="button" class="hm-city" data-act="city"><small>' + t("profile.city") + "</small><b>" + I("pin", 15) + "<span>" + esc(city ? tx(city.name) : "") + "</span>" + I("chevD", 14) + "</b></button>" +
+          '<span class="hm-acts">' + SF.themeBtn("hm-ib") + (u ? SF.bell().replace('class="iconbtn"', 'class="iconbtn hm-ib"') : '<a class="hm-login" href="#/login">' + t("auth.login") + "</a>") + "</span></div>";
+        var hero = '<section class="hm-hero"><i class="hm-orn" aria-hidden="true"></i>' + hbar +
           '<div class="hm-hi"><p>' + t(greet) + (first ? ", <b>" + first + "</b>" : "") + "</p><h1>" + t("hm.title") + "</h1></div>" +
-          '<form class="hm-search" data-form="search" role="search">' + I("search", 20) + '<input name="q" placeholder="' + t("sa.searchPh") + '" aria-label="' + t("sa.searchPh") + '" enterkeyhint="search"><button class="hm-go" aria-label="' + t("btn.find") + '">' + I("chevR", 18) + "</button></form>" +
-          (svOn.length ? '<nav class="hm-sv" aria-label="' + t("sv.title") + '">' + svOn.map(function (x, i) { return '<a href="#' + x[3] + '" style="--i:' + i + '">' + SF.svVis(x[0]) + "<span>" + t("svs." + x[0]) + "</span></a>"; }).join("") + "</nav>" : "") + "</section>";
+          '<form class="hm-search" data-form="search" role="search">' + I("search", 20) + '<input name="q" placeholder="' + t("sa.searchPh") + '" aria-label="' + t("sa.searchPh") + '" enterkeyhint="search"><button class="hm-go" aria-label="' + t("btn.find") + '">' + I("chevR", 18) + "</button></form></section>";
+        /* the services: one big card for the first, neat cards with a line about each for the rest (no round stickers) */
+        var svc = !svOn.length ? "" : '<section class="hm-svc"><div class="hm-h"><div><h2>' + t("sv.title") + '</h2></div><a href="#/services">' + t("sa.allR") + I("chevR", 14) + "</a></div>" +
+          '<nav class="svb n' + svOn.length + '" aria-label="' + t("sv.title") + '">' + svOn.map(function (x, i) {
+            return '<a href="#' + x[3] + '" class="svb-t svb-' + x[0] + (i === 0 ? " big" : "") + '" style="--i:' + i + ';--sb:' + x[2] + '">' + SF.svVis(x[0], false) +
+              '<span class="svb-tx"><b>' + t("svs." + x[0]) + "</b><small>" + t("svd." + x[0]) + "</small>" + (i === 0 ? '<em>' + t("hm.svOpen") + I("chevR", 14) + "</em>" : "") + "</span></a>"; }).join("") + "</nav></section>";
         var slides = banners.map(function (b) { return SF.bannerHtml(b, "a"); });
         var ban = !slides.length ? "" : '<section class="hm-offers"><div class="banners hm-ban" id="banners" aria-label="' + t("home.offers") + '">' + slides.join("") + "</div>" + (slides.length > 1 ? '<div class="bdots" aria-hidden="true">' + slides.map(function (b, i) { return '<i class="' + (i ? "" : "on") + '"></i>'; }).join("") + "</div>" : "") + "</section>";
         function sect(title, sub, href, body, cls) { return '<section class="hm-sect' + (cls ? " " + cls : "") + '"><div class="hm-h"><div><h2>' + title + "</h2>" + (sub ? "<p>" + sub + "</p>" : "") + "</div>" + (href ? '<a href="#' + href + '">' + t("sa.allR") + I("chevR", 14) + "</a>" : "") + "</div>" + body + "</section>"; }
@@ -83,7 +92,7 @@
         var goods = ((newGoods && newGoods.list) || []).filter(function (x) { return !ownShop || x.restaurantId !== ownShop.id; }).slice(0, 16); SF.rememberProducts(goods);
         var gdH = goods.length ? sect(t("sv.shops"), t("hm.goodsSub"), "/shops/goods", '<div class="hscroll goodsrow onerow">' + goods.map(goodCard).join("") + "</div>") : "";
         var store = SF.ownShopHero ? SF.ownShopHero(ownShop) : "";
-        return '<div class="sahome hm">' + (SF.installBar ? SF.installBar() : "") + hero + ban + store + adsH + gdH + (SF.soonBlock ? SF.soonBlock() : "") + (SF.svcOn("food") ? promo + popH : "") + "</div>";
+        return '<div class="sahome hm">' + (SF.installBar ? SF.installBar() : "") + hero + svc + ban + store + adsH + gdH + (SF.soonBlock ? SF.soonBlock() : "") + (SF.svcOn("food") ? promo + popH : "") + "</div>";
       });
     });
   }

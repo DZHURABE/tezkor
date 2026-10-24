@@ -25,7 +25,7 @@
       '<header class="top' + (u ? " u" : "") + (path === "/" ? " athome" : "") + '"><div class="wrap topin">' +
         '<a href="#/" class="brandlink" aria-label="' + esc(SF.brand()) + '">' + SF.logo() + "</a>" +
         '<form class="topsearch" data-form="search" role="search"><span>' + I("search", 18) + '</span><input name="q" placeholder="' + t("home.search") + '" aria-label="' + t("home.search") + '" value="' + esc(SF.state.q || "") + '"></form>' +
-        '<div class="topact">' + langSel() + bell() +
+        '<div class="topact">' + langSel() + SF.themeBtn() + bell() +
           '<a href="#/cart" class="cartbtn' + (n ? " has" : "") + '">' + I("cart", 20) + "<span>" + (n ? SF.money(SF.state.cartSum || 0) : t("nav.cart")) + "</span>" + (n ? '<i class="badge" id="cartBadge">' + n + "</i>" : "") + "</a>" +
           (u ? '<a href="#/profile" class="avatar" aria-label="' + t("nav.profile") + '">' + esc(u.name.charAt(0)) + "</a>" : '<a href="#/login" class="btn sm primary toplogin">' + t("auth.login") + "</a>") +
         "</div></div></header>" +
@@ -62,7 +62,7 @@
     return '<div class="panel' + (SF.state.drawer ? " open" : "") + '"><aside class="side"><div class="sidehead">' + SF.logo() + '<span class="rolebadge">' + t("role." + u.role) + "</span></div>" +
       '<nav class="sidenav">' + nav.map(function (n) { if (n[0] === "-") return '<p class="sidesep">' + t(n[2]) + "</p>"; var on = n === cur; return '<a href="#' + n[0] + '" class="' + (on ? "on" : "") + '"' + (on ? ' aria-current="page"' : "") + ">" + I(n[1], 18) + "<span>" + t(n[2]) + "</span>" + (n[0] === "/rest/orders" && SF.state.newCount ? '<i class="badge">' + SF.state.newCount + "</i>" : "") + "</a>"; }).join("") + "</nav>" +
       '<div class="sideuser"><span class="avatar sm">' + esc(u.name.charAt(0)) + '</span><div><b>' + esc(u.name) + "</b><small>" + esc(SF.phone(u.phone)) + '</small></div><button class="iconbtn" data-act="logout" aria-label="' + t("auth.logout") + '">' + I("logout", 18) + "</button></div></aside>" +
-      '<div class="scrim" data-act="drawer"></div><div class="pmain"><header class="ptop"><button class="iconbtn menubtn" data-act="drawer" aria-label="' + t("nav.menu") + '">' + I("menu") + '</button><h1>' + t(cur ? cur[2] : "adm.dash") + '</h1><div class="topact">' + langSel() + bell() + "</div></header>" +
+      '<div class="scrim" data-act="drawer"></div><div class="pmain"><header class="ptop"><button class="iconbtn menubtn" data-act="drawer" aria-label="' + t("nav.menu") + '">' + I("menu") + '</button><h1>' + t(cur ? cur[2] : "adm.dash") + '</h1><div class="topact">' + langSel() + SF.themeBtn() + bell() + "</div></header>" +
       '<div class="pcontent page">' + html + "</div></div></div>";
   };
 
@@ -71,7 +71,7 @@
     var path = SF.path().split("?")[0];
     function tab(p, icon, key) { var on = path === p; return '<a href="#' + p + '" class="' + (on ? "on" : "") + '"' + (on ? ' aria-current="page"' : "") + ">" + I(icon, 22) + "<span>" + t(key) + "</span></a>"; }
     var cu = SF.state.user, own = cu && cu.courier && cu.courier.restaurantName;
-    return '<div class="flag-line" aria-hidden="true"></div><div class="capp"><header class="ctop">' + SF.logo() + '<div class="topact">' + langSel() + bell() + "</div></header>" +
+    return '<div class="flag-line" aria-hidden="true"></div><div class="capp"><header class="ctop">' + SF.logo() + '<div class="topact">' + langSel() + SF.themeBtn() + bell() + "</div></header>" +
       '<main class="cmain page">' + (own ? '<div class="ownstrip">' + I("store", 16) + "<span>" + t("dl.youAre", { name: esc(SF.tx(own)) }) + "</span></div>" : "") + html + '</main><nav class="tabbar show" aria-label="' + t("nav.main") + '">' + tab("/courier", "box", "cour.orders") + tab("/courier/earnings", "wallet", "cour.earnings") + tab("/courier/history", "list", "cour.history") + tab("/", "cart", "cb.shop") + tab("/courier/profile", "user", "nav.profile") + "</nav></div>";
   };
 
