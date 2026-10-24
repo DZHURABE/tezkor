@@ -1,0 +1,4 @@
+apps/web/dist/
+apps/web/shots/
+apps/api/data/
+node_modules/

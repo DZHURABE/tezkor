@@ -200,13 +200,12 @@
   SF.mapPick = SF.mapPick || {}; SF.mapSlots = SF.mapSlots || {};
   SF.zone = function (cityId) {
     var cs = SF.state.cities || [], c = cs.filter(function (x) { return x.id === cityId; })[0] || cs.filter(function (x) { return x.id === (SF.state.pub || {}).defaultCityId; })[0] || cs[0];
-    if (!c) return null; var km = (SF.state.pub || {}).zoneKm || 5, poly = c.zone && c.zone.length > 2 ? c.zone : null;
-    /* a drawn area: km = how far its farthest corner is (used to keep the map near the town) */
-    if (poly) km = Math.max.apply(null, poly.map(function (p) { return SF.geo.km(c, p); }));
-    return { lat: c.lat, lng: c.lng, km: Math.round(km * 10) / 10, name: SF.tx(c.name), poly: poly };
+    /* no towns any more: only the map's starting point; it never limits where people live — each shop has its own area */
+    if (!c) return null; return { lat: c.lat, lng: c.lng, km: 100000, name: "", poly: null, open: true };
   };
   /* a restaurant with its own drawn area delivers only there; otherwise the town's area */
-  SF.restZone = function (r) { if (!r || !r.zone || r.zone.length < 3) return SF.zone(r && r.cityId);
+  SF.restZone = function (r) { if (!r || r.lat == null) return SF.zone(r && r.cityId);
+    if (!r.zone || r.zone.length < 3) return { lat: r.lat, lng: r.lng, km: (SF.state.pub || {}).zoneKm || 5, name: SF.tx(r.name), poly: null };   // no drawn area: a circle around the shop
     return { lat: r.lat, lng: r.lng, km: Math.round(Math.max.apply(null, r.zone.map(function (p) { return SF.geo.km(r, p); })) * 10) / 10, name: SF.tx(r.name), poly: r.zone }; };
   SF.inZoneOf = function (p, z) { if (!z) return true; return z.poly ? SomonRules.inPolygon(p, z.poly) : SF.geo.km(z, p) <= z.km + 1e-9; };
   SF.inZone = function (p, cityId) { return SF.inZoneOf(p, SF.zone(cityId)); };

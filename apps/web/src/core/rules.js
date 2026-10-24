@@ -9,14 +9,16 @@
 
   // status -> { nextStatus: [roles allowed] }
   var ORDER_FLOW = {
-    awaiting_payment: { pending: ["system", "admin"], cancelled: ["customer", "admin", "system"] },
+    awaiting_payment: { pending: ["system", "admin"], scheduled: ["system", "admin"], cancelled: ["customer", "admin", "system"] },
+    /* ordered ahead for a chosen time: reaches the kitchen by itself shortly before that time */
+    scheduled: { pending: ["system", "admin"], cancelled: ["customer", "admin", "system"] },
     pending: { cooking: ["restaurant", "admin"], rejected: ["restaurant", "admin"], cancelled: ["customer", "admin"] },
     cooking: { ready: ["restaurant", "admin"], cancelled: ["admin", "restaurant"] },
     ready: { picked_up: ["courier", "admin", "restaurant"], cancelled: ["admin", "restaurant"] },      // restaurant: only for its own delivery (checked by the route)
     picked_up: { delivered: ["courier", "admin", "restaurant"] },
     delivered: {}, rejected: {}, cancelled: {}
   };
-  var ACTIVE = ["awaiting_payment", "pending", "cooking", "ready", "picked_up"];
+  var ACTIVE = ["awaiting_payment", "scheduled", "pending", "cooking", "ready", "picked_up"];
   var FINAL = ["delivered", "rejected", "cancelled"];
 
   function canTransition(from, to, role) {
@@ -31,8 +33,15 @@
   }
 
   // settings: { deliveryBase, deliveryPerKm, deliveryMin, courierPct }
+  /* the owner's own price table: «up to 100 m — 1 с.», «up to 300 m — 3 с.», «up to 1 km — 5 с.» …,
+     beyond the last row + deliveryExtraKm for each started km; on a bad-weather day + weatherFee.
+     Without a table: the old formula base + per km (never below the minimum). */
+  function tierFee(settings, km) { var tl = settings && settings.deliveryTiers; if (!tl || !tl.length) return null; var m = Math.max(0, km) * 1000;
+    for (var i = 0; i < tl.length; i++) if (m <= tl[i].m) return tl[i].fee;
+    var last = tl[tl.length - 1]; return last.fee + Math.ceil((m - last.m) / 1000) * (settings.deliveryExtraKm || 0); }
   function deliveryFee(settings, km) {
-    return Math.max(settings.deliveryMin, Math.round(settings.deliveryBase + settings.deliveryPerKm * km));
+    var f = tierFee(settings, km); if (f == null) f = Math.max(settings.deliveryMin || 0, Math.round((settings.deliveryBase || 0) + (settings.deliveryPerKm || 0) * km));
+    return f + (settings && settings.weatherOn ? settings.weatherFee || 0 : 0);
   }
 
   function promoDiscount(promo, subtotal, now) {
@@ -48,20 +57,20 @@
   function split(order, restaurant, settings) {
     var commission = Math.round(order.subtotal * (restaurant.commissionPct || 0) / 100);
     if (order.ownDelivery)   // the restaurant delivered with its own people: the delivery fee is the restaurant's, the platform keeps only the commission
-      return { commission: commission, courierPay: 0, restaurantPayout: order.subtotal - commission - (order.discount || 0) + order.deliveryFee, platform: commission };
+      return { commission: commission, courierPay: 0, restaurantPayout: order.subtotal - commission - (order.discount || 0) + order.deliveryFee, platform: commission - (order.bonusUsed || 0) };
     var courierPay = Math.round(order.deliveryFee * settings.courierPct / 100);
     return {
       commission: commission,
       courierPay: courierPay,
       restaurantPayout: order.subtotal - commission - (order.discount || 0),
-      platform: commission + (order.deliveryFee - courierPay)
+      platform: commission + (order.deliveryFee - courierPay) - (order.bonusUsed || 0)   // bonus points are paid by the platform, never by the restaurant
     };
   }
 
   // "09:00"-"23:00" (also handles overnight like "18:00"-"02:00")
   var TZ_MIN = 300;
   function isOpenAt(hours, date) {
-    if (!hours) return true;
+    if (!hours) return true; if (hours.from === hours.to) return true;   // same start and end: open round the clock
     var m = (date.getUTCHours() * 60 + date.getUTCMinutes() + TZ_MIN) % 1440;   // opening hours are Tajikistan time (UTC+5) whatever the device clock zone
     var f = toMin(hours.from), t = toMin(hours.to);
     return f <= t ? (m >= f && m < t) : (m >= f || m < t);

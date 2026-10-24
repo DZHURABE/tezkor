@@ -31,16 +31,16 @@
         SF.kpi("receipt", t("k.avgCheck"), money(s.avgCheck)) + SF.kpi("star", t("k.rating"), s.rating == null ? "—" : s.rating.toFixed(1), t("k.active", { n: s.active })) + "</div>" +
         '<div class="two"><section class="card"><div class="rowhead"><h3>' + t("k.sales14") + "</h3></div>" + SF.bars(s.series, money, t("k.sales14")) + "</section>" +
         '<section class="card"><h3>' + t("k.top") + "</h3>" + (s.topProducts.length ? s.topProducts.map(function (p, i) { return '<div class="topi"><span class="num rank">' + (i + 1) + '</span><span class="cim">' + SF.art(p.kind, 40) + '</span><div class="grow"><b>' + esc(tx(p.name)) + '</b><small class="muted num">' + t("k.sold", { n: p.qty }) + '</small></div><b class="num">' + money(p.sum) + "</b></div>"; }).join("") : '<p class="muted">' + t("k.noData") + "</p>") +
-        '<div class="line"><span>' + t("k.payout") + '</span><b class="num">' + money(s.payout) + '</b></div><div class="line muted"><span>' + t("k.commission", { p: r.commissionPct }) + '</span><span class="num">' + money(s.commission) + "</span></div></section></div>";
+        '<div class="line"><span>' + t("k.payout") + '</span><b class="num">' + money(s.payout) + "</b></div></section></div>";
     });
   } });
   /* subscription: the owner sees how long the place stays visible, and is warned before the end */
-  function subBanner(r) { var sb = r.sub; if (!sb || sb.state === "none" || sb.state === "ok") return "";
+  function subBanner(r) { return ""; var sb = r.sub;   // no subscriptions if (!sb || sb.state === "none" || sb.state === "ok") return "";
     var exp = sb.state === "expired", ph = SF.state.pub && SF.state.pub.supportPhone;
     return '<section class="subwarn' + (exp ? " bad" : "") + '">' + I(exp ? "shield" : "clock", 22) + '<div class="grow"><b>' + t(exp ? "sub.restExpired" : "sub.restSoon", { n: sb.daysLeft, d: SF.fullDate(sb.until) }) + "</b><span>" + t(exp ? "sub.restExpiredSub" : "sub.restSoonSub") + "</span></div>" +
       (ph ? '<a class="btn sm ' + (exp ? "danger" : "primary") + '" href="tel:' + esc(String(ph).replace(/\s/g, "")) + '">' + I("phone", 14) + t("sub.call") + "</a>" : "") + "</section>"; }
   SF.restSubBanner = subBanner;
-  function subCard(r) { var sb = r.sub, h = r.subHistory || [];
+  function subCard(r) { return ""; var sb = r.sub, h = r.subHistory || [];
     return '<section class="card stack"><h3>' + I("wallet", 18) + t("sub.title") + '</h3><div class="line"><span>' + t("sub.status") + "</span>" + SF.subPill(sb) + "</div>" +
       (h.length ? '<div class="subhist">' + h.map(function (x) { return '<div class="line"><span class="num">' + SF.fullDate(x.at) + "</span><span>" + (x.kind === "trial" ? t("sub.trialRow", { n: x.days }) : t(x.months === 12 ? "sub.year" : "sub.months", { n: x.months })) + '</span><b class="num">' + (x.amount ? money(x.amount) : "—") + "</b></div>"; }).join("") + "</div>" : "") +
       '<p class="fine">' + t("sub.restNote") + "</p></section>"; }
@@ -271,10 +271,10 @@
   }
   R("/rest/orders", { title: "rest.orders", live: true, render: function () {
     SF.state.prep = SF.state.prep || {};
-    return Promise.all([api().get("/restaurant/orders?scope=new"), api().get("/restaurant/orders?scope=active"), api().get("/restaurant/me")]).then(function (a) {
+    return Promise.all([api().get("/restaurant/orders?scope=new"), api().get("/restaurant/orders?scope=active"), api().get("/restaurant/me"), api().get("/restaurant/orders?scope=soon").catch(function () { return []; })]).then(function (a) {
       var fresh = a[0], act = a[1], cook = act.filter(function (o) { return o.status === "cooking"; }), out = act.filter(function (o) { return o.status !== "cooking"; }); SF.state.newCount = fresh.length;
       function col(key, list, icon) { return '<section class="col"><h3>' + I(icon, 18) + t(key) + '<span class="cnt num">' + list.length + "</span></h3>" + (list.length ? list.map(ticket).join("") : '<div class="colempty">' + t("rest.none") + "</div>") + "</section>"; }
-      return subBanner(a[2]) + (SF.pushCard ? SF.pushCard() : "") + SF.soundBar() + '<div class="board">' + col("rest.colNew", fresh, "bell") + col("rest.colCooking", cook, "fire") + col("rest.colOut", out, "scooter") + "</div>";
+      return subBanner(a[2]) + (SF.pushCard ? SF.pushCard() : "") + SF.soundBar() + '<div class="board">' + col("rest.colNew", fresh, "bell") + col("rest.colCooking", cook, "fire") + col("rest.colOut", out, "scooter") + "</div>" + (SF.soonList ? SF.soonList(a[3]) : "");
     });
   } });
   SF.actions.prep = function (el) { SF.state.prep[el.dataset.id] = +el.dataset.v; SF.render({ quiet: true }); };
@@ -349,8 +349,18 @@
   /* sizes of one article: one photo, one card, a price for each size */
   var VPRE = [["var.g.vol", ["0,1 л", "0,2 л", "0,25 л", "0,3 л", "0,33 л", "0,5 л", "0,75 л", "1 л", "1,5 л", "2 л", "5 л", "10 л", "19 л"]], ["var.g.wt", ["100 г", "250 г", "500 г", "1 кг", "5 кг", "10 кг", "25 кг", "50 кг"]], ["var.g.sz", ["S", "M", "L", "XL"]]];
   function vRow(v) { v = v || {}; return '<div class="vrow"><input class="vl" data-vl maxlength="24" placeholder="' + t("var.label") + '" value="' + esc(v.label || "") + '" aria-label="' + t("var.label") + '"><input class="vp" data-vp inputmode="numeric" placeholder="' + t("menu.price") + '" value="' + esc(v.price || "") + '" aria-label="' + t("menu.price") + '"><input class="vs" data-vs inputmode="numeric" placeholder="' + t("var.stock") + '" value="' + esc(v.stock == null ? "" : v.stock) + '" aria-label="' + t("var.stock") + '"><input type="hidden" data-vi value="' + esc(v.id || "") + '"><button type="button" class="vdel" data-act="vdel" aria-label="' + t("btn.remove") + '">' + I("x", 16) + "</button></div>"; }
+  /* sizes: type your own (0,445 л · 1 л · 50 кг · 12 дона) with its price and how many you have, or tap a ready one */
   function varBox(p) { var vs = p.variants || [];
-    return '<div class="varbox"><b>' + t("var.title") + '</b><div id="vrows">' + vs.map(vRow).join("") + '</div><div class="vbulk"><div class="vbrow"><input id="vbulk" maxlength="400" placeholder="' + t("var.bulkPh") + '" aria-label="' + t("var.bulk") + '"><button type="button" class="btn sm dark" data-act="vbulk">' + t("var.bulkGo") + '</button></div><p class="fine">' + t("var.bulk") + '</p></div><details class="vpresets"' + (vs.length ? "" : "") + '><summary>' + t("var.presets") + '</summary><div class="vpre">' + VPRE.map(function (g) { return '<p class="vgl">' + t(g[0]) + "</p><div class=\"vgrp\">" + g[1].map(function (x) { return '<button type="button" class="chip" data-act="vadd" data-v="' + esc(x) + '">+ ' + esc(x) + "</button>"; }).join("") + "</div>"; }).join("") + '<button type="button" class="chip" data-act="vadd" data-v="">+ ' + t("var.other") + '</button></div></details></div>'; }
+    return '<div class="varbox"><b>' + t("var.title") + '</b><p class="fine">' + t("vm.hint") + '</p><div id="vrows">' + vs.map(vRow).join("") + "</div>" +
+      '<div class="vmake"><input id="vmn" inputmode="decimal" placeholder="1" aria-label="' + t("vm.amount") + '"><select id="vmu" aria-label="' + t("vm.unit") + '">' + ["л", "мл", "кг", "г", "дона", "м"].map(function (u) { return '<option value="' + u + '">' + u + "</option>"; }).join("") + "</select>" +
+      '<input id="vmp" inputmode="numeric" placeholder="' + t("menu.price") + '" aria-label="' + t("menu.price") + '"><input id="vms" inputmode="numeric" placeholder="' + t("var.stock") + '" aria-label="' + t("var.stock") + '"><button type="button" class="btn sm primary" data-act="vmake">' + I("plus", 14) + t("vm.add") + "</button></div>" +
+      '<details class="vpresets"><summary>' + t("var.presets") + '</summary><div class="vpre">' + VPRE.map(function (g) { return '<p class="vgl">' + t(g[0]) + "</p><div class=\"vgrp\">" + g[1].map(function (x) { return '<button type="button" class="chip" data-act="vadd" data-v="' + esc(x) + '">+ ' + esc(x) + "</button>"; }).join("") + "</div>"; }).join("") + "</div></details></div>"; }
+  SF.actions.vmake = function (el) { var f = el.closest("form"), rows = f.querySelector("#vrows"), n = String(f.querySelector("#vmn").value || "").trim().replace(".", ","), u = f.querySelector("#vmu").value;
+    if (!/^\d+(,\d+)?$/.test(n)) { SF.toast(t("vm.bad"), "err"); f.querySelector("#vmn").focus(); return; }
+    var price = String(f.querySelector("#vmp").value || "").replace(/\D/g, ""), st = String(f.querySelector("#vms").value || "").replace(/\D/g, ""), lb = n + " " + u;
+    if ([].some.call(rows.querySelectorAll(".vl"), function (i) { return i.value.trim().toLowerCase() === lb.toLowerCase(); })) { SF.toast(t("vm.dup"), "err"); return; }
+    if (rows.children.length >= 20) return; rows.insertAdjacentHTML("beforeend", vRow({ label: lb, price: price, stock: st === "" ? null : st }));
+    ["#vmn", "#vmp", "#vms"].forEach(function (k) { f.querySelector(k).value = ""; }); vSync(f); if (!price) rows.lastChild.querySelector(".vp").focus(); };
   /* «0,25 л=2, 0,5 л=3, 1 л=5» → one row per size, with its price */
   SF.actions.vbulk = function (el) { var f = el.closest("form"), rows = f.querySelector("#vrows"), inp = f.querySelector("#vbulk"), have = {};
     [].forEach.call(rows.querySelectorAll(".vl"), function (i) { have[i.value.trim().toLowerCase()] = 1; });
@@ -471,7 +481,7 @@
         '<section class="card stack"><h3>' + t("rest.where") + '</h3><p class="muted sm">' + t("rest.whereSub") + "</p>" + SF.tmap({ key: "rloc", center: { lat: r.lat, lng: r.lng }, zoom: 15, zone: SF.restZone(r), markers: [{ lat: r.lat, lng: r.lng, type: "rest", label: "R" }], label: t("rest.where") }) +
         '<p class="fine">' + I("info", 14) + " " + t("rest.placeAdmin") + "</p></section>" + SF.pwForm() +
         subCard(r) + '<section class="card stack"><h3>' + t("rest.profile") + '</h3><div class="rprof" style="--tone:' + esc(r.tone) + '">' + SF.art("plov", 72) + "<div><b class=\"h2\">" + esc(tx(r.name)) + '</b><span class="muted">' + esc(tx(r.cuisine)) + "</span></div></div>" +
-        '<div class="line"><span>' + t("k.rating") + "</span>" + SF.stars(r.rating) + '</div><div class="line"><span>' + t("adm.commission") + '</span><b class="num">' + r.commissionPct + '%</b></div><div class="line"><span>' + t("rest.products") + '</span><b class="num">' + r.productCount + "</b></div><p class=\"fine\">" + t("rest.profileNote") + "</p></section></div>";
+        '<div class="line"><span>' + t("k.rating") + "</span>" + SF.stars(r.rating) + '</div><div class="line"><span>' + t("rest.products") + '</span><b class="num">' + r.productCount + "</b></div><p class=\"fine\">" + t("rest.profileNote") + "</p></section></div>";
     });
   } });
   SF.forms.rset = function (fd) { var ph = String(fd.phone || "").replace(/\D/g, "");

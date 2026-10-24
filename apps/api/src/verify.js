@@ -69,7 +69,7 @@ function createVerify() {
     const text = String(m.text || "");
     if (text.startsWith("/start")) {
       const token = text.split(/\s+/)[1];
-      if (!token) return say(chatId, "Салом! Ин боти <b>Тезкор</b> аст 🍽\n\nТаоми гарм аз беҳтарин ошхонаҳои Шаҳритус — то дари хона." + (SITE ? "" : "\n\nБарои тасдиқи рақам дар сайт ё барнома тугмаи <b>Telegram</b>-ро пахш кунед."), welcome());
+      if (!token) return say(chatId, "Салом! Ин боти <b>Тезкор</b> аст 🍽\n\nТаом ва мол — то дари хона." + (SITE ? "" : "\n\nБарои тасдиқи рақам дар сайт ё барнома тугмаи <b>Telegram</b>-ро пахш кунед."), welcome());
       const r = api.inbound("telegram", { token, chatId });
       if (!r.ok) return say(chatId, "⏱ Мӯҳлати ин истинод гузашт ё он аллакай истифода шудааст.\n\nДар сайт тугмаи <b>Telegram</b>-ро бори дигар пахш кунед.", noKeyboard);
       return say(chatId, (r.purpose === "reset" ? "🔑 <b>Барқарор кардани парол</b>\n\n" : "👋 <b>Хуш омадед ба Тезкор!</b>\n\n") +
@@ -156,7 +156,17 @@ function createVerify() {
     if (!r.ok) throw new Error("HTTP " + r.status);
   }
 
+  /* any text through the same SMS gateway (new-order alerts for shops and couriers) */
+  async function smsText(phone, text) {
+    const fill = (s, enc) => { const e = enc ? encodeURIComponent : (x => x);
+      return String(s).replace(/\{phone\}/g, e(phone)).replace(/\{phone_local\}/g, phone.replace(/^\+992/, "")).replace(/\{phone_digits\}/g, phone.replace(/\D/g, "")).replace(/\{text\}/g, e(text)).replace(/\{code\}/g, ""); };
+    const method = (env.SMS_METHOD || "GET").toUpperCase(), headers = env.SMS_HEADERS ? JSON.parse(env.SMS_HEADERS) : {};
+    const r = await fetch(fill(SMS_URL, true), { method, headers, body: method === "GET" ? undefined : fill(env.SMS_BODY || "", false), signal: AbortSignal.timeout(15000) });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+  }
+
   return {
+    smsReady: !!SMS_URL, sms: (phone, text) => { if (SMS_URL) smsText(phone, text).catch(e => log("sms alert:", e.message)); },
     channels, start, whatsappVerify, whatsappIncoming,
     attach(coreApi) { api = coreApi; if (TG_TOKEN && !state.running) { state.running = true; botLoop(); } },
     stop() { state.running = false; },

@@ -13,12 +13,16 @@ var SF = (function () {
   SF.esc = function (v) { return String(v == null ? "" : v).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); };
   SF.t = function (key, p) {
     /* inside a shop the same screens speak of goods, not dishes: «key.sh» wins when it exists */
-    var row = (SF.state.ctxShop && SF.I18N[key + ".sh"]) || SF.I18N[key], s = row ? (row[SF.state.lang] || row.tg) : "⟦" + key + "⟧";
+    var row = (SF.state.ctxShop && SF.I18N[key + ".sh"]) || SF.I18N[key], s = row ? (row[SF.state.lang] || row.tg) : /^veh\./.test(key) ? key.slice(4) : "⟦" + key + "⟧";   // a vehicle the admin typed himself is shown as typed
     if (p) s = s.replace(/\{(\w+)\}/g, function (_, k) { var v = p[k]; return v == null ? "" : typeof v === "object" ? SF.tx(v) : v; });
     return s;
   };
+  /* vehicle: a known kind is translated, anything typed is shown as it is */
+  SF.vehName = function (v) { return v ? SF.t("veh." + v) : ""; };
   SF.tx = function (obj) { if (obj == null) return ""; if (typeof obj === "string") return obj; return obj[SF.state.lang] || obj.tg || obj.ru || ""; };
   SF.money = function (n) { n = Math.round(n || 0); var s = String(n).replace(/\B(?=(\d{3})+(?!\d))/g, " "); return SF.state.lang === "en" ? s + " TJS" : s + " " + SF.t("cur"); };
+  /* greeting by the clock in Tajikistan (UTC+5), whatever the phone's time zone says */
+  SF.greetKey = function () { var h = (new Date().getUTCHours() + 5) % 24; return h >= 4 && h < 11 ? "home.morning" : h >= 11 && h < 17 ? "home.day" : h >= 17 && h < 23 ? "home.evening" : "home.night"; };
   SF.time = function (ms) { var d = new Date(ms); return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0"); };
   SF.date = function (ms) { var d = new Date(ms); return String(d.getDate()).padStart(2, "0") + "." + String(d.getMonth() + 1).padStart(2, "0"); };
   SF.dt = function (ms) { return SF.date(ms) + " · " + SF.time(ms); };
@@ -27,6 +31,7 @@ var SF = (function () {
 
   /* ---------- icons (24px line set) ---------- */
   var P = {
+    cloud: '<path d="M7 17a4 4 0 0 1-.5-7.97A6 6 0 0 1 18 9a4 4 0 0 1 0 8z"/><path d="M8 20l1-1.5M12 21l1-1.5M16 20l1-1.5"/>',
     flag: '<path d="M5 21V4M5 4h11l-2 4 2 4H5"/>', thumbup: '<path d="M7 11v9H4v-9zM7 11l4-7a2 2 0 0 1 2 2v3h5.5a2 2 0 0 1 2 2.3l-1.2 6.2a2 2 0 0 1-2 1.6H7"/>', thumbdown: '<path d="M7 13V4H4v9zM7 13l4 7a2 2 0 0 0 2-2v-3h5.5a2 2 0 0 0 2-2.3L19.3 6.3a2 2 0 0 0-2-1.6H7"/>',
     bike: '<circle cx="6" cy="16" r="3.5"/><circle cx="18" cy="16" r="3.5"/><path d="M6 16l4-8h5l3 8M10 8l5 8M13 5h3"/>', walk: '<circle cx="13" cy="4.5" r="1.8"/><path d="M12 8l-3 4 3 2v6M9 12l-2 4M12 8l4 3 2 .5M12 14l3 3 .5 3"/>',
     sparkles: '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8z"/>',
@@ -77,10 +82,14 @@ var SF = (function () {
   SF.brand = function () { return SF.BRAND[SF.state.lang] || SF.BRAND.tg; };
   /* mark: a map pin with a T cut out of it and a dot for the door, on a deep-green tile (logo «Манзил-Т») */
   SF.markInner = '<path d="M60 12C37 12 22 29 22 50C22 75 60 104 60 104C60 104 98 75 98 50C98 29 83 12 60 12Z" fill="#E8590C"/><rect x="40" y="35" width="40" height="11" rx="3" fill="#fff"/><rect x="54.5" y="35" width="11" height="34" rx="3" fill="#fff"/><circle cx="60" cy="110" r="4.5" fill="#E8590C"/>';
-  /* the Tezkor sign: an orange disc with a white T and two speed lines — one sign for every Tezkor service */
-  SF.mark = function (s) { s = s || 36; var g = "tzm" + (SF._mk = (SF._mk || 0) + 1); /* own gradient id: a gradient inside a hidden copy would not paint */
-    return '<svg class="tzmark" width="' + s + '" height="' + s + '" viewBox="0 0 120 120" aria-hidden="true"><defs><linearGradient id="' + g + '" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FF8C3A"/><stop offset="1" stop-color="#E4570B"/></linearGradient></defs>' +
-    '<circle cx="60" cy="60" r="57" fill="#F06A1F"/><circle cx="60" cy="60" r="57" fill="url(#' + g + ')"/><path d="M42 36h50v14H74v40H59V50H42z" fill="#fff"/><path d="M16 62h20M22 76h16" stroke="#fff" stroke-width="7" stroke-linecap="round" opacity=".9"/></svg>'; };
+  /* the Tezkor sign (2026): a soft orange tile, a forward-leaning T with two speed lines, and a green dot — the place it arrives */
+  SF.markSvg = function (s, id) { var g = id || ("tzm" + (SF._mk = (SF._mk || 0) + 1)); /* own gradient id: a gradient inside a hidden copy would not paint */
+    return '<svg class="tzmark" width="' + s + '" height="' + s + '" viewBox="0 0 120 120" aria-hidden="true"><defs><linearGradient id="' + g + '" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FF8F2E"/><stop offset="1" stop-color="#E04A06"/></linearGradient>' +
+      '<linearGradient id="' + g + 's" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".26"/><stop offset=".5" stop-color="#fff" stop-opacity="0"/></linearGradient></defs>' +
+      '<rect x="4" y="4" width="112" height="112" rx="34" fill="#EE6A1C"/><rect x="4" y="4" width="112" height="112" rx="34" fill="url(#' + g + ')"/><rect x="4" y="4" width="112" height="112" rx="34" fill="url(#' + g + 's)"/>' +
+      '<g transform="translate(9 0) skewX(-12)"><path d="M34 31H92A9.5 9.5 0 0 1 92 50H71V84A9 9 0 0 1 53 84V50H34A9.5 9.5 0 0 1 34 31Z" fill="#fff"/><path d="M22 66H40M30 79H42" stroke="#fff" stroke-width="6.5" stroke-linecap="round" opacity=".6"/></g>' +
+      '<circle cx="88" cy="86" r="9.5" fill="#13A35E" stroke="#fff" stroke-width="4.5"/></svg>'; };
+  SF.mark = function (s) { return SF.markSvg(s || 36); };
   SF.logo = function () { var b = SF.brand(); return '<span class="logo">' + SF.mark(34) + '<span class="wm"><b>' + SF.esc(b.slice(0, 3)) + "<em>" + SF.esc(b.slice(3)) + "</em></b><i>" + SF.esc(SF.t("brand.sub")) + "</i></span></span>"; };
 
   /* ---------- food art (original illustrations) ---------- */
@@ -184,6 +193,8 @@ var SF = (function () {
   SF.route = function (pattern, opts) { var keys = [], re = new RegExp("^" + pattern.replace(/:(\w+)/g, function (_, k) { keys.push(k); return "([^/]+)"; }) + "$"); SF.routes.push(Object.assign({ re: re, keys: keys, pattern: pattern }, opts)); };
   SF.go = function (path) { if (root.location) { if (root.location.hash === "#" + path) SF.render(); else root.location.hash = path; } else { SF._path = path; return SF.render(); } };
   SF.path = function () { return root.location ? (root.location.hash.slice(1) || "/") : (SF._path || "/"); };
+  /* who may shop: customers, and couriers with the same account */
+  SF.isBuyer = function (u) { return !!u && (u.role === "customer" || u.role === "courier"); };
   SF.homeOf = function (u) { return !u ? "/" : u.role === "restaurant" ? "/rest" : u.role === "courier" ? "/courier" : u.role === "admin" ? "/admin" : "/"; };
   SF.match = function (path) { var p = path.split("?")[0];
     for (var i = 0; i < SF.routes.length; i++) { var r = SF.routes[i], m = p.match(r.re); if (m) { var params = {}; r.keys.forEach(function (k, j) { params[k] = decodeURIComponent(m[j + 1]); }); var q = {}; (path.split("?")[1] || "").split("&").forEach(function (kv) { if (kv) { var a = kv.split("="); q[a[0]] = decodeURIComponent(a[1] || ""); } }); return { route: r, params: params, query: q }; } }
@@ -194,7 +205,7 @@ var SF = (function () {
     opts = opts || {}; var path = SF.path(), m = SF.match(path), u = SF.state.user, seq = ++SF.renderSeq;
     if (!m) { SF.go(SF.homeOf(u)); return Promise.resolve(); }
     var r = m.route;
-    if (r.roles) { if (!u) { SF.state.after = path; SF.go("/login"); return Promise.resolve(); } if (r.roles.indexOf(u.role) < 0 && !(u.role === "admin" && u.restaurantId && r.roles.indexOf("restaurant") >= 0)) { SF.go(SF.homeOf(u)); return Promise.resolve(); } }
+    if (r.roles) { if (!u) { SF.state.after = path; SF.go("/login"); return Promise.resolve(); } if (r.roles.indexOf(u.role) < 0 && !(u.role === "courier" && r.roles.indexOf("customer") >= 0) && !(u.role === "admin" && u.restaurantId && r.roles.indexOf("restaurant") >= 0)) { SF.go(SF.homeOf(u)); return Promise.resolve(); } }
     if (r.guest && u) { SF.go(SF.homeOf(u)); return Promise.resolve(); }
     var app = document.getElementById("app");
     if (!opts.quiet && app && !app.firstChild) app.innerHTML = '<div class="boot">' + SF.mark(56) + "</div>";
@@ -228,7 +239,7 @@ var SF = (function () {
 
   /* ---------- small view helpers ---------- */
   SF.stars = function (r) { return r == null ? '<span class="rate new">' + SF.t("rest.new") + "</span>" : '<span class="rate">' + SF.icon("star", 14) + "<b>" + Number(r).toFixed(1) + "</b></span>"; };
-  SF.statusPill = function (s) { var c = { awaiting_payment: "warn", pending: "brand", cooking: "warn", ready: "ok", picked_up: "info", delivered: "ok", rejected: "bad", cancelled: "mut" }[s] || "mut"; return '<span class="pill p-' + c + '">' + SF.t("st." + s) + "</span>"; };
+  SF.statusPill = function (s) { var c = { awaiting_payment: "warn", scheduled: "info", pending: "brand", cooking: "warn", ready: "ok", picked_up: "info", delivered: "ok", rejected: "bad", cancelled: "mut" }[s] || "mut"; return '<span class="pill p-' + c + '">' + SF.t("st." + s) + "</span>"; };
   SF.empty = function (icon, title, sub, btn) { return '<div class="empty">' + (icon.indexOf("<") === 0 ? icon : SF.icon(icon, 36)) + "<b>" + title + "</b>" + (sub ? "<span>" + sub + "</span>" : "") + (btn || "") + "</div>"; };
   SF.reduced = false; try { SF.reduced = root.matchMedia && root.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) {}
   return SF;

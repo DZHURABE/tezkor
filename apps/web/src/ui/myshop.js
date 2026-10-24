@@ -7,10 +7,18 @@
     if (!u.restaurantId) return '<section class="card stack mhcreate"><h2 class="h2">' + t("mh.create") + "</h2><p class=\"muted\">" + t("mh.createSub") + '</p><button class="btn primary lg block" data-act="mhcreate">' + I("store", 18) + t("mh.create") + "</button></section>" +
       '<div class="mhgrid">' + big("/admin/services", "grid", t("mh.more"), t("mh.moreSub")) + "</div>";
     return Promise.all([api().get("/restaurant/me"), api().get("/restaurant/orders").catch(function () { return []; })]).then(function (a) { var r = a[0], os = a[1] || [], nw = os.filter(function (o) { return o.status === "pending"; }).length, act = os.filter(function (o) { return ["pending", "cooking", "ready", "picked_up"].indexOf(o.status) >= 0; }).length;
-      return '<div class="mhpage"><section class="card mhhead"><div><h2 class="h2">' + esc(SF.tx(r.name)) + "</h2><p class=\"muted\">" + t("mh.sub") + '</p></div><label class="switchrow"><span>' + t("mh.open") + '</span><button class="switch' + (r.open ? " on" : "") + '" role="switch" aria-checked="' + !!r.open + '" data-act="ropen" aria-label="' + t("mh.open") + '"></button></label></section>' +
+      return '<div class="mhpage"><section class="card mhhead"><div><h2 class="h2">' + esc(SF.tx(r.name)) + "</h2><p class=\"muted\">" + t("mh.sub") + '</p></div><label class="switchrow"><span>' + t("mh.open") + '</span><button class="switch' + (r.open ? " on" : "") + '" role="switch" aria-checked="' + !!r.open + '" data-act="ropen" aria-label="' + t("mh.open") + '"></button></label></section>' + hoursCard(r) +
         '<div class="mhgrid">' + big("/rest/orders", "receipt", t("mh.orders"), act ? t("mh.ordersNew", { n: nw }) + " · " + act : "", nw || "") + big("/rest/menu", "plus", t("mh.add"), "") + big("/rest/catalog", "box", t("mh.catalog"), "") + big("/rest/starter", "list", t("mh.ready"), "") + big("/admin/books", "wallet", t("mh.books"), "") + big("/admin/prices", "scooter", t("pr.nav"), "") + big("/admin/pay", "card", t("pr.payNav"), "") + big("/admin/soon", "flag", t("mh.soon"), t("mh.soonSub")) + "</div>" +
         '<p class="msg info mhnote">' + I("scooter", 16) + "<span>" + t("mh.deliv", { n: (SF.state.pub && SF.state.pub.handoffMin) || 7 }) + "</span></p>" +
         '<a class="mhmore" href="#/admin/services">' + I("cog", 18) + "<span><b>" + t("mh.more") + "</b><small>" + t("mh.moreSub") + "</small></span>" + I("chevR", 18) + "</a></div>"; }); } });
+  /* working hours of the owner's shop: from – to, or round the clock */
+  function hoursCard(r) { var h = r.hours || { from: "09:00", to: "22:00" }, all = h.from === h.to;
+    return '<form class="card mhhours" data-form="mhhours"><span class="bic">' + I("clock", 20) + '</span><div class="grow"><b>' + t("hr.title") + '</b><small>' + (all ? t("hr.allDay") : t("hr.now", { from: h.from, to: h.to })) + '</small></div>' +
+      '<label class="tin"><input type="time" name="from" value="' + esc(h.from) + '" aria-label="' + t("rest.from") + '"></label><span class="tlbl">—</span><label class="tin"><input type="time" name="to" value="' + esc(h.to) + '" aria-label="' + t("rest.to") + '"></label>' +
+      '<label class="checkrow sm"><input type="checkbox" name="all"' + (all ? " checked" : "") + "><span>" + t("hr.24") + '</span></label><button class="btn primary sm">' + t("btn.save") + "</button></form>"; }
+  SF.forms.mhhours = function (fd) { var h = fd.all ? { from: "00:00", to: "00:00" } : { from: fd.from, to: fd.to };
+    if (!fd.all && h.from === h.to) { SF.toast(t("hr.same"), "err"); return; }
+    return api().patch("/restaurant/me", { hours: h }).then(function () { SF.toast(t("btn.saved")); SF.render({ quiet: true }); }, function (e) { SF.toast(SF.err(e), "err"); }); };
   SF.actions.mhcreate = function () { return api().post("/admin/own-shop", {}).then(function () { return api().get("/auth/me"); }).then(function (me) { SF.state.user = me; SF.render({ quiet: true }); }, function (e) { SF.toast(SF.err(e), "err"); }); };
 
   SF.adminRoute("/admin/soon", { title: "soon.nav", render: function () {
@@ -24,31 +32,41 @@
   SF.actions.soondel = function (el) { return api().del("/admin/soon/" + el.dataset.id).then(function () { SF.render({ quiet: true }); }); };
   SF.actions.soonmiss = function (el) { return api().post("/admin/soon/miss", { q: el.dataset.q, add: !!el.dataset.add }).then(function () { SF.render({ quiet: true }); }); };
 
-  /* delivery prices: six numbers, a table of typical orders, three starting suggestions */
-  var PRESETS = [{ deliveryBase: 3, deliveryPerKm: 2, deliveryMin: 5, heavyFreeKg: 20, heavyStepKg: 25, heavyStepFee: 3 }, { deliveryBase: 5, deliveryPerKm: 3, deliveryMin: 7, heavyFreeKg: 20, heavyStepKg: 25, heavyStepFee: 5 }, { deliveryBase: 7, deliveryPerKm: 4, deliveryMin: 10, heavyFreeKg: 10, heavyStepKg: 20, heavyStepFee: 8 }];
-  var PF = [["deliveryBase", "pr.f.base"], ["deliveryPerKm", "pr.f.km"], ["deliveryMin", "pr.f.min"], ["heavyFreeKg", "pr.f.free"], ["heavyStepKg", "pr.f.step"], ["heavyStepFee", "pr.f.fee"], ["maxOrderKg", "pr.f.max"]];
+  /* delivery prices: the owner's own table «up to N metres — M somoni», beyond it + per km, a bad-weather surcharge, heavy goods */
+  var HF = [["heavyFreeKg", "pr.f.free"], ["heavyStepKg", "pr.f.step"], ["heavyStepFee", "pr.f.fee"], ["maxOrderKg", "pr.f.max"]];
+  function distLbl(km) { return km < 1 ? t("dp.m", { n: Math.round(km * 1000) }) : t("pr.km", { n: km }); }
   function ptable(d) { var KEY = { 5: "pr.r5", 9: "pr.r9", 25: "pr.r25", 50: "pr.r50", 250: "pr.r250", 500: "pr.r500" };
-    return '<table class="prtab"><thead><tr><th></th>' + d.kms.map(function (k) { return "<th>" + t("pr.km", { n: k }) + "</th>"; }).join("") + "</tr></thead><tbody>" + d.rows.map(function (r) { return "<tr><td>" + t(KEY[r.kg]) + "</td>" + r.fees.map(function (f) { return '<td class="num"><b>' + SF.money(f) + "</b></td>"; }).join("") + "</tr>"; }).join("") + "</tbody></table>"; }
-  function pvals(f) { var o = {}; PF.forEach(function (x) { o[x[0]] = f.querySelector("[name=" + x[0] + "]").value; }); return o; }
+    return '<div class="tscroll"><table class="prtab"><thead><tr><th></th>' + d.kms.map(function (k) { return "<th>" + distLbl(k) + "</th>"; }).join("") + "</tr></thead><tbody>" + d.rows.filter(function (r) { return [5, 25, 50].indexOf(r.kg) >= 0; }).map(function (r) { return "<tr><td>" + t(KEY[r.kg]) + "</td>" + r.fees.map(function (f) { return '<td class="num"><b>' + SF.money(f) + "</b></td>"; }).join("") + "</tr>"; }).join("") + "</tbody></table></div>"; }
+  function tierRow(x) { return '<div class="tierrow"><span class="tlbl">' + t("dp.upTo") + '</span><label class="tin"><input data-tm inputmode="numeric" value="' + esc(x.m) + '" aria-label="' + t("dp.metres") + '"><i>' + t("dp.mU") + '</i></label><span class="tlbl">—</span><label class="tin"><input data-tf inputmode="numeric" value="' + esc(x.fee) + '" aria-label="' + t("dp.fee") + '"><i>' + t("cur") + '</i></label><button type="button" class="iconbtn" data-act="tierdel" aria-label="' + t("btn.remove") + '">' + I("x", 16) + "</button></div>"; }
+  function fval(f) { var o = { deliveryTiers: [].map.call(f.querySelectorAll(".tierrow"), function (r) { return { m: Number(String(r.querySelector("[data-tm]").value).replace(/\D/g, "")), fee: Number(String(r.querySelector("[data-tf]").value).replace(/\D/g, "")) }; }).filter(function (x) { return x.m > 0; }).sort(function (a, b) { return a.m - b.m; }),
+      deliveryExtraKm: f.querySelector("[name=deliveryExtraKm]").value, weatherFee: f.querySelector("[name=weatherFee]").value, weatherOn: f.querySelector("[data-act=wthr]").getAttribute("aria-checked") === "true" ? 1 : 0 };
+    HF.forEach(function (x) { o[x[0]] = f.querySelector("[name=" + x[0] + "]").value; }); return o; }
   var pvT = null;
-  function prefresh(f) { clearTimeout(pvT); pvT = setTimeout(function () { api().post("/admin/delivery-preview", pvals(f)).then(function (d) { var box = document.getElementById("prtable"); if (box) box.innerHTML = ptable(d); }); }, 250); }
-  SF.adminRoute("/admin/prices", { title: "pr.nav", render: function () { return api().post("/admin/delivery-preview", {}).then(function (d) {
-    return '<div class="mhpage"><p class="muted">' + t("pr.sub") + '</p><form class="card stack prform" data-form="prices"><div class="grid2">' + PF.map(function (x) { return '<label class="f">' + t(x[1]) + '<input name="' + x[0] + '" inputmode="numeric" data-input="prchg" value="' + esc(d.cfg[x[0]]) + '"></label>'; }).join("") + "</div>" +
-      '<p class="lbl">' + t("pr.presets") + '</p><div class="chips">' + [1, 2, 3].map(function (i) { return '<button type="button" class="chip" data-act="prpreset" data-v="' + (i - 1) + '">' + t("pr.p" + i) + "</button>"; }).join("") + "</div>" +
-      '<h3>' + t("pr.table") + '</h3><div id="prtable">' + ptable(d) + '</div><p class="fine">' + t("pr.maxHint") + '</p><p class="fine">' + t("pr.how") + '</p><p class="fine">' + t("pr.hint") + '</p><button class="btn primary block lg">' + t("pr.save") + "</button></form></div>"; }); } });
+  function prefresh(f) { clearTimeout(pvT); pvT = setTimeout(function () { api().post("/admin/delivery-preview", fval(f)).then(function (d) { var box = document.getElementById("prtable"); if (box) box.innerHTML = ptable(d); }, function () {}); }, 300); }
+  SF.adminRoute("/admin/prices", { title: "pr.nav", render: function () { return api().post("/admin/delivery-preview", {}).then(function (d) { var c = d.cfg, R = window.SomonRules;
+    var tiers = c.deliveryTiers && c.deliveryTiers.length ? c.deliveryTiers : [500, 1000, 2000, 3000, 5000].map(function (m) { return { m: m, fee: R.deliveryFee({ deliveryBase: c.deliveryBase, deliveryPerKm: c.deliveryPerKm, deliveryMin: c.deliveryMin }, m / 1000) }; });
+    return '<div class="mhpage"><form class="card stack prform" data-form="prices"><h3>' + I("route", 18) + " " + t("dp.title") + '</h3><p class="muted">' + t("dp.lead") + "</p>" +
+      '<div id="tiers" class="tiers">' + tiers.map(tierRow).join("") + '</div><button type="button" class="btn ghost" data-act="tieradd">' + I("plus", 16) + t("dp.add") + "</button>" +
+      '<label class="f">' + t("dp.extra") + '<input name="deliveryExtraKm" inputmode="numeric" data-input="prchg" value="' + esc(c.deliveryExtraKm || 0) + '"></label>' +
+      '<div class="wthr"><span class="bic">' + I("cloud", 20) + '</span><div class="grow"><b>' + t("dp.wT") + "</b><small>" + t("dp.wS") + '</small></div><label class="tin sm"><span>+</span><input name="weatherFee" inputmode="numeric" data-input="prchg" value="' + esc(c.weatherFee || 2) + '"><i>' + t("cur") + '</i></label><button type="button" class="switch' + (c.weatherOn ? " on" : "") + '" role="switch" aria-checked="' + !!c.weatherOn + '" data-act="wthr" aria-label="' + t("dp.wT") + '"></button></div>' +
+      '<details class="catmore"><summary>' + t("dp.heavy") + '</summary><div class="grid2">' + HF.map(function (x) { return '<label class="f">' + t(x[1]) + '<input name="' + x[0] + '" inputmode="numeric" data-input="prchg" value="' + esc(c[x[0]] == null ? 0 : c[x[0]]) + '"></label>'; }).join("") + "</div></details>" +
+      "<h3>" + t("pr.table") + '</h3><div id="prtable">' + ptable(d) + '</div><button class="btn primary block lg">' + t("pr.save") + "</button></form></div>"; }); } });
   SF.inputs.prchg = function (v, el) { prefresh(el.closest("form")); };
-  SF.actions.prpreset = function (el) { var f = el.closest("form"), p = PRESETS[+el.dataset.v]; PF.forEach(function (x) { if (p[x[0]] != null) f.querySelector("[name=" + x[0] + "]").value = p[x[0]]; }); prefresh(f); };
-  SF.forms.prices = function (fd) { var b = {}; PF.forEach(function (x) { b[x[0]] = fd[x[0]]; }); return api().patch("/admin/settings", b).then(function () { SF.toast(t("pr.saved")); SF.render({ quiet: true }); }, function (e) { SF.toast(SF.err(e), "err"); }); };
-
+  document.addEventListener("input", function (e) { if (e.target && e.target.closest && e.target.closest(".tierrow")) prefresh(e.target.closest("form")); });
+  SF.actions.tieradd = function (el) { var f = el.closest("form"), box = f.querySelector("#tiers"), rows = box.querySelectorAll(".tierrow"); if (rows.length >= 20) return;
+    var last = rows.length ? rows[rows.length - 1] : null, lm = last ? Number(last.querySelector("[data-tm]").value) || 0 : 0, lf = last ? Number(last.querySelector("[data-tf]").value) || 0 : 0;
+    box.insertAdjacentHTML("beforeend", tierRow({ m: lm ? lm + (lm < 1000 ? 100 : 1000) : 100, fee: lf + 1 })); prefresh(f); };
+  SF.actions.tierdel = function (el) { var f = el.closest("form"); el.closest(".tierrow").remove(); prefresh(f); };
+  SF.actions.wthr = function (el) { var on = el.getAttribute("aria-checked") !== "true"; el.setAttribute("aria-checked", on); el.classList.toggle("on", on); prefresh(el.closest("form")); };
+  SF.forms.prices = function (fd, f) { return api().post("/admin/delivery-prices", fval(f)).then(function () { return api().get("/settings/public"); }).then(function (p) { SF.state.pub = p; SF.toast(t("pr.saved")); SF.render({ quiet: true }); }, function (e) { SF.toast(SF.err(e), "err"); }); };
 
   /* the shop's own showcase on the home screen: a new visitor sees at once what it is and can order without hunting for the «Shops» section */
+  /* the owner's warehouse on the home screen: one neat line (name, «open», hours, a button) and one row of goods */
   SF.ownShopHero = function (r) { if (!r || !r.own) return ""; var ps = (r.products || []).filter(function (x) { return x.available; }); if (!ps.length) return "";
-    ps = ps.filter(function (x) { return x.popular; }).concat(ps.filter(function (x) { return !x.popular; })).slice(0, 8); SF.rememberProducts(r.products);
-    var cnt = {}; (r.products || []).forEach(function (x) { if (x.available) cnt[x.categoryId] = (cnt[x.categoryId] || 0) + 1; });
-    var seen = {}, cats = (SF.state.shopCats || []).concat(SF.state.categories || []).filter(function (c) { if (!cnt[c.id] || seen[c.id]) return false; seen[c.id] = 1; return true; }).slice(0, 8), open = r.isOpenNow !== false;
-    return '<section class="sasect ownshop"><a class="osbanner" href="#/r/' + r.id + '"><span class="osb1"></span><span class="osb2"></span><div class="osl"><span class="oslogo">' + I("store", 22) + "</span><div><b>" + esc(SF.tx(r.name)) + "</b><small><i class=\"pulse" + (open ? "" : " off") + "\"></i>" + t(open ? "os.open" : "os.closed") + (r.eta ? " · " + esc(r.eta) + " " + t("u.min") : "") + "</small></div></div>" +
-      "<p>" + t("os.lead") + '</p><span class="oscta">' + t("os.cta") + I("chevR", 18) + "</span></a>" +
-      (cats.length ? '<div class="oscats">' + cats.map(function (c, i) { return '<a class="oscat" style="--i:' + i + '" href="#/shops/goods?cat=' + c.id + '">' + esc(SF.tx(c.name)) + " <i class=\"num\">" + cnt[c.id] + "</i></a>"; }).join("") + "</div>" : "") +
+    ps = ps.filter(function (x) { return x.popular; }).concat(ps.filter(function (x) { return !x.popular; })).slice(0, 12); SF.rememberProducts(r.products);
+    var open = r.isOpenNow !== false, hrs = r.hours && r.hours.from === r.hours.to ? t("hr.allDay") : r.hours ? esc(r.hours.from) + "–" + esc(r.hours.to) : "";
+    return '<section class="sasect ownshop compact"><a class="osline" href="#/r/' + r.id + '"><span class="oslogo">' + I("store", 20) + '</span><span class="grow"><b>' + esc(SF.tx(r.name)) + '</b><small><i class="pulse' + (open ? "" : " off") + '"></i>' + t(open ? "os.open" : "os.closed") + "</small>" + (hrs ? '<small class="oshrs">' + I("clock", 12) + hrs + "</small>" : "") + "</span>" +
+      '<span class="osgo">' + t("os.go") + I("chevR", 16) + "</span></a>" +
       '<div class="hscroll osrow">' + ps.map(function (p, i) { return '<div class="osi" style="--i:' + i + '">' + SF.prodCard(p) + "</div>"; }).join("") + "</div></section>"; };
   /* where customers send money: cards and e-wallet phone numbers of several banks */
   SF.adminRoute("/admin/pay", { title: "pr.payNav", render: function () { return api().get("/restaurant/me").then(function (r) { return '<div class="mhpage">' + SF.payAccForm(r) + "</div>"; }); } });

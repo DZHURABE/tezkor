@@ -12,41 +12,47 @@
     try { navigator.clipboard.writeText(v).then(done, function () { sel(); }); } catch (e) { sel(); }
     function sel() { var c = document.getElementById("coords-text"); if (c) { var r = document.createRange(); r.selectNodeContents(c); var s = getSelection(); s.removeAllRanges(); s.addRange(r); } } };
 
+  /* the courier's main screen, made simple: one big «start / finish work» button, then either the current order
+     (one step at a time, one big button) or the list of new orders (each with one big «take» button). The map is folded away. */
   R("/courier", { title: "cour.orders", live: true, render: function () {
     return Promise.all([api().get("/auth/me"), api().get("/courier/orders/active"), api().get("/courier/orders/available"), api().get("/courier/earnings")]).then(function (a) {
       var me = a[0], act = a[1], open = a[2], e = a[3], c = me.courier; SF.state.user = me;
-      var head = '<section class="chero' + (c.online ? " on" : "") + '"><span class="avatar">' + esc(me.name.charAt(0)) + '</span><div class="grow"><b>' + esc(me.name) + "</b><span>" + SF.stars(c.rating) + ' <small class="num">(' + (c.ratingCount || 0) + ")</small> · " + t("veh." + c.vehicle) + "</span></div>" +
-        '<button class="switch big' + (c.online ? " on" : "") + '" role="switch" aria-checked="' + c.online + '" data-act="online" aria-label="' + t("cour.online") + '"></button><p class="cstate">' + (c.online ? (act ? t("cour.st.busy") : t("cour.st.online")) : t("cour.st.offline")) + "</p></section>" +
-        '<div class="kpis k3">' + SF.kpi("wallet", t("cour.today"), money(e.today)) + SF.kpi("box", t("cour.delivered"), e.todayCount) + SF.kpi("star", t("k.rating"), c.rating == null ? "—" : Number(c.rating).toFixed(1)) + "</div>";
-      head = (SF.pushCard ? SF.pushCard() : "") + SF.soundBar() + head;
+      var head = '<section class="cv-head' + (c.online ? " on" : "") + '"><div class="cv-me"><span class="avatar">' + esc(me.name.charAt(0)) + '</span><div class="grow"><b>' + esc(me.name) + '</b><small>' + (c.online ? (act ? t("cour.st.busy") : t("cv.onShift")) : t("cv.offShift")) + '</small></div>' +
+          '<div class="cv-today"><b class="num">' + money(e.today) + '</b><small>' + t("cv.todayN", { n: e.todayCount }) + "</small></div></div>" +
+        (act ? "" : '<button class="cv-shift' + (c.online ? " stop" : "") + '" data-act="online">' + I(c.online ? "x" : "scooter", 22) + t(c.online ? "cv.stop" : "cv.start") + "</button>") + "</section>";
+      head = head + (SF.pushCard ? SF.pushCard() : "") + SF.soundBar();
       if (act) return head + activeCard(act);
-      if (!c.online) return head + SF.empty("scooter", t("cour.offTitle"), t("cour.offSub"), '<button class="btn primary" data-act="online">' + t("cour.goOnline") + "</button>");
-      return head + '<div class="sect"><h2>' + t("cour.available") + '</h2><span class="muted num">' + open.length + "</span></div>" + (open.length ? '<div class="stack">' + open.map(function (o) {
-        return '<article class="card offer"><div class="rowhead"><b class="num">№' + o.number + '</b><span class="pill p-ok num">+' + money(payEst(o)) + "</span></div>" + route(o, false) +
-          '<div class="tmeta"><span>' + SF.statusPill(o.status) + '</span><span class="num">' + o.km + " " + t("u.km") + " · " + (o.payment.method === "cash" ? t("cour.collect", { sum: money(o.total) }) : t("cour.paidOnline")) + "</span></div>" +
-          '<button class="btn primary block" data-act="take" data-id="' + o.id + '">' + t("cour.take") + "</button></article>"; }).join("") + "</div>" : SF.empty("box", t("cour.noneTitle"), t("cour.noneSub")));
+      if (!c.online) return head + '<div class="cv-empty">' + I("scooter", 46) + "<b>" + t("cour.offTitle") + "</b><p>" + t("cv.offHint") + "</p></div>";
+      if (!open.length) return head + '<div class="cv-empty wait"><span class="cv-radar"></span><b>' + t("cv.waitT") + "</b><p>" + t("cv.waitS") + "</p></div>";
+      return head + '<h2 class="cv-h">' + t("cv.newN", { n: open.length }) + "</h2>" + open.map(function (o) {
+        return '<article class="cv-offer"><div class="cv-ofhead"><span class="num">№' + o.number + '</span><b class="num">+' + money(payEst(o)) + "</b></div>" + legs(o) +
+          '<div class="cv-chips"><span>' + I("route", 14) + o.km + " " + t("u.km") + "</span>" + (o.payment.method === "cash" ? '<span class="cash">' + I("cash", 14) + t("cv.collectS", { sum: money(o.total) }) + "</span>" : '<span class="paid">' + I("check", 14) + t("cv.paidS") + "</span>") + "</div>" +
+          '<button class="cv-big" data-act="take" data-id="' + o.id + '">' + I("check", 20) + t("cv.take") + "</button></article>"; }).join("");
     });
   } });
-  function route(o, full) {
-    return '<div class="route"><div class="rdots"><i></i><s></s><i class="b"></i></div><div class="rpts"><div><small>' + t("cour.pickup") + "</small><b>" + esc(tx(o.restaurant.name)) + "</b>" + (full && tx(o.restaurant.address) && tx(o.restaurant.address) !== "—" ? '<span class="muted">' + esc(tx(o.restaurant.address)) + "</span>" : "") + "</div>" +
-      "<div><small>" + t("cour.dropoff") + "</small><b>" + esc(o.address.text) + "</b>" + (o.address.landmark ? '<span class="muted">' + esc(o.address.landmark) + "</span>" : "") + "</div></div></div>";
-  }
+  function legs(o) {
+    return '<div class="cv-legs"><div class="cv-leg"><i class="dot a"></i><div><small>' + t("cv.from") + "</small><b>" + esc(tx(o.restaurant.name)) + "</b></div></div>" +
+      '<div class="cv-leg"><i class="dot b"></i><div><small>' + t("cv.to") + "</small><b>" + esc(o.address.text) + "</b>" + (o.address.landmark ? "<span>" + esc(o.address.landmark) + "</span>" : "") + "</div></div></div>"; }
+  function route(o) { return legs(o); }
+  /* the current order: where to go now, how to get there, who to call, how much to take — and one button */
   function activeCard(o) {
-    var stage = o.status === "picked_up" ? 2 : o.status === "ready" ? 1 : 0, city = cityOf(o.cityId) || o.restaurant, cp = o.courierPos || { lat: SF.state.user.courier.lat, lng: SF.state.user.courier.lng };
-    var target = stage === 2 ? o.address : o.restaurant, far = cp.lat == null || SF.geo.km(cp, target) > 30;   /* GPS is old or wrong (a PC, no signal): do not stretch the map over half the country — show the place itself */
-    var steps = [t("cour.s1"), t("cour.s2"), t("cour.s3")];
-    var action = stage === 0 ? '<div class="msg info">' + I("fire", 16) + t("cour.cooking", { min: o.prepMin || 20 }) + '</div><button class="btn block" disabled>' + t("cour.picked") + "</button>"
-      : stage === 1 ? '<button class="btn primary block lg" data-act="pickup" data-id="' + o.id + '">' + I("bag", 18) + t("cour.picked") + "</button>"
-      : '<button class="btn ok block lg" data-act="deliver" data-id="' + o.id + '">' + I("check", 18) + (o.payment.method === "cash" ? t("cour.deliveredCash", { sum: money(o.total) }) : t("cour.deliveredBtn")) + "</button>";
-    return '<section class="card active"><div class="rowhead"><b class="num">№' + o.number + "</b>" + SF.statusPill(o.status) + "</div>" +
-      '<ol class="steps three">' + steps.map(function (s, i) { var st = i < stage ? "done" : i === stage ? "now" : ""; return '<li class="' + st + '"><span>' + I(st === "done" ? "check" : ["store", "bag", "home"][i], 16) + "</span><small>" + s + "</small></li>"; }).join("") + "</ol>" +
-      '<div class="mapcard">' + SF.tmap({ key: "c-" + o.id + "-" + stage + (far ? "f" : ""), center: target, zoom: far ? 16 : undefined, free: true, zone: far ? undefined : SF.zone(o.cityId), fit: far ? undefined : [cp, target], markers: [{ lat: o.restaurant.lat, lng: o.restaurant.lng, type: "rest", label: "R" }, { lat: o.address.lat, lng: o.address.lng, type: "home", label: "" }].concat(far ? [] : [{ lat: cp.lat, lng: cp.lng, type: "courier" }]), route: far ? undefined : [cp, target], label: t("cour.map") }) + "</div>" +
-      (far ? '<div class="msg warn">' + I("info", 16) + "<span>" + t("cour.gpsFar") + "</span></div>" : '<p class="fine mapdist">' + I("route", 14) + t("cour.dist", { km: SF.geo.km(cp, target).toFixed(1) }) + "</p>") +
-      navBlock(target, stage === 2 ? t("cour.client") : tx(o.restaurant.name), stage === 2 ? t("cour.coords") : t("cour.coordsR")) + route(o, true) +
-      '<div class="contact"><span class="avatar sm">' + esc(o.customer.name.charAt(0)) + '</span><div class="grow"><b>' + esc(o.customer.name) + '</b><span class="muted num">' + esc(SF.phone(o.phone || o.customer.phone)) + '</span>' + SF.custMark(o.customer) + '</div>' + SF.callBtn(o.customer.name, o.phone || o.customer.phone, t("role.customer"), t("cour.call")) + "</div>" +
-      (o.comment ? '<div class="note">' + I("info", 14) + esc(o.comment) + "</div>" : "") +
-      '<details class="items"><summary>' + t("cour.itemsN", { n: o.items.reduce(function (s, i) { return s + i.qty; }, 0) }) + "</summary>" + o.items.map(function (i) { return '<div class="line"><span>' + esc(tx(i.name)) + '</span><b class="num">×' + i.qty + "</b></div>"; }).join("") + "</details>" +
-      '<div class="line tot"><span>' + (o.payment.method === "cash" ? t("cour.collectL") : t("cour.paidOnline")) + '</span><b class="num">' + money(o.payment.method === "cash" ? o.total : 0) + "</b></div>" + action + "</section>";
+    var stage = o.status === "picked_up" ? 2 : o.status === "ready" ? 1 : 0, toClient = stage === 2, target = toClient ? o.address : o.restaurant, n = SF.geo.nav(target);
+    var who = toClient ? o.customer.name : tx(o.restaurant.name), phone = toClient ? (o.phone || o.customer.phone) : o.restaurant.phone, cash = o.payment.method === "cash";
+    var action = stage === 0 ? '<div class="cv-wait">' + I("clock", 18) + t("cour.cooking", { min: o.prepMin || 20 }) + "</div>"
+      : stage === 1 ? '<button class="cv-big" data-act="pickup" data-id="' + o.id + '">' + I("bag", 22) + t("cour.picked") + "</button>"
+      : '<button class="cv-big ok" data-act="deliver" data-id="' + o.id + '">' + I("check", 22) + (cash ? t("cour.deliveredCash", { sum: money(o.total) }) : t("cour.deliveredBtn")) + "</button>";
+    return '<section class="cv-active">' +
+      '<div class="cv-steps">' + [t("cv.s1"), t("cv.s2")].map(function (x, i) { var st = (toClient ? 1 : 0); return '<span class="' + (i < st ? "done" : i === st ? "now" : "") + '">' + (i < st ? I("check", 14) : i + 1) + " " + x + "</span>"; }).join("") + "</div>" +
+      '<div class="cv-target"><small>' + t(toClient ? "cv.goClient" : "cv.goShop") + '</small><b>' + esc(toClient ? o.address.text : tx(o.restaurant.name)) + "</b>" +
+        (toClient && o.address.landmark ? "<span>" + esc(o.address.landmark) + "</span>" : !toClient && tx(o.restaurant.address) && tx(o.restaurant.address) !== "—" ? "<span>" + esc(tx(o.restaurant.address)) + "</span>" : "") +
+        '<div class="cv-btns"><a class="cv-nav" href="' + esc(n.google) + '" target="_blank" rel="noopener">' + I("navarrow", 18) + t("cv.navG") + '</a><a class="cv-nav y" href="' + esc(n.yandex) + '" target="_blank" rel="noopener">' + I("map", 18) + t("cv.navY") + "</a>" +
+        (phone ? SF.callBtn(who, phone, toClient ? t("role.customer") : tx(o.restaurant.name), t("cour.call")) : "") + "</div></div>" +
+      '<div class="cv-money' + (cash ? " cash" : "") + '"><span>' + t(cash ? "cv.collect" : "cv.paid") + '</span><b class="num">' + (cash ? money(o.total) : "0") + "</b></div>" +
+      '<div class="cv-info"><div class="cv-row"><span class="avatar sm">' + esc(o.customer.name.charAt(0)) + '</span><div class="grow"><b>' + esc(o.customer.name) + '</b><small class="num">' + esc(SF.phone(o.phone || o.customer.phone)) + "</small></div><span class=\"num\">№" + o.number + "</span></div>" +
+        (o.comment ? '<div class="note">' + I("info", 14) + esc(o.comment) + "</div>" : "") +
+        '<details class="items"><summary>' + t("cour.itemsN", { n: o.items.reduce(function (x, i) { return x + i.qty; }, 0) }) + "</summary>" + o.items.map(function (i) { return '<div class="line"><span>' + esc(tx(i.name)) + '</span><b class="num">×' + i.qty + "</b></div>"; }).join("") + "</details>" +
+        '<details class="cv-map"><summary>' + I("map", 16) + t("cv.showMap") + "</summary>" + SF.tmap({ key: "cv-" + o.id + "-" + stage, center: target, zoom: 16, free: true, markers: [{ lat: o.restaurant.lat, lng: o.restaurant.lng, type: "rest", label: "R" }, { lat: o.address.lat, lng: o.address.lng, type: "home", label: "" }], label: t("cour.map") }) + "</details></div>" +
+      '<div class="cv-bottom">' + action + "</div></section>";
   }
   SF.actions.online = function (el) { var on = !SF.state.user.courier.online; return api().patch("/courier/me", { online: on }).then(function (u) { SF.state.user = u; SF.toast(t(on ? "cour.st.online" : "cour.st.offline"), "info"); SF.render({ quiet: true }); }); };
   SF.actions.take = function (el) { return api().post("/courier/orders/" + el.dataset.id + "/accept").then(function () { SF.toast(t("cour.taken")); SF.render({ quiet: true }); }); };
@@ -69,7 +75,7 @@
     return api().get("/auth/me").then(function (u) { SF.state.user = u; var c = u.courier;
       return '<div class="profile">' + SF.installCard() + '<section class="card phead"><span class="avatar xl">' + esc(u.name.charAt(0)) + '</span><div><h1 class="h2">' + esc(u.name) + '</h1><span class="muted num">' + esc(SF.phone(u.phone)) + "</span>" + SF.stars(c.rating) + "</div></section>" +
         '<section class="card menu"><div class="mrow"><span>' + t("cour.vehicle") + '</span><div class="seg">' + ["scooter", "bike", "car", "foot"].map(function (v) { return '<button class="' + (c.vehicle === v ? "on" : "") + '" aria-pressed="' + (c.vehicle === v) + '" data-act="vehicle" data-v="' + v + '">' + t("veh." + v) + "</button>"; }).join("") + "</div></div>" +
-        '<div class="mrow"><span>' + t("profile.city") + "</span><b>" + esc(tx((cityOf(u.cityId) || {}).name)) + '</b></div><div class="mrow"><span>' + t("profile.lang") + "</span>" + SF.langSel() + '</div><div class="mrow"><span>' + t("foot.support") + '</span><b class="num">' + esc(SF.state.pub.supportPhone) + "</b></div></section>" +
+        '<div class="mrow"><span>' + t("profile.lang") + "</span>" + SF.langSel() + '</div><div class="mrow"><span>' + t("foot.support") + '</span><b class="num">' + esc(SF.state.pub.supportPhone) + "</b></div></section>" +
         SF.pwForm() + '<button class="btn ghost block" data-act="logout">' + I("logout", 18) + t("auth.logout") + "</button></div>";
     });
   } });

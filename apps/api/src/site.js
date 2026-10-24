@@ -4,9 +4,9 @@
    headTags()   — title, description, share picture (Open Graph), structured data, injected into the app page */
 const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
-const TITLE = "Тезкор — расонидани таом дар Шаҳритус";
-const DESC = "Тезкор (Tezkor) — фармоиши таом аз беҳтарин ошхонаҳои Шаҳритус бо расонидан то дари хона. Палав, шашлик, пицца, бургер ва ширинӣ. Барномаи Android ва сайт.";
-const KEYWORDS = "Тезкор, Tezkor, tezkor tj, расонидани таом, доставка еды Шаартуз, Шаҳритус, Shahrituz, фармоиши таом, ошхона, доставка";
+const TITLE = "Тезкор — расонидани таом ва мол";
+const DESC = "Тезкор (Tezkor) — фармоиши таом ва мол бо расонидан то дари хона, эълонҳо ва хизматҳо. Палав, шашлик, пицца, бургер ва ширинӣ. Барномаи Android ва сайт.";
+const KEYWORDS = "Тезкор, Tezkor, tezkor tj, расонидани таом, доставка еды, доставка товаров, объявления, фармоиши таом, ошхона, доставка";
 
 /* the address people see: PUBLIC_URL, Render's own address, or the host the request came to */
 function baseUrl(req) {
@@ -20,9 +20,9 @@ function headTags(base) {
   const ld = {
     "@context": "https://schema.org",
     "@graph": [
-      { "@type": "WebSite", name: "Тезкор", alternateName: ["Tezkor", "Tezkor TJ", "Тезкор Шаҳритус"], url: base + "/", inLanguage: ["tg", "ru"] },
+      { "@type": "WebSite", name: "Тезкор", alternateName: ["Tezkor", "Tezkor TJ"], url: base + "/", inLanguage: ["tg", "ru"] },
       { "@type": "Organization", name: "Тезкор", alternateName: "Tezkor", url: base + "/", logo: base + "/icons/icon-512.png",
-        areaServed: { "@type": "City", name: "Шаҳритус (Shahrituz), Тоҷикистон" } },
+        areaServed: { "@type": "Country", name: "Тоҷикистон" } },
       { "@type": "MobileApplication", name: "Тезкор", operatingSystem: "Android", applicationCategory: "LifestyleApplication",
         downloadUrl: base + "/tezkor.apk", offers: { "@type": "Offer", price: "0", priceCurrency: "TJS" } },
     ],
@@ -61,7 +61,7 @@ function downloadPage(base, o) {
   const bot = o.botName ? `https://t.me/${o.botName}` : null;
   return `<!doctype html><html lang="tg"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Барномаи Тезкор — боргирӣ барои Android ва iPhone</title>
-<meta name="description" content="Барномаи Тезкорро ройгон боргирӣ кунед: фармоиши таом дар Шаҳритус бо расонидан то дари хона. Android (APK) ва iPhone.">
+<meta name="description" content="Барномаи Тезкорро ройгон боргирӣ кунед: фармоиши таом ва мол бо расонидан то дари хона. Android (APK) ва iPhone.">
 <meta name="theme-color" content="#E8590C"><link rel="icon" href="/icons/icon-192.png"><link rel="canonical" href="${esc(base)}/download">
 <meta property="og:title" content="Барномаи Тезкор"><meta property="og:description" content="${esc(DESC)}"><meta property="og:image" content="${esc(base)}/og.png"><meta property="og:url" content="${esc(base)}/download">
 <style>
@@ -80,7 +80,7 @@ ol{margin:10px 0 0;padding-left:20px;color:var(--mut);font-size:14.5px;line-heig
 .hide{display:none}.foot{text-align:center;color:var(--mut);font-size:13px;margin:10px 0 30px}
 </style></head><body>
 <header class="hero"><img class="logo" src="/icons/icon-192.png" alt="Тезкор" width="96" height="96">
-<h1>Тезкор</h1><p>Таоми гарм аз беҳтарин ошхонаҳои Шаҳритус — то дари хона. Як бор насб кунед, баъд бо як пахш фармоиш диҳед.</p></header>
+<h1>Тезкор</h1><p>Таом ва мол — то дари хона. Як бор насб кунед, баъд бо як пахш фармоиш диҳед.</p></header>
 <main class="wrap">
 ${o.apk ? `<section class="card" id="android"><h2>🤖 Android <span class="tag">тавсия</span></h2><p>Барнома бе Play Market, ройгон. Худаш нав мешавад — дубора боргирӣ лозим нест.</p>
 <a class="btn b1" href="/tezkor.apk" download="tezkor.apk">⬇ Боргирии барнома (APK)</a>
@@ -92,7 +92,7 @@ ${o.apk ? `<section class="card" id="android"><h2>🤖 Android <span class="tag"
 <a class="btn b2" href="/">Фармоиш додан</a></section>
 ${bot ? `<section class="card" id="tg"><h2>✈️ Telegram</h2><p>Боти мо: тасдиқи рақам ва кушодани Тезкор рост аз Telegram.</p><a class="btn b3" href="${esc(bot)}" rel="noopener">@${esc(o.botName)}</a></section>` : ""}
 </main>
-<p class="foot">Тезкор · Шаҳритус · <a href="/" style="color:inherit">${esc(base.replace(/^https?:\/\//, ""))}</a></p>
+<p class="foot">Тезкор · <a href="/" style="color:inherit">${esc(base.replace(/^https?:\/\//, ""))}</a></p>
 <script>/* on an iPhone show the iPhone way first; on Android the APK */
 (function(){var ua=navigator.userAgent,ios=/iphone|ipad|ipod/i.test(ua),w=document.querySelector(".wrap"),i=document.getElementById("ios"),a=document.getElementById("android");
 if(ios){if(a)a.classList.add("hide");w.insertBefore(i,w.firstChild);}else if(/android/i.test(ua)&&a){w.insertBefore(a,w.firstChild);}})();</script>

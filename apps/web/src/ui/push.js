@@ -6,10 +6,15 @@
   var ios = /iphone|ipad|ipod/i.test(navigator.userAgent), standalone = (window.matchMedia && matchMedia("(display-mode: standalone)").matches) || navigator.standalone;
   var busy = false, keyP = null, lastUser = null;
   function u8(b64) { var p = "=".repeat((4 - b64.length % 4) % 4), s = atob((b64 + p).replace(/-/g, "+").replace(/_/g, "/")), a = new Uint8Array(s.length); for (var i = 0; i < s.length; i++) a[i] = s.charCodeAt(i); return a; }
+  function b64(buf) { var b = new Uint8Array(buf), s = ""; for (var i = 0; i < b.length; i++) s += String.fromCharCode(b[i]); return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); }
   function key() { return keyP || (keyP = SF.api.get("/push/key").then(function (r) { return r && r.key; }, function () { keyP = null; return null; })); }
   function subscribe() {
     return key().then(function (k) { if (!k) return false;
-      return navigator.serviceWorker.ready.then(function (reg) { return reg.pushManager.getSubscription().then(function (s) { return s || reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: u8(k) }); }); })
+      /* a subscription made with an old server key no longer receives anything: drop it and subscribe again */
+      return navigator.serviceWorker.ready.then(function (reg) { return reg.pushManager.getSubscription().then(function (s) {
+        var same = s && s.options && s.options.applicationServerKey && b64(s.options.applicationServerKey) === String(k).replace(/=+$/, "");
+        if (s && same) return s;
+        return (s ? s.unsubscribe().catch(function () {}) : Promise.resolve()).then(function () { return reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: u8(k) }); }); }); })
         .then(function (s) { return SF.api.post("/push/subscribe", JSON.parse(JSON.stringify(s))).then(function () { SF.ls.set("push." + SF.state.user.id, 1); return true; }); }); });
   }
   function bar(html) { var b = document.getElementById("pushbar"); if (!html) { if (b) b.remove(); return; }

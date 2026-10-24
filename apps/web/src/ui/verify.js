@@ -91,7 +91,7 @@
 
   /* ---------- sign up with a verified number ---------- */
   SF.registerFlow = function (fd, enter) {
-    var info = SF.verifyInfo(), R = window.SomonRules;
+    var info = null, R = window.SomonRules;   // sign-up: name, phone and password only — no Telegram step
     /* catch the simple mistakes before sending anyone to Telegram */
     if (String(fd.name || "").trim().length < 2) return Promise.reject({ code: "BAD_NAME" });
     if (R && !R.normPhone(fd.phone)) return Promise.reject({ code: "BAD_PHONE" });

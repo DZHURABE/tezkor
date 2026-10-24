@@ -24,7 +24,6 @@
     return '<div class="flag-line" aria-hidden="true"></div>' +
       '<header class="top' + (u ? " u" : "") + (path === "/" ? " athome" : "") + '"><div class="wrap topin">' +
         '<a href="#/" class="brandlink" aria-label="' + esc(SF.brand()) + '">' + SF.logo() + "</a>" +
-        '<button class="citybtn" data-act="city" aria-label="' + t("profile.city") + ": " + esc(cityName()) + '">' + I("pin", 16) + "<span>" + esc(cityName()) + "</span>" + I("chevD", 14) + "</button>" +
         '<form class="topsearch" data-form="search" role="search"><span>' + I("search", 18) + '</span><input name="q" placeholder="' + t("home.search") + '" aria-label="' + t("home.search") + '" value="' + esc(SF.state.q || "") + '"></form>' +
         '<div class="topact">' + langSel() + bell() +
           '<a href="#/cart" class="cartbtn' + (n ? " has" : "") + '">' + I("cart", 20) + "<span>" + (n ? SF.money(SF.state.cartSum || 0) : t("nav.cart")) + "</span>" + (n ? '<i class="badge" id="cartBadge">' + n + "</i>" : "") + "</a>" +
@@ -43,7 +42,7 @@
   SF.panelNav = {
     restaurant: [["/rest", "chart", "rest.dash"], ["/rest/orders", "receipt", "rest.orders"], ["/rest/hall", "map", "hl.nav"], ["/rest/pos", "cash", "pos.nav"], ["/rest/sales", "wallet", "sl.nav"], ["/rest/me", "user", "my.nav"], ["/rest/menu", "grid", "rest.menu"], ["/rest/promo", "gift", "rest.promo"], ["/rest/tables", "grid", "tb.nav"], ["/rest/history", "list", "rest.history"], ["/rest/staff", "users", "sf.nav"], ["/rest/settings", "store", "rest.settings"]],
     admin: [["/admin/services", "grid", "adm.services"], ["/admin/orders", "receipt", "adm.orders"], ["/admin/books", "wallet", "bk.nav"], ["/admin/restaurants", "store", "adm.restaurants"], ["/admin/couriers", "scooter", "adm.couriers"], ["/admin/users", "users", "adm.users"],
-      ["/admin/banners", "gift", "adm.banners"], ["/admin/ads", "megaphone", "adm.ads"], ["/admin/complaints", "flag", "adm.complaints"], ["/admin/promos", "percent", "adm.promos"], ["/admin/cities", "city", "adm.cities"], ["/admin/settings", "cog", "adm.settings"]]
+      ["/admin/banners", "gift", "adm.banners"], ["/admin/ads", "megaphone", "adm.ads"], ["/admin/complaints", "flag", "adm.complaints"], ["/admin/settings", "cog", "adm.settings"]]
   };
   SF.shells.panel = function (html, r) {
     /* a worker of the restaurant: orders, menu (in stock / out of stock), history. A branch manager sees everything. */
@@ -73,7 +72,7 @@
     function tab(p, icon, key) { var on = path === p; return '<a href="#' + p + '" class="' + (on ? "on" : "") + '"' + (on ? ' aria-current="page"' : "") + ">" + I(icon, 22) + "<span>" + t(key) + "</span></a>"; }
     var cu = SF.state.user, own = cu && cu.courier && cu.courier.restaurantName;
     return '<div class="flag-line" aria-hidden="true"></div><div class="capp"><header class="ctop">' + SF.logo() + '<div class="topact">' + langSel() + bell() + "</div></header>" +
-      '<main class="cmain page">' + (own ? '<div class="ownstrip">' + I("store", 16) + "<span>" + t("dl.youAre", { name: esc(SF.tx(own)) }) + "</span></div>" : "") + html + '</main><nav class="tabbar show" aria-label="' + t("nav.main") + '">' + tab("/courier", "box", "cour.orders") + tab("/courier/earnings", "wallet", "cour.earnings") + tab("/courier/history", "list", "cour.history") + tab("/courier/profile", "user", "nav.profile") + "</nav></div>";
+      '<main class="cmain page">' + (own ? '<div class="ownstrip">' + I("store", 16) + "<span>" + t("dl.youAre", { name: esc(SF.tx(own)) }) + "</span></div>" : "") + html + '</main><nav class="tabbar show" aria-label="' + t("nav.main") + '">' + tab("/courier", "box", "cour.orders") + tab("/courier/earnings", "wallet", "cour.earnings") + tab("/courier/history", "list", "cour.history") + tab("/", "cart", "cb.shop") + tab("/courier/profile", "user", "nav.profile") + "</nav></div>";
   };
 
   SF.shells.bare = function (html) { return '<div class="flag-line" aria-hidden="true"></div>' + html; };

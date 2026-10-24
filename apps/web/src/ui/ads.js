@@ -24,7 +24,7 @@
   function price(a) { return a.price == null ? T(svOf(a), "deal") : money(a.price); }
   function when(ms) { var d = new Date(ms), n = new Date(), y = new Date(n.getTime() - 86400000), same = function (x) { return x.toDateString() === d.toDateString(); };
     return same(n) ? t("ad.today") + ", " + SF.time(ms) : same(y) ? t("ad.yday") + ", " + SF.time(ms) : SF.date(ms) + "." + d.getFullYear(); }
-  function cityName(a) { var c = SF.tx(a.city) || "", ar = a.area ? SF.tx(a.area) : ""; return ar ? c + ", " + ar : c; }
+  function cityName(a) { return ""; }   // no towns: only the address the person typed
   function back(href, title, extra) { return '<div class="svhead"><a class="svback" href="#' + href + '" aria-label="' + t("btn.back") + '">' + I("chevL", 20) + "</a><h1>" + title + "</h1>" + (extra || "") + "</div>"; }
   function isAdmin() { return SF.state.user && SF.state.user.role === "admin"; }
   /* while the admin keeps a service off, every page of it says «soon» */
@@ -35,10 +35,14 @@
   function thumb(a, s) { var c = catOf(a); return a.photos && a.photos[0] ? '<img src="' + esc(a.photos[0]) + '" alt="" loading="lazy">' : '<i style="color:' + c[2] + '">' + I(c[1], s || 30) + "</i>"; }
   SF.adRow = function (a, mine) { var B = CFG[svOf(a)].base;
     return '<article class="adrow' + (a.color ? " hl" : "") + '"><a class="rhit" href="#' + B + "/" + a.id + '" aria-label="' + esc(a.title) + '"></a><span class="adph">' + thumb(a) + (a.vip ? '<em class="advip">VIP</em>' : "") + "</span>" +
-      '<div class="adtx"><b class="adt">' + esc(a.title) + '</b><span class="adp num">' + price(a) + '</span><small class="adloc">' + I("pin", 12) + esc(cityName(a)) + "</small><small>" + t("adc." + a.cat) + " · " + when(a.publishedAt || a.createdAt) + "</small>" +
+      '<div class="adtx"><b class="adt">' + esc(a.title) + '</b><span class="adp num">' + price(a) + '</span>' + (a.addr ? '<small class="adloc">' + I("pin", 12) + esc(a.addr) + "</small>" : "") + "<small>" + t("adc." + a.cat) + " · " + when(a.publishedAt || a.createdAt) + "</small>" +
       (mine ? '<span class="adst">' + stPill(a.status, a) + '<small class="num">' + I("eye", 13) + a.views + "</small></span>" : "") + "</div>" +
       (mine ? '<button type="button" class="iconbtn admore" data-act="admenu" data-id="' + a.id + '" aria-label="' + t("ads.actions") + '">' + I("dots", 20) + "</button>" : favA(a)) + "</article>"; };
 
+  /* a square tile for the home screen: picture first, then price and title (cars, jobs, sheep, houses — all in one grid) */
+  SF.adTile = function (a) { var B = CFG[svOf(a)].base, c = catOf(a);
+    return '<a class="adtile' + (a.vip ? " vip" : "") + '" href="#' + B + "/" + a.id + '"><span class="atimg" style="--tc:' + c[2] + '">' + (a.photos && a.photos[0] ? '<img src="' + esc(a.photos[0]) + '" alt="" loading="lazy">' : I(c[1], 34)) +
+      '<em class="atsvc">' + t("sv." + svOf(a)) + "</em>" + (a.vip ? '<em class="advip">VIP</em>' : "") + '</span><span class="atbody"><b class="num">' + price(a) + "</b><span>" + esc(a.title) + "</span><small>" + when(a.publishedAt || a.createdAt) + "</small></span></a>"; };
   /* «+» in the bottom bar: post into one of the listing services the admin switched on */
   SF.actions.create = function () { var on = KEYS.filter(function (k) { return SF.svcOn(k); });
     if (!on.length) { SF.actions.soon({ dataset: { k: "ads" } }); return; }
@@ -138,9 +142,9 @@
           '<a class="gbtn gl" href="#' + B + '" aria-label="' + t("btn.back") + '">' + I("chevL", 20) + '</a><span class="gbtns"><button type="button" class="gbtn" data-act="adshare" data-title="' + esc(a.title) + '" aria-label="' + t("ads.share") + '">' + I("share", 18) + "</button>" + (mine ? "" : favA(a).replace("favbtn adfav", "favbtn adfav gbtn")) + "</span>" +
           (ph.length > 1 ? '<span class="gcount num" id="gcount">1/' + ph.length + "</span>" : "") + "</div>";
         SF.state.curad = a; var info = '<section class="adinfo">' + (mine ? '<div class="adown">' + stPill(a.status, a) + (a.reason ? '<p class="adwhy">' + I("info", 16) + esc(a.reason) + "</p>" : "") + (a.awaiting ? '<p class="adwhy warn">' + I("wallet", 16) + t("ads.awaiting") + '</p><button type="button" class="btn primary sm" data-act="adpayinfo" data-id="' + a.id + '">' + I("wallet", 15) + t("pay.how") + "</button>" : "") + "</div>" : "") +
-          "<h1>" + esc(a.title) + '</h1><b class="adprice num">' + price(a) + '</b><p class="adwhere">' + I("pin", 15) + esc(a.addr ? a.addr + ", " : "") + esc(cityName(a)) + " · " + when(a.publishedAt || a.createdAt) + "</p>" +
+          "<h1>" + esc(a.title) + '</h1><b class="adprice num">' + price(a) + '</b><p class="adwhere">' + I("pin", 15) + esc(a.addr ? a.addr + " · " : "") + when(a.publishedAt || a.createdAt) + "</p>" +
           (a.lat != null ? '<section class="adloc"><div class="mapbox">' + SF.tmap({ key: "adv-" + a.id, free: true, center: { lat: a.lat, lng: a.lng }, zoom: 16, markers: [{ lat: a.lat, lng: a.lng, type: "home", label: "" }], label: t("ap.pinT") }) + '</div><a class="btn ghost sm" target="_blank" rel="noopener" href="' + SF.geo.nav(a).google + '">' + I("route", 14) + t("sh.go") + "</a></section>" : "") + (a.desc ? '<p class="addesc">' + esc(a.desc).replace(/\n/g, "<br>") + "</p>" : "") +
-          '<dl class="adattrs"><dt>' + t("ads.cat") + "</dt><dd>" + t("adc." + a.cat) + "</dd>" + (a.cond ? "<dt>" + t("af.cond") + "</dt><dd>" + t("af.c." + a.cond) + "</dd>" : "") + "<dt>" + t("profile.city") + "</dt><dd>" + esc(cityName(a)) + "</dd><dt>" + t("ads.views") + '</dt><dd class="num">' + a.views + "</dd>" + (mine ? "" : "<dt>" + T(sv, "seller") + "</dt><dd>" + esc(a.seller) + "</dd>") + "</dl>" +
+          '<dl class="adattrs"><dt>' + t("ads.cat") + "</dt><dd>" + t("adc." + a.cat) + "</dd>" + (a.cond ? "<dt>" + t("af.cond") + "</dt><dd>" + t("af.c." + a.cond) + "</dd>" : "") + "<dt>" + t("ads.views") + '</dt><dd class="num">' + a.views + "</dd>" + (mine ? "" : "<dt>" + T(sv, "seller") + "</dt><dd>" + esc(a.seller) + "</dd>") + "</dl>" +
           (mine || !more ? "" : sellerCard(a, more.sellerInfo)) +
           (mine ? "" : '<p class="fine adsafe">' + I("shield", 14) + T(sv, "safety") + '</p><button type="button" class="link sm adrep" data-act="adreport" data-id="' + a.id + '">' + I("flag", 14) + " " + t("rp.btn") + "</button>") + "</section>" +
           (more && more.seller.length ? '<section class="admore"><h3>' + t("sc2.other") + '</h3><div class="adlist">' + more.seller.map(function (x) { return SF.adRow(x); }).join("") + "</div></section>" : "") +
@@ -182,8 +186,6 @@
       '<label class="f">' + t("ads.title") + '<input data-input="adf" data-k="title" value="' + esc(d.title) + '" maxlength="80" placeholder="' + T(sv, "titlePh") + '"></label>' +
       '<label class="f">' + t("ads.desc") + '<textarea data-input="adf" data-k="desc" rows="4" maxlength="3000" placeholder="' + T(sv, "descPh") + '">' + esc(d.desc) + "</textarea></label>" +
       '<div class="grid2"><label class="f">' + T(sv, "price") + '<input data-input="adf" data-k="price" inputmode="numeric" value="' + esc(d.price) + '" placeholder="0"><small class="muted">' + T(sv, "priceHint") + "</small></label>" +
-      '<label class="f">' + t("profile.city") + '<select data-input="adf" data-k="cityId">' + cities.map(function (c) { return '<option value="' + c.id + '"' + (c.id === d.cityId ? " selected" : "") + ">" + esc(SF.tx(c.name)) + "</option>"; }).join("") + "</select></label>" +
-      (function () { var ar = (SF.state.areas || []).filter(function (x) { return x.cityId === d.cityId; }); return ar.length ? '<label class="f">' + t("ar.village") + '<select data-input="adf" data-k="areaId"><option value="">' + t("ar.none") + "</option>" + ar.map(function (x) { return '<option value="' + x.id + '"' + (x.id === d.areaId ? " selected" : "") + ">" + esc(SF.tx(x.name)) + "</option>"; }).join("") + "</select><small class=\"muted\">" + t("ar.hint") + "</small></label>" : ""; })() + "</div>" +
       '<label class="f">' + t("ap.addr") + '<input data-input="adf" data-k="addr" data-geo="adm" value="' + esc(d.addr || "") + '" maxlength="140" placeholder="' + t("ap.addrPh") + '" autocomplete="off"><small class="muted">' + t("ap.addrHint") + "</small></label>" +
       '<div class="mfres" data-mfres="adm" hidden></div><div class="mapslot" data-mapslot="adm">' + (d.lat != null ? SF.tmap(adMap(d)) : "") + "</div>" +
       (sv === "ads" && ["jobs", "services", "realty"].indexOf(d.cat) < 0 ? '<p class="adlbl">' + t("af.cond") + '</p><div class="seg" role="group">' + [["", "af.c.na"], ["new", "af.c.new"], ["used", "af.c.used"]].map(function (o) { var on = (d.cond || "") === o[0]; return '<button type="button" class="' + (on ? "on" : "") + '" aria-pressed="' + on + '" data-act="adcond" data-v="' + o[0] + '">' + t(o[1]) + "</button>"; }).join("") + "</div>" : "") +
@@ -217,7 +219,9 @@
   function payModal(x) { var pub = SF.state.pub || {}, c = x.card, B = CFG[SF.state.L || "ads"].base;
     SF.modal('<button class="mx" data-act="closemodal" aria-label="' + t("btn.close") + '">' + I("x", 20) + '</button><div class="stack paybox"><span class="cic">' + I("wallet", 26) + '</span><h2 class="h2">' + t("pay.t") + '</h2>' +
       '<div class="payamt"><small>' + t("pay.amount") + '</small><b class="num">' + money(x.amount) + "</b><small>" + t("ads.p." + x.kind) + "</small></div>" +
-      (c ? '<div class="paycard"><small>' + esc(c.bank || c.label || t("pay.card")) + '</small><button type="button" class="paynum num" data-act="copyv" data-v="' + esc(c.number) + '" aria-label="' + t("pay.copy") + '">' + esc(fmtCard(c.number)) + I("copy", 16) + "</button>" +
+      /* paying by phone number: the big number is the phone the card is linked to (no card number, no name) */
+      (c && !c.number && c.phone ? '<div class="paycard byphone"><small>' + esc(c.bank || t("pay.byPhone")) + '</small><button type="button" class="paynum num" data-act="copyv" data-v="' + esc(String(c.phone).replace(/\D/g, "").slice(-9)) + '" aria-label="' + t("pay.copy") + '">' + I("phone", 18) + esc(SF.phone(c.phone)) + I("copy", 16) + "</button><span class=\"payhold\">" + t("pay.byPhoneHow") + "</span></div>"
+      : c ? '<div class="paycard"><small>' + esc(c.bank || c.label || t("pay.card")) + '</small><button type="button" class="paynum num" data-act="copyv" data-v="' + esc(c.number) + '" aria-label="' + t("pay.copy") + '">' + esc(fmtCard(c.number)) + I("copy", 16) + "</button>" +
           (c.holder ? '<span class="payhold">' + esc(c.holder) + "</span>" : "") +
           (c.phone ? '<button type="button" class="payph" data-act="copyv" data-v="' + esc(String(c.phone).replace(/\D/g, "")) + '">' + I("phone", 14) + t("pay.byPhone") + ' <b class="num">' + esc(SF.phone(c.phone)) + "</b>" + I("copy", 14) + "</button>" : "") + "</div>"
         : '<p class="muted">' + t("ads.payAsk", { sum: money(x.amount), phone: esc(pub.supportPhone || "") }) + "</p>") +

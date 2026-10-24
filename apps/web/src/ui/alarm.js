@@ -126,4 +126,12 @@
     navigator.wakeLock.request("screen").then(function (w) { wake = w; w.addEventListener("release", function () { wake = null; }); }).catch(function () {});
   }
   document.addEventListener("visibilitychange", function () { if (!document.hidden && SF.state.user && KEYS[SF.state.user.role] && SF.soundOn()) keepAwake(); });
+  /* Android app: while a shop, the owner's shop or an online courier is signed in, the phone stays «on duty» —
+     new orders ring loud even when the app is closed or the screen is off (DutyService in the APK) */
+  var dutySig = null;
+  SF.after.push(function () { var A = window.TezkorApp; if (!A || !A.startDuty) return;
+    var u = SF.state.user, tok = SF.api && SF.api.token && SF.api.token();
+    var duty = !!u && !!tok && (u.role === "restaurant" || (u.role === "admin" && !!u.restaurantId) || (u.role === "courier" && !!(u.courier && u.courier.online)));
+    var sig = duty ? tok : ""; if (sig === dutySig) return; dutySig = sig;
+    try { if (duty) A.startDuty(((window.SOMON_CONFIG || {}).api) || "/api", tok); else A.stopDuty(); } catch (e) {} });
 })();

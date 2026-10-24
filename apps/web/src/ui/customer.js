@@ -41,7 +41,7 @@
   }
   SF.prodCard = prodCard; SF.rememberProducts = remember;
   SF.actions.brandf = function (el) { SF.state.brandF = { r: el.dataset.r, b: el.dataset.v }; SF.render({ quiet: true }); };
-  SF.actions.fav = function (el) { var u = SF.state.user; if (!u || u.role !== "customer") { SF.toast(t("fav.login"), "info"); SF.state.after = SF.path(); SF.go("/login"); return; }
+  SF.actions.fav = function (el) { var u = SF.state.user; if (!SF.isBuyer(u)) { SF.toast(t("fav.login"), "info"); SF.state.after = SF.path(); SF.go("/login"); return; }
     var on = !isFav(el.dataset.t, el.dataset.id); el.classList.toggle("on", on); el.setAttribute("aria-pressed", on);
     return api().post("/auth/me/favorites", { type: el.dataset.t, id: el.dataset.id, on: on }).then(function (nu) { SF.state.user = nu; SF.toast(t(on ? "fav.added" : "fav.removed")); }); };
   function stepper(p, q, big) {
@@ -52,9 +52,8 @@
   /* one banner, the same on the home page, in the restaurant's ad editor (preview) and in admin */
   SF.bannerHtml = function (b, tag, cls) { tag = tag || "div";
     return "<" + tag + ' class="banner' + (b.photo ? " hasph" : "") + (cls ? " " + cls : "") + '" style="--b:' + esc(b.tone) + '"' + (tag === "a" ? ' href="#' + (b.restaurantId ? "/r/" + b.restaurantId : "/") + '"' : "") + ">" +
-      (b.photo ? '<img class="bph" src="' + esc(b.photo) + '" alt="">' : "") + "<div><b>" + esc(tx(b.title)) + "</b>" + (b.place ? '<span class="bplace">' + I("pin", 13) + esc(tx(b.place)) + "</span>" : "") + "<span>" + esc(tx(b.sub)) + "</span>" +
+      (b.photo ? '<img class="bph" src="' + esc(b.photo) + '" alt="">' : "") + "<div><b>" + esc(tx(b.title)) + "</b><span>" + esc(tx(b.sub)) + "</span>" +
         (b.own ? '<em class="bgo">' + t("ad.go") + I("chevR", 14) + "</em>" : b.restaurantId ? '<em class="bgo">' + t("h3.order") + I("chevR", 14) + "</em>" : "") + "</div>" +
-        (b.restaurantId && SF.qrSvg && cls !== "small" ? '<span class="bqr" title="' + t("h3.menuQr") + '">' + SF.qrSvg((location.protocol.indexOf("http") === 0 ? location.origin : "https://tezkor.pro") + "/#/r/" + b.restaurantId, { level: "M", pad: 2 }) + "<small>" + t("h3.menuQr") + "</small></span>" : "") +
       (b.photo ? "" : '<span class="bart">' + SF.art(b.art, cls === "small" ? 70 : 110) + "</span>") + '<i class="ornament" aria-hidden="true"></i></' + tag + ">"; };
 
   /* ---------- Home ---------- */
@@ -91,12 +90,12 @@
       var banners = res[0], pop = res[1], rests = res[2]; remember(pop);
       return Promise.all(rests.map(function (r) { return api().get("/restaurants/" + r.id).then(function (full) { remember(full.products); return Object.assign(full, { orderCount: r.orderCount, hasSale: r.hasSale, isNew: r.isNew }); }); })).then(function (full) {
         withArt(full);
-        var u = SF.state.user, hour = new Date().getHours(), greet = hour < 12 ? "home.morning" : hour < 18 ? "home.day" : "home.evening", pub = SF.state.pub || {};
+        var u = SF.state.user, greet = SF.greetKey(), pub = SF.state.pub || {};
         var cityN = tx(((SF.state.cities || []).filter(function (c) { return c.id === SF.state.cityId; })[0] || {}).name), ad0 = u && (u.addresses || [])[0];
         var all = []; full.forEach(function (r) { (r.products || []).forEach(function (x) { if (x.available) all.push(Object.assign({}, x, { restaurant: { id: r.id, name: r.name, tone: r.tone } })); }); }); remember(all);
         /* hero: greeting + big title over a food photo, three promises; then a glass panel with the address, «on the map» and search */
         var top = '<div class="svhead"><a class="svback" href="#/" aria-label="' + t("btn.back") + '">' + I("chevL", 20) + '</a><h1>' + t("sa.food") + '</h1><span class="svstate on">' + t("sa.works") + "</span></div>" +
-          '<section class="gpanel"><div class="gprow"><button class="addrbar" data-act="addrpick"><span class="apin">' + I("pin", 18) + '</span><span class="grow"><small>' + t("home.deliverTo") + "</small><b>" + esc(ad0 ? (ad0.text || t("addr." + (ad0.kind || "other"))) + " · " + cityN : cityN) + "</b></span>" + I("chevD", 16) + "</button>" +
+          '<section class="gpanel"><div class="gprow"><button class="addrbar" data-act="addrpick"><span class="apin">' + I("pin", 18) + '</span><span class="grow"><small>' + t("home.deliverTo") + "</small><b>" + esc(ad0 ? (ad0.text || t("addr." + (ad0.kind || "other"))) : t("addr.pickMap")) + "</b></span>" + I("chevD", 16) + "</button>" +
             '<button type="button" class="onmap" data-act="onmap">' + I("map", 18) + "<span>" + t("h3.map") + "</span></button></div>" +
           '<form class="bigsearch" data-form="search" role="search">' + I("search", 20) + '<input name="q" placeholder="' + t("home.search") + '" aria-label="' + t("home.search") + '" enterkeyhint="search"><button class="btn primary">' + t("btn.find") + "</button></form></section>";
         /* ads: restaurant banners (swipe, auto-play) + a card about delivery from the real settings */
@@ -105,7 +104,7 @@
         var slides = banners.map(function (b) { return SF.bannerHtml(b, "a"); }).concat([dcard]);
         var ban = '<section class="banners b3" id="banners" aria-label="' + t("home.offers") + '">' + slides.join("") + "</section>" + (slides.length > 1 ? '<div class="bdots" aria-hidden="true">' + slides.map(function (b, i) { return '<i class="' + (i ? "" : "on") + '"></i>'; }).join("") + "</div>" : "");
         var cats = SF.catRow(cat, "#/food");
-        if (!rests.length && !cat) return top + cats + ban + '<section class="emptycity">' + SF.art("scooter", 120) + "<h2>" + t("ec.title", { city: esc(cityN) }) + "</h2><p>" + t("ec.sub") + '</p><div class="row2"><button class="btn primary" data-act="city">' + I("city", 16) + t("ec.city") + '</button><a class="btn ghost" href="#/login">' + I("store", 16) + t("ec.partner") + "</a></div></section>";
+        if (!rests.length && !cat) return top + cats + ban + '<section class="emptycity">' + SF.art("scooter", 120) + "<h2>" + t("ec.title") + "</h2><p>" + t("ec.sub") + "</p></section>";
         if (cat) { var cp = all.filter(function (x) { return x.categoryId === cat; }), cn = tx(((SF.state.categories || []).filter(function (c) { return c.id === cat; })[0] || {}).name);
           return top + cats + (cp.length ? sect(cn, t("cat.dishes", { n: cp.length })) + '<div class="pgrid">' + cp.map(function (x) { return prodCard(x, true); }).join("") + "</div>" : "") +
             (full.length ? sect(t("home.restaurants"), t("cat.rests", { n: full.length })) + '<div class="rgrid2">' + sortRests(full, so).map(restCard).join("") + "</div>" : SF.empty(SF.art("plate", 90), t("cat.none"), t("cat.noneSub"), '<a class="btn" href="#/food">' + t("home.all") + "</a>")); }
@@ -114,7 +113,7 @@
         var popIds = pop.map(function (x) { return x.id; }), favR = (u && u.favs && u.favs.r) || [];
         var rec = all.filter(function (x) { return popIds.indexOf(x.id) < 0 && (favR.indexOf(x.restaurantId) >= 0 || x.popular); }).sort(function (a, b) { return (favR.indexOf(b.restaurantId) >= 0) - (favR.indexOf(a.restaurantId) >= 0); }).slice(0, 10);
         var list = sortRests(filterRests(full, f), so), slot = SF.mealSlot(), forNow = mealPicks(all, full, slot);
-        return top + cats + ban +
+        return top + cats + ban + (SF.reorderSlot ? SF.reorderSlot() : "") +
           (forNow.length >= 3 ? sect(t("ml.t." + slot), t("ml.s." + slot)) + rowProds(forNow) : "") +
           (sale.length ? sect(t("hs.sale"), t("hs.saleSub")) + rowProds(sale) : "") +
           (popR.length > 1 ? sect(t("hs.popRest")) + rowRests(popR) : "") +
@@ -131,14 +130,14 @@
   } });
   SF.actions.rfilter = function (el) { SF.state.rf = el.dataset.v; SF.render({ quiet: true }); };
   SF.inputs.rsort = function (v) { SF.state.rs = v; SF.render({ quiet: true }); };
-  SF.actions.addrpick = function () { if (SF.state.user && SF.state.user.role === "customer") SF.go("/addresses"); else SF.actions.city(); };
+  SF.actions.addrpick = function () { if (SF.isBuyer(SF.state.user)) SF.go("/addresses"); else SF.actions.city(); };
   /* banners slide by themselves every 5 s; a finger on them pauses it */
   SF.after.push(function () { var b = document.getElementById("banners"); clearInterval(SF._bauto); if (!b || b.children.length < 2) return; var hold = 0;
     b.addEventListener("pointerdown", function () { hold = Date.now(); }); b.addEventListener("touchstart", function () { hold = Date.now(); }, { passive: true });
     SF._bauto = setInterval(function () { if (!document.body.contains(b)) { clearInterval(SF._bauto); return; } if (Date.now() - hold < 7000 || document.hidden) return;
       var w = b.firstElementChild.getBoundingClientRect().width + 12, n = Math.round(b.scrollLeft / w) + 1; if (n * w > b.scrollWidth - b.clientWidth + 5) n = 0; b.scrollTo({ left: n * w, behavior: "smooth" }); }, 5000); });
   SF.actions.toall = function () { var el = document.getElementById("allrests"); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); };
-  SF.actions.onmap = function () { var u = SF.state.user; if (u && u.role === "customer") SF.go("/addresses/new"); else { SF.state.after = "/addresses/new"; SF.go("/login"); } };
+  SF.actions.onmap = function () { var u = SF.state.user; if (SF.isBuyer(u)) SF.go("/addresses/new"); else { SF.state.after = "/addresses/new"; SF.go("/login"); } };
   SF.after.push(function () { var b = document.getElementById("banners"), d = document.querySelector(".bdots"); if (!b || !d) return;
     b.onscroll = function () { var w = b.firstElementChild ? b.firstElementChild.getBoundingClientRect().width + 12 : 1, i = Math.round(b.scrollLeft / w);
       Array.prototype.forEach.call(d.children, function (x, k) { x.classList.toggle("on", k === i); }); }; });
@@ -263,7 +262,7 @@
         ids.filter(function (k) { return cache[k]; }).map(function (k) { var p = cache[k]; return '<div class="cline"><span class="cim" style="--tone:' + esc(r.tone) + '">' + SF.pic(p, 52) + '</span><div class="cinfo"><b>' + esc(tx(p.name)) + '</b><span class="muted num">' + money(p.price) + "</span></div>" + stepper(p, c.items[k]) + '<b class="num csum">' + money(p.price * c.items[k]) + '</b><button class="iconbtn rmline" data-act="rmline" data-id="' + p.id + '" aria-label="' + t("cart.remove") + '">' + I("trash", 16) + "</button></div>"; }).join("") +
         '<a class="addmore" href="#/r/' + r.id + '">' + I("plus", 16) + t("cart.addMoreItems") + "</a>" +
         (r.isOpenNow ? "" : '<div class="msg ' + (r.viaUs ? "info" : "warn") + '">' + t(r.viaUs ? "rest.viaUs" : "rest.closedNow", { from: r.hours.from }) + "</div>") + "</div>" +
-        '<div class="card sum"><h3>' + t("cart.summary") + '</h3><form class="promo" data-form="promo"><input name="code" placeholder="' + t("cart.promo") + '" aria-label="' + t("cart.promo") + '" value="' + esc(promo ? promo.code : "") + '"><button class="btn ghost sm">' + t("btn.apply") + "</button></form>" +
+        '<div class="card sum"><h3>' + t("cart.summary") + '</h3>' +
         (promo ? '<div class="msg ok">' + I("percent", 14) + t("cart.promoOk", { code: promo.code, sum: money(disc) }) + ' <button class="link" data-act="unpromo">' + t("btn.remove") + "</button></div>" : "") +
         '<div class="line"><span>' + t("cart.subtotal") + '</span><span class="num">' + money(sum) + "</span></div>" + (disc ? '<div class="line ok"><span>' + t("cart.discount") + '</span><span class="num">−' + money(disc) + "</span></div>" : "") +
         '<div class="line muted"><span>' + t("cart.delivery") + '</span><span class="num">' + t("cart.deliveryFrom", { sum: money(r.deliveryFrom) }) + "</span></div>" +
@@ -278,12 +277,15 @@
   SF.forms.promo = function (fd) { var code = String(fd.code || "").trim(); if (!code) return;
     return api().post("/promos/validate", { code: code, subtotal: cartSum() }).then(function (r) { SF.state.promo = r; SF.toast(t("cart.promoOk", { code: r.code, sum: money(r.discount) })); SF.render({ quiet: true }); }); };
   SF.actions.tocheckout = function () { if (!SF.state.user) { SF.state.after = "/checkout"; SF.toast(t("auth.needLogin"), "info"); SF.go("/login"); return; }
-    if (SF.state.user.role !== "customer") { SF.toast(t("auth.customerOnly"), "err"); return; } SF.go("/checkout"); };
+    if (!SF.isBuyer(SF.state.user)) { SF.toast(t("auth.customerOnly"), "err"); return; } SF.go("/checkout"); };
 
   /* ---------- Checkout ---------- */
   function co() { var u = SF.state.user || {}; SF.state.co = SF.state.co || { name: u.name || "", text: "", landmark: "", lat: null, lng: null, phone: u.phone ? u.phone.slice(4) : "", comment: "", pay: "cash", quote: null }; return SF.state.co; }
-  function fixPay(r) { var x = co(), pub = SF.state.pub, ok = { transfer: pub.transferEnabled && r.payCard, cash: pub.cashEnabled, card: pub.cardEnabled };
-    if (!ok[x.pay]) x.pay = ok.transfer ? "transfer" : ok.cash ? "cash" : ok.card ? "card" : null; }
+  function fixPay(r) { var x = co(), pub = SF.state.pub, k = acctKinds(r), ok = { phone: pub.walletEnabled && k.phone, card: pub.cardTrEnabled && k.card, cash: pub.cashEnabled };
+    /* the ways the owner switched on, and only those the shop has numbers for */
+    var cur = x.pay === "transfer" ? x.trKind : x.pay;
+    if (!ok[cur]) { var first = ok.phone ? "phone" : ok.card ? "card" : ok.cash ? "cash" : null; x.pay = first === "cash" ? "cash" : first ? "transfer" : null; x.trKind = first === "phone" || first === "card" ? first : null; } }
+  SF.actions.paytr = function (el) { co().pay = "transfer"; co().trKind = el.dataset.k; SF.render({ quiet: true }); };
   /* «how do I pay?» — three steps, and the admin's number to ask «did you get my money?» */
   SF.payHelp = function (o) {
     var ph = (SF.state.pub || {}).supportPhone, rp = o && o.restaurant && o.restaurant.phone;
@@ -291,11 +293,14 @@
       (ph ? '<p class="phask">' + t("ph.ask") + '</p><button type="button" class="btn ok block" data-act="call" data-name="' + esc(SF.brand() + " · " + t("ph.admin")) + '" data-phone="' + esc(ph) + '" data-sub="' + esc(t("ph.callSub")) + '">' + I("phone", 18) + t("ph.call") + " · " + esc(SF.phone(ph)) + "</button>" : "") +
       (rp ? '<button type="button" class="btn ghost block" data-act="call" data-name="' + esc(tx(o.restaurant.name)) + '" data-phone="' + esc(rp) + '" data-sub="' + esc(t("ph.callSub")) + '">' + I("store", 16) + t("ph.callRest") + "</button>" : "") + "</section>"; };
   /* transfer to the restaurant's card: number to copy, exact amount, receipt photo (required) */
-  function acctCards(r) { var pc = r.payCard; return (r.payAccounts && r.payAccounts.length ? r.payAccounts : [pc]).map(function (x, i) { var ph = x.kind === "phone", shown = ph ? SF.phone(x.number) : String(x.number).replace(/(\d{4})(?=\d)/g, "$1 "), raw = ph ? String(x.number).replace(/[^+\d]/g, "") : x.number;
+  /* the shop's accounts: e-wallets (a phone number) and bank cards; the customer picks «to a wallet» or «to a card» */
+  function accts(r) { return (r.payAccounts && r.payAccounts.length ? r.payAccounts : r.payCard ? [r.payCard] : []).filter(function (x) { return x && x.number; }); }
+  function acctKinds(r) { var k = { phone: false, card: false }; accts(r).forEach(function (x) { k[x.kind === "phone" ? "phone" : "card"] = true; }); return k; }
+  function acctCards(r) { var want = co().trKind; return accts(r).filter(function (x) { return !want || (want === "phone") === (x.kind === "phone"); }).map(function (x, i) { var ph = x.kind === "phone", shown = ph ? SF.phone(x.number) : String(x.number).replace(/(\d{4})(?=\d)/g, "$1 "), raw = ph ? String(x.number).replace(/[^+\d]/g, "") : x.number;
         return '<div class="tcard"><small>' + I(ph ? "phone" : "card", 13) + " " + t(ph ? "pa.phone" : "tr.card") + (x.bank ? " · " + esc(x.bank) : "") + '</small><code class="num"' + (i ? "" : ' id="callnum"') + ">" + esc(shown) + "</code>" + (x.holder ? "<span>" + esc(x.holder) + "</span>" : "") +
           '<button type="button" class="btn sm ghost" data-act="copynum" data-v="' + esc(raw) + '">' + I("copy", 14) + t("cour.copy") + "</button></div>"; }).join(""); }
   function transferBox(r, qt) {
-    var x = co(), pc = r.payCard, num = pc.number.replace(/(\d{4})(?=\d)/g, "$1 ");
+    var x = co();
     return '<div class="transfer"><ol class="tsteps"><li>' + t("tr.s1") + "</li><li>" + t("tr.s2") + "</li><li>" + t("tr.s3") + "</li></ol>" +
       /* every card / wallet number of the restaurant, each with its bank, to copy */
       acctCards(r) +
@@ -320,6 +325,7 @@
       remember(r.products); var city = (SF.state.cities || []).filter(function (z) { return z.id === r.cityId; })[0] || { lat: r.lat, lng: r.lng };
       var body = { restaurantId: r.id, items: Object.keys(c.items).map(function (k) { return { productId: k, qty: c.items[k] }; }), promoCode: SF.state.promo ? SF.state.promo.code : null, address: x.lat != null && inZone(x, r.cityId) ? { lat: x.lat, lng: x.lng } : {} };
       if (!r.pickup) x.pickup = false; if (x.pickup) { body.pickup = true; body.address = {}; }
+      if (SF.schedPrepare) SF.schedPrepare(r, x); if (x.when === "later" && x.slot) body.scheduledAt = x.slot; if (x.useBonus) body.useBonus = true;
       return api().post("/orders/quote", body).then(function (qt) { x.quote = qt; return [r, city, qt]; });
     }).then(function (a) {
       var r = a[0], city = a[1], qt = a[2], u = SF.state.user, addrs = u.addresses || [], zone = SF.restZone(r), x = co(); SF.state.coRest = r; fixPay(r); SF.state.ctxShop = r.kind === "shop";
@@ -337,15 +343,20 @@
         '<div class="geotools"><button type="button" class="btn ghost sm" data-act="geoloc">' + I("locate", 16) + t("co.myLoc") + '</button><form class="llform" data-form="coords"><label class="f grow">' + t("co.pasteLL") + '<span class="llrow"><input name="ll" id="co-ll" placeholder="' + t("co.pastePh") + '" autocomplete="off"><button class="btn sm">' + I("link", 16) + t("co.show") + "</button></span></label></form></div>" +
         '<div class="grid2"><label class="f">' + t("co.street") + '<input data-input="co" data-k="text" data-geo="co" value="' + esc(x.text) + '" placeholder="' + t("co.streetPh") + '" autocomplete="street-address"></label><label class="f">' + t("co.landmark") + '<input data-input="co" data-k="landmark" value="' + esc(x.landmark) + '" placeholder="' + t("co.landmarkPh") + '"></label></div></section>') +
         '<section class="card"><h3><span class="num stepn">2</span>' + t("co.contact") + '</h3><div class="grid2"><label class="f">' + t("profile.name") + '<input data-input="co" data-k="name" value="' + esc(x.name) + '" autocomplete="name" placeholder="' + t("co.namePh") + '"></label><label class="f">' + t("auth.phone") + '<span class="phonein"><i>+992</i><input data-input="co" data-k="phone" value="' + esc(x.phone) + '" inputmode="tel" placeholder="90 123 45 67" autocomplete="tel-national"></span></label><label class="f full">' + t("co.comment") + '<input data-input="co" data-k="comment" value="' + esc(x.comment) + '" placeholder="' + t("co.commentPh") + '"></label></div></section>' +
-        '<section class="card"><h3><span class="num stepn">3</span>' + t("co.payment") + '</h3><div class="payopts">' + (SF.state.pub.transferEnabled && r.payCard ? payOpt("transfer", "card", t("pay.transfer"), t("pay.transferSub")) : "") + (SF.state.pub.cashEnabled ? payOpt("cash", "cash", t("pay.cash"), t("pay.cashSub")) : "") + (SF.state.pub.cardEnabled ? payOpt("card", "card", t("pay.card"), t("pay.cardSub")) : "") + "</div>" +
-          (!(SF.state.pub.transferEnabled && r.payCard) && !SF.state.pub.cashEnabled && !SF.state.pub.cardEnabled ? '<div class="msg err">' + I("info", 16) + t("co.noPay") + "</div>" : "") + (x.pay === "transfer" ? transferBox(r, qt) : "") + "</section></div>" +
+        (SF.schedBox ? SF.schedBox(r, x) : "") +
+        '<section class="card"><h3><span class="num stepn">3</span>' + t("co.payment") + '</h3><div class="payopts">' + (function () { var k = acctKinds(r), on = SF.state.pub.transferEnabled, x = co();
+          /* only: to an e-wallet, to a card number, and cash — no online card form */
+          return (SF.state.pub.walletEnabled && k.phone ? trOpt("phone", "wallet", t("pay.wallet"), t("pay.walletSub"), x) : "") + (SF.state.pub.cardTrEnabled && k.card ? trOpt("card", "card", t("pay.toCard"), t("pay.toCardSub"), x) : "") + (SF.state.pub.cashEnabled ? payOpt("cash", "cash", t("pay.cash"), t("pay.cashSub")) : ""); })() +"</div>" +
+          (!co().pay ? '<div class="msg err">' + I("info", 16) + t("co.noPay") + "</div>" : "") + (x.pay === "transfer" ? transferBox(r, qt) : "") + "</section></div>" +
         '<aside class="card sum sticky"><h3>' + esc(tx(r.name)) + "</h3>" + Object.keys(SF.cart.get().items).map(function (k) { var p = cache[k]; return '<div class="line"><span>' + esc(tx(p.name)) + " × " + SF.cart.get().items[k] + '</span><span class="num">' + money(p.price * SF.cart.get().items[k]) + "</span></div>"; }).join("") +
         '<div class="line muted"><span>' + t("cart.delivery") + (qt.km != null ? " · " + qt.km + " " + t("u.km") : "") + '</span><span class="num">' + (qt.deliveryFee != null ? money(qt.deliveryFee) : t("co.pinFirst")) + "</span></div>" + (qt.heavyFee ? '<div class="line muted"><span>' + t("hv.line", { kg: qt.weightKg }) + '</span><span class="num">' + money(qt.heavyFee) + "</span></div>" : "") +
         (qt.discount ? '<div class="line ok"><span>' + t("cart.discount") + '</span><span class="num">−' + money(qt.discount) + "</span></div>" : "") +
+(qt.scheduledAt ? '<div class="line"><span>' + I("clock", 14) + " " + t("co.schedFor", { time: SF.whenText(qt.scheduledAt) }) + "</span></div>" : "") +
         '<div class="line tot"><span>' + t("cart.total") + '</span><b class="num">' + money(qt.total) + "</b></div>" +
         (qt.tooHeavy ? '<div class="msg err">' + I("info", 16) + "<span>" + t("e.TOO_HEAVY", { max: qt.tooHeavy }) + "</span></div>" : "") + '<button class="btn primary block lg" data-act="placeorder"' + (qt.tooHeavy ? " disabled" : "") + ">" + (x.pay === "card" ? t("co.payOrder") : t("co.placeOrder")) + "</button><p class=\"fine\">" + t("co.fine") + "</p></aside></div>" +
         '<div class="cobar"><span><small>' + t("cart.total") + '</small><b class="num">' + money(qt.total) + '</b></span><button class="btn primary lg" data-act="placeorder"' + (qt.tooHeavy ? " disabled" : "") + ">" + (x.pay === "card" ? t("co.payOrder") : t("co.placeOrder")) + "</button></div>";
     });
+    function trOpt(kind, icon, title, sub, x) { var on = x.pay === "transfer" && x.trKind === kind; return '<button class="payopt' + (on ? " on" : "") + '" data-act="paytr" data-k="' + kind + '" aria-pressed="' + on + '"><span class="pic">' + I(icon, 22) + "</span><span><b>" + title + "</b><small>" + sub + "</small></span><i></i></button>"; }
     function payOpt(v, icon, title, sub) { var on = co().pay === v; return '<button class="payopt' + (on ? " on" : "") + '" data-act="paym" data-v="' + v + '" aria-pressed="' + on + '"><span class="pic">' + I(icon, 22) + "</span><span><b>" + title + "</b><small>" + sub + "</small></span><i></i></button>"; }
   } });
   SF.inputs.co = function (v, el) { co()[el.dataset.k] = v; };
@@ -385,9 +396,10 @@
     if (!pick && !inZone(x, x.cityId)) { var z = zoneOf(x.cityId); if (z.poly) { SF.toast(t("e.OUT_OF_AREA"), "err"); return; } SF.toast(t("e.OUT_OF_ZONE", { km: Math.round(SF.geo.km(z, x) * 10) / 10, max: z.km }), "err"); return; }
     if (!x.pay) { SF.toast(t("e.PAY_METHOD_OFF"), "err"); return; }
     var body = { restaurantId: c.restaurantId, items: Object.keys(c.items).map(function (k) { return { productId: k, qty: c.items[k] }; }), address: pick ? {} : { text: x.text, landmark: x.landmark, lat: x.lat, lng: x.lng }, pickup: pick || undefined,
-      name: String(x.name || "").trim(), phone: x.phone, comment: x.comment, paymentMethod: x.pay, receipt: x.pay === "transfer" ? x.receipt : undefined, promoCode: SF.state.promo ? SF.state.promo.code : null };
+      name: String(x.name || "").trim(), phone: x.phone, comment: x.comment, paymentMethod: x.pay, receipt: x.pay === "transfer" ? x.receipt : undefined, trKind: x.pay === "transfer" ? x.trKind : undefined, promoCode: SF.state.promo ? SF.state.promo.code : null,
+      scheduledAt: x.when === "later" && x.slot ? x.slot : undefined, useBonus: x.useBonus || undefined };
     SF.state.placing = true; document.querySelectorAll("[data-act=placeorder]").forEach(function (b) { b.disabled = true; });
-    return api().post("/orders", body).then(function (o) { SF.cart.clear(); SF.state.promo = null; x.comment = ""; x.receipt = null; SF.state.cartSum = 0; SF.state.justPlaced = o.id;
+    return api().post("/orders", body).then(function (o) { SF.cart.clear(); SF.state.promo = null; x.comment = ""; x.receipt = null; x.when = null; x.slot = null; x.useBonus = false; SF.state.cartSum = 0; SF.state.justPlaced = o.id;
       return SF.api.get("/auth/me").then(function (u) { SF.state.user = u; SF.go(o.status === "awaiting_payment" ? "/pay/" + o.id : "/o/" + o.id); }); })
       .then(function () { SF.state.placing = false; }, function (e) { SF.state.placing = false; document.querySelectorAll("[data-act=placeorder]").forEach(function (b) { b.disabled = false; }); throw e; });
   };
@@ -430,7 +442,7 @@
     ready: '<svg class="ill" viewBox="0 0 300 150" aria-hidden="true"><g class="bob2"><path d="M134 46q16-26 32 0" stroke="#8A4B2A" stroke-width="5" fill="none" stroke-linecap="round"/><path d="M118 50h64l7 84h-78z" fill="#E8A54E"/><rect x="118" y="46" width="64" height="10" rx="2" fill="#D58A35"/><g transform="translate(132 76) scale(.56)">' + '<rect width="64" height="64" rx="18" fill="#E8590C"/><path d="M14 30h36a18 18 0 01-36 0z" fill="#fff"/>' + '</g></g><g class="popin"><circle cx="192" cy="52" r="17" fill="#0B8A5A"/><path d="M184 52l6 6 10-11" stroke="#fff" stroke-width="3.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></g></svg>',
     picked_up: '<svg class="ill" viewBox="0 0 300 150" aria-hidden="true"><path d="M40 112C100 50 170 150 252 74" stroke="#15171C" stroke-width="16" fill="none" stroke-linecap="round"/><path class="lane" d="M40 112C100 50 170 150 252 74" stroke="#fff" stroke-width="2.5" fill="none" stroke-dasharray="10 9"/><circle cx="40" cy="112" r="15" fill="#fff" stroke="#E8590C" stroke-width="3"/><g transform="translate(236 34)"><path d="M0 28L18 12L36 28V52H0Z" fill="#fff" stroke="#15171C" stroke-width="2.5" stroke-linejoin="round"/><rect x="13" y="36" width="10" height="16" rx="1.5" fill="#0B8A5A"/></g><g><circle r="15" fill="#E8590C" stroke="#fff" stroke-width="3"/><path d="M-7-3h7l3 6" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round"/><animateMotion dur="6s" repeatCount="indefinite" path="M40 112C100 50 170 150 252 74" keyPoints="0;0.86" keyTimes="0;1" calcMode="linear"/></g></svg>'
   };
-  HERO.delivered = HERO.ready;
+  HERO.delivered = HERO.ready; HERO.scheduled = HERO.pending;
   function etaOf(o) { var travel = Math.round((o.km || 2) * 3 + 6), base = o.history[0].at;
     if (o.status === "picked_up") return Math.max(1, Math.round(travel * (1 - (o.courierPos ? o.courierPos.progress : 0))));
     var prep = o.prepMin || 20, cookStart = (o.history.filter(function (h) { return h.status === "cooking"; })[0] || {}).at || Date.now();
@@ -442,18 +454,18 @@
       var steps = [["trk.1", "receipt"], ["trk.2", "fire"], ["trk.3", "bag"], ["trk.4", "box"], ["trk.5", "scooter"], ["trk.6", "home"]], cur = { pending: 0, cooking: 1, ready: 2, picked_up: 4, delivered: 5 }[o.status];
       var cp = o.courierPos, markers = [{ lat: r.lat, lng: r.lng, type: "rest", label: "R" }, { lat: o.address.lat, lng: o.address.lng, type: "home", label: "" }];
       var gps = cp && cp.live; if (gps && !done) markers.push({ lat: cp.lat, lng: cp.lng, type: "courier" });
-      var map = fin || done ? "" : '<section class="card mapcard live-map">' + SF.tmap({ key: "o-" + o.id + "-" + (cp ? cp.leg : "none"), center: city, zone: SF.zone(o.cityId), fit: [gps && cp.leg === "to_customer" ? cp : r, o.address].concat(gps && cp.leg !== "to_customer" ? [cp] : []), markers: markers, route: [gps ? cp : r, gps && cp.leg !== "to_customer" ? r : o.address], label: t("track.map") }) +
+      var map = fin || done ? "" : '<section class="card mapcard live-map">' + SF.tmap({ key: "o-" + o.id + "-" + (cp ? cp.leg : "none"), center: city, fit: [gps && cp.leg === "to_customer" ? cp : r, o.address].concat(gps && cp.leg !== "to_customer" ? [cp] : []), markers: markers, route: [gps ? cp : r, gps && cp.leg !== "to_customer" ? r : o.address], label: t("track.map") }) +
         (gps ? '<div class="mapchip"><span class="dotlive on"></span><b>' + t("cr.chip." + cp.leg, { km: cp.km, min: cp.etaMin }) + "</b></div>" : o.courier ? '<div class="mapchip"><span class="dotlive"></span><b>' + t("trk.noGps") + "</b></div>" : "") +
         '<div class="legend"><span><i class="lg-r"></i>' + esc(tx(r.name)) + '</span><span><i class="lg-h"></i>' + t("track.you") + "</span>" + (gps ? '<span><i class="lg-c"></i>' + t("track.courier") + "</span>" : "") + "</div></section>";
-      var status = '<section class="card live"><div class="lhero s-' + o.status + (moving ? " small" : "") + (r.kind === "shop" ? " plain" : "") + '">' + (r.kind === "shop" ? "" : HERO[o.status] || "") + (!fin && !done ? '<span class="eta num">≈ ' + etaOf(o) + " " + t("u.min") + "</span>" : "") + (done && Date.now() - (o.updatedAt || o.createdAt) < 15 * 60000 ? confetti() : "") + "</div>" +
-        '<div class="lbody"><span class="muted num">№' + o.number + " · " + esc(tx(r.name)) + "</span><h1 class=\"h2\">" + t("track.h." + o.status) + "</h1><p class=\"muted\">" + t("track.p." + o.status, { min: o.prepMin, sum: money(o.total) }) + "</p>" +
+      var status = '<section class="card live"><div class="lhero s-' + o.status + (moving ? " small" : "") + (r.kind === "shop" ? " plain" : "") + '">' + (r.kind === "shop" ? "" : HERO[o.status] || "") + (!fin && !done && o.status !== "scheduled" ? '<span class="eta num">≈ ' + etaOf(o) + " " + t("u.min") + "</span>" : "") + (done && Date.now() - (o.updatedAt || o.createdAt) < 15 * 60000 ? confetti() : "") + "</div>" +
+        '<div class="lbody"><span class="muted num">№' + o.number + " · " + esc(tx(r.name)) + "</span><h1 class=\"h2\">" + t("track.h." + o.status, { time: o.scheduledAt ? SF.whenText(o.scheduledAt) : "" }) + "</h1><p class=\"muted\">" + t("track.p." + o.status, { min: o.prepMin, sum: money(o.total), lead: ((SF.state.pub || {}).loyalty || {}).schedLeadMin || 40 }) + "</p>" +
         (o.payment.method === "transfer" && o.payment.status === "review" ? '<div class="msg info">' + I("receipt", 16) + t("tr.checking") + "</div>" + SF.payHelp(o) : "") +
         (o.status === "rejected" && o.rejectReason ? '<div class="msg err">' + I("info", 16) + esc(o.rejectReason) + "</div>" : "") +
         (fin ? "" : '<ol class="steps">' + steps.map(function (s, i) { var st = i < cur || done ? "done" : i === cur ? "now" : ""; return '<li class="' + st + '"><span>' + I(st === "done" ? "check" : s[1], 16) + "</span><small>" + t(s[0]) + "</small></li>"; }).join("") + "</ol>") +
         (o.status === "awaiting_payment" ? '<div class="msg warn">' + I("wallet", 16) + t(o.payment.method === "transfer" ? "pay.waitRc" : "pay.waitCard") + '</div><a class="btn primary block lg paybtn" href="#/pay/' + o.id + '">' + I("wallet", 18) + t("pay.payBtn", { sum: money(o.total) }) + "</a>" : "") +
-        (["pending", "awaiting_payment"].indexOf(o.status) >= 0 ? '<button class="btn ghost" data-act="cancelorder" data-id="' + o.id + '">' + t("track.cancel") + "</button>" : "") + "</div></section>";
+        (["pending", "awaiting_payment", "scheduled"].indexOf(o.status) >= 0 ? '<button class="btn ghost" data-act="cancelorder" data-id="' + o.id + '">' + t("track.cancel") + "</button>" : "") + "</div></section>";
       var fresh = SF.state.justPlaced === o.id && !fin && !done;
-      var conf = fresh ? '<section class="card confirm2"><span class="okmark">' + I("check", 34) + '</span><div class="grow"><h1 class="h2">' + t("ok.title") + '</h1><p class="muted">' + t("ok.sub", { name: esc(tx(r.name)) }) + '</p></div><div class="onum"><small>' + t("ok.number") + '</small><b class="num">№' + o.number + "</b></div></section>" : "";
+      var conf = fresh ? '<section class="card confirm2"><span class="okmark">' + I("check", 34) + '</span><div class="grow"><h1 class="h2">' + t("ok.title") + '</h1><p class="muted">' + (o.status === "scheduled" ? t("co.schedFor", { time: SF.whenText(o.scheduledAt) }) : t("ok.sub", { name: esc(tx(r.name)) })) + '</p></div><div class="onum"><small>' + t("ok.number") + '</small><b class="num">№' + o.number + "</b></div></section>" : "";
       var html = '<a class="backlink" href="#/orders">' + I("chevL", 18) + t("nav.orders") + "</a>" + conf + '<div class="two track"><div class="stack">' +
         (moving ? map + courierCard(o) + status : status + (fin ? "" : courierCard(o)) + map) +
         (done && !o.review ? reviewForm(o) : "") + (o.review ? '<section class="card"><h3>' + t("rv.thanks") + "</h3>" + SF.stars(o.review.rating) + (o.review.comment ? '<p class="muted">«' + esc(o.review.comment) + "»</p>" : "") + "</section>" : "") +
@@ -463,6 +475,7 @@
         (done || fin ? '<button class="btn primary block" data-act="reorder" data-id="' + o.id + '">' + I("route", 16) + t("orders.repeat") + "</button>" : "") + "</section>" +
         '<details class="card details"><summary>' + t("track.details") + '<span class="num">' + money(o.total) + "</span></summary>" + o.items.map(function (it) { return '<div class="line"><span>' + esc(tx(it.name)) + " × " + it.qty + '</span><span class="num">' + money(it.price * it.qty) + "</span></div>"; }).join("") +
         '<div class="line muted"><span>' + t("cart.delivery") + '</span><span class="num">' + money(o.deliveryFee) + "</span></div>" + (o.discount ? '<div class="line ok"><span>' + t("cart.discount") + '</span><span class="num">−' + money(o.discount) + "</span></div>" : "") +
+        (o.bonusUsed ? '<div class="line ok"><span>' + t("bn.line") + '</span><span class="num">−' + money(o.bonusUsed) + "</span></div>" : "") + (o.bonusEarned ? '<div class="line ok"><span>' + t("bn.earned", { sum: o.bonusEarned }) + "</span></div>" : "") +
         '<div class="line"><span>' + t("co.payment") + "</span><span>" + t("pay." + o.payment.method) + " · " + t("ps." + o.payment.status) + '</span></div><div class="line"><span>' + t("co.address") + "</span><span class=\"right\">" + esc(o.address.text) + (o.address.landmark ? ", " + esc(o.address.landmark) : "") + "</span></div></details></div></div>";
       return html;
     });
@@ -478,7 +491,7 @@
       return '<section class="card courier2"><div class="crow"><span class="avatar">' + I("store", 20) + '</span><div class="grow"><small class="muted">' + t("dl.selfTitle") + "</small><b>" + esc(sd.name || tx(o.restaurant.name)) + '</b><span class="muted">' + esc(tx(o.restaurant.name)) + "</span></div>" + (ph && !done0 ? SF.callBtn(sd.name || tx(o.restaurant.name), ph, t("dl.selfTitle"), t("track.call")) : "") + "</div>" +
         '<div class="cstage leg-' + (done0 ? "done" : "to_customer") + '"><span class="cst-ic">' + I(done0 ? "check" : "scooter", 18) + '</span><div class="grow"><b>' + t(done0 ? "cr.leg.done" : "dl.selfOnWay") + "</b></div></div></section>"; }
     if (!c) {
-      if (["awaiting_payment", "pending"].indexOf(o.status) >= 0) return '<section class="card cwait"><span class="cpulse">' + I("scooter", 22) + '</span><div class="grow"><b>' + t("cr.later") + "</b><small>" + t("cr.laterSub") + "</small></div></section>";
+      if (["awaiting_payment", "scheduled", "pending"].indexOf(o.status) >= 0) return '<section class="card cwait"><span class="cpulse">' + I("scooter", 22) + '</span><div class="grow"><b>' + t("cr.later") + "</b><small>" + t("cr.laterSub") + "</small></div></section>";
       return '<section class="card cwait searching"><span class="cpulse">' + I("scooter", 22) + '</span><div class="grow"><b>' + t(o.delivery === "own" || (o.delivery === "mixed" && !o.handedOff) ? "dl.ownSearch" : "cr.search") + "</b><small>" + t("cr.searchSub") + "</small></div></section>";
     }
     var leg = o.status === "delivered" ? "done" : cp ? cp.leg : "to_restaurant", has = o.status === "picked_up";
@@ -515,15 +528,16 @@
     return api().get("/orders/my").then(function (list) {
       var act = list.filter(function (o) { return SomonRules.ACTIVE.indexOf(o.status) >= 0; }), past = list.filter(function (o) { return act.indexOf(o) < 0; });
       return '<h1 class="h2 pt">' + t("nav.orders") + "</h1>" + (!list.length ? SF.empty(SF.art("plov", 100), t("orders.none"), t("orders.noneSub"), '<a class="btn primary" href="#/food">' + t("cart.browse") + "</a>") : "") +
-        (act.length ? '<div class="sect"><h2>' + t("orders.active") + '</h2></div><div class="olist">' + act.map(function (o) { var pr = { awaiting_payment: 5, pending: 15, cooking: 45, ready: 65, picked_up: 85 }[o.status];
-          return '<a class="ocard live" href="#/o/' + o.id + '"><span class="cim" style="--tone:' + esc(o.restaurant.tone) + '">' + SF.pic(o.items[0], 52) + '</span><div class="grow"><div class="rrow"><b>' + esc(tx(o.restaurant.name)) + "</b>" + SF.statusPill(o.status) + '</div><span class="muted num">№' + o.number + " · " + money(o.total) + '</span>' + (o.status === "awaiting_payment" ? '<span class="paychip">' + I("wallet", 13) + t("pay.payNow") + "</span>" : '<span class="bar"><i style="width:' + pr + '%"></i></span>') + '</div>' + I("chevR", 18) + "</a>"; }).join("") + "</div>" : "") +
+        (act.length ? '<div class="sect"><h2>' + t("orders.active") + '</h2></div><div class="olist">' + act.map(function (o) { var pr = { awaiting_payment: 5, scheduled: 8, pending: 15, cooking: 45, ready: 65, picked_up: 85 }[o.status];
+          return '<a class="ocard live" href="#/o/' + o.id + '"><span class="cim" style="--tone:' + esc(o.restaurant.tone) + '">' + SF.pic(o.items[0], 52) + '</span><div class="grow"><div class="rrow"><b>' + esc(tx(o.restaurant.name)) + "</b>" + SF.statusPill(o.status) + '</div><span class="muted num">№' + o.number + " · " + money(o.total) + (o.scheduledAt && o.status === "scheduled" ? " · " + SF.whenText(o.scheduledAt) : "") + '</span>' + (o.status === "awaiting_payment" ? '<span class="paychip">' + I("wallet", 13) + t("pay.payNow") + "</span>" : '<span class="bar"><i style="width:' + pr + '%"></i></span>') + '</div>' + I("chevR", 18) + "</a>"; }).join("") + "</div>" : "") +
         (past.length ? '<div class="sect"><h2>' + t("orders.history") + '</h2></div><div class="olist">' + past.map(function (o) {
           return '<div class="ocard past"><a class="ohit" href="#/o/' + o.id + '" aria-label="№' + o.number + '"></a><span class="cim" style="--tone:' + esc(o.restaurant.tone) + '">' + SF.pic(o.items[0], 44) + '</span><div class="grow"><b class="oname">' + esc(tx(o.restaurant.name)) + '</b><span class="muted num">' + SF.dt(o.createdAt) + '</span><span class="ometa">' + SF.statusPill(o.status) + (o.review ? SF.stars(o.review.rating) : "") + "</span></div>" +
             '<div class="oside"><b class="num">' + money(o.total) + "</b>" + (o.status === "delivered" ? '<button class="btn sm ghost" data-act="reorder" data-id="' + o.id + '">' + I("route", 14) + t("orders.repeat") + "</button>" : "") + "</div></div>"; }).join("") + "</div>" : "");
     });
   } });
   SF.actions.reorder = function (el) { return api().get("/orders/" + el.dataset.id).then(function (o) { return api().get("/restaurants/" + o.restaurantId).then(function (r) { remember(r.products); SF.cart.clear();
-    o.items.forEach(function (it) { var p = cache[it.productId]; if (p && p.available) SF.cart.add(p, it.qty); }); SF.state.cartSum = cartSum(); SF.toast(t("orders.repeated")); SF.go("/cart"); }); }); };
+    var miss = 0, got = 0; o.items.forEach(function (it) { var p = cache[it.productId]; if (p && p.available) { SF.cart.add(p, it.qty); got++; } else miss++; }); SF.state.cartSum = cartSum();
+    if (!got) { SF.toast(t("ro.none"), "err"); return; } SF.toast(miss ? t("ro.missing", { n: miss }) : t("orders.repeated"), miss ? "info" : undefined); SF.go("/cart"); }); }); };
 
   /* ---------- Profile ---------- */
   var KIND_IC = { home: "home", work: "briefcase", other: "pin" };
@@ -536,15 +550,14 @@
           '<div class="grow"><b>' + esc(u.name) + '</b><span class="num muted">' + esc(SF.phone(u.phone)) + '</span><button type="button" class="link sm" data-act="editname">' + t("pf.editName") + "</button></div></section>" +
         '<div class="pstats"><a href="#/orders"><b class="num">' + list.length + "</b><small>" + t("orders.count") + '</small></a><div><b class="num">' + money(done.reduce(function (s, o) { return s + o.total; }, 0)) + "</b><small>" + t("orders.spent") + '</small></div><a href="#/favorites"><b class="num">' + nf + "</b><small>" + t("pf.favs") + "</small></a></div>" +
         '<nav class="plist card">' +
+          (u.role === "courier" ? prow("scooter", t("cb.toCourier"), 'href="#/courier"') : "") +
           prow("pin", t("pf.addresses"), 'href="#/addresses"', (u.addresses || []).length ? '<em class="num">' + u.addresses.length + "</em>" : "") +
           prow("receipt", t("pf.orders"), 'href="#/orders"') +
           (SF.LISTINGS ? Object.keys(SF.LISTINGS).filter(function (k) { return SF.svcOn(k); }).map(function (k) { return prow(SF.LISTINGS[k].icon, t("L.my." + k), 'href="#' + SF.LISTINGS[k].base + '/my"'); }).join("") : "") +
           prow("heart", t("pf.favs"), 'href="#/favorites"', nf ? '<em class="num">' + nf + "</em>" : "") +
-          prow("ticket", t("pf.promos"), 'href="#/promos"') +
           prow("bell", t("n.title"), 'data-act="notes"', (SF.state.notes || []).length ? '<em class="num">' + SF.state.notes.length + "</em>" : "") +
           prow("wallet", t("pm.title"), 'data-act="paymethods"') + prow("grid", t("sa.all"), 'href="#/services"') +
         '</nav><nav class="plist card">' +
-          prow("city", t("profile.city"), 'data-act="city"', '<i class="pval">' + esc(city) + "</i>") +
           '<label class="prow"><span class="pic">' + I("globe", 21) + '</span><span class="grow">' + t("profile.lang") + "</span>" + SF.langSel() + "</label>" +
           prow("lock", t("pf.password"), 'data-act="pwmodal"') + (SF.installCard() ? prow("download", t("pf.install"), 'href="/download"') : "") + prow("share", t("ib.shareRow"), 'data-act="shareapp"') +
           prow("help", t("pf.support"), 'data-act="call" data-name="' + esc(SF.brand()) + '" data-phone="' + esc(pub.supportPhone || "") + '" data-sub="' + esc(t("foot.support")) + '"') +
@@ -562,7 +575,7 @@
   SF.actions.avdel = function () { return api().patch("/auth/me", { avatar: null }).then(function (u) { SF.state.user = u; SF.closeModal(); SF.render({ quiet: true }); }); };
   /* which ways to pay this service accepts — only the ones the admin really switched on */
   SF.actions.paymethods = function () { var p = SF.state.pub || {}, rows = [];
-    if (p.cashEnabled) rows.push(["cash", "pm.cash", "pm.cashSub"]); if (p.transferEnabled) rows.push(["wallet", "pm.transfer", "pm.transferSub"]); if (p.cardEnabled) rows.push(["card", "pm.card", "pm.cardSub"]);
+    if (p.cashEnabled) rows.push(["cash", "pm.cash", "pm.cashSub"]); if (p.walletEnabled) rows.push(["wallet", "pay.wallet", "pay.walletSub"]); if (p.cardTrEnabled) rows.push(["card", "pay.toCard", "pay.toCardSub"]);
     SF.modal('<button class="mx" data-act="closemodal" aria-label="' + t("btn.close") + '">' + I("x", 20) + '</button><h2 class="h2">' + t("pm.title") + '</h2><p class="muted">' + t("pm.lead") + '</p><div class="plist card">' +
       rows.map(function (r) { return '<div class="prow"><span class="pic">' + I(r[0], 21) + '</span><span class="grow"><b>' + t(r[1]) + "</b><small>" + t(r[2]) + "</small></span>" + I("check", 18) + "</div>"; }).join("") + "</div>"); };
   SF.actions.pwmodal = function () { SF.modal('<button class="mx" data-act="closemodal" aria-label="' + t("btn.close") + '">' + I("x", 20) + "</button>" + SF.pwForm()); };
@@ -584,7 +597,7 @@
     var x = na(), zone = SF.zone(SF.state.cityId);
     return '<a class="backlink" href="#/addresses">' + I("chevL", 18) + t("pf.addresses") + '</a><h1 class="h2 pt">' + t("addr.new") + '</h1><div class="newaddr">' +
       '<div class="kinds">' + ["home", "work", "other"].map(function (k) { return '<button type="button" class="kind' + (x.kind === k ? " on" : "") + '" data-act="addrkind" data-v="' + k + '" aria-pressed="' + (x.kind === k) + '">' + I(KIND_IC[k], 18) + t("addr." + k) + "</button>"; }).join("") + "</div>" +
-      '<p class="muted sm">' + t("addr.where") + '</p>' + SF.mapFind("na") + '<div class="mapbox">' + SF.tmap({ key: "na", picker: true, center: x.lat != null ? x : zone, zoom: x.lat != null ? 17 : 14, zone: zone, markers: [], label: t("addr.where"), onMove: function (p, fin) { if (fin) { na().lat = p.lat; na().lng = p.lng; } } }) + "</div>" +
+      '<p class="muted sm">' + t("addr.where") + '</p>' + SF.mapFind("na") + '<div class="mapbox">' + SF.tmap({ key: "na", picker: true, center: x.lat != null ? x : zone, zoom: x.lat != null ? 17 : 14, markers: [], label: t("addr.where"), onMove: function (p, fin) { if (fin) { na().lat = p.lat; na().lng = p.lng; } } }) + "</div>" +
       '<button type="button" class="btn ghost sm" data-act="nageo">' + I("locate", 16) + t("co.myLoc") + "</button>" +
       '<div class="afields"><label class="f">' + t("addr.street") + '<input data-input="na" data-k="text" data-geo="na" value="' + esc(x.text) + '" placeholder="' + t("co.streetPh") + '" autocomplete="street-address"></label>' +
       '<div class="grid2"><label class="f">' + t("addr.flat") + '<input data-input="na" data-k="flat" value="' + esc(x.flat) + '"></label><label class="f">' + t("co.landmark") + '<input data-input="na" data-k="landmark" value="' + esc(x.landmark) + '" placeholder="' + t("co.landmarkPh") + '"></label></div></div>' +

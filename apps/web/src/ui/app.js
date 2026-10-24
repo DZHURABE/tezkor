@@ -7,7 +7,7 @@
   SF.server = server;
   SF.api = SomonClient.createClient(cfg.api ? { transport: "http", baseUrl: cfg.api } : { transport: "local", server: server });
 
-  SF.state.lang = SF.ls.get("lang", null) || ((navigator.language || "").indexOf("ru") === 0 ? "ru" : "tg");   // Tajik by default; English only when chosen
+  SF.state.lang = SF.ls.get("lang", null) || "ru";   // Russian first: everyone understands it; Тоҷикӣ and English are one tap away   // Tajik by default; English only when chosen
   SF.state.cart = SF.ls.get("cart", { restaurantId: null, items: {} });
   SF.state.notes = []; SF.state.seen = {};
   document.documentElement.lang = SF.state.lang === "tg" ? "tg" : SF.state.lang;
@@ -37,7 +37,7 @@
   SF.inputs.lang = function (v) { SF.state.lang = v; SF.ls.set("lang", v); document.documentElement.lang = v; if (SF.state.user) SF.api.patch("/auth/me", { lang: v }).catch(function () {}); SF.render({ quiet: true }); };
   SF.actions.drawer = function () { SF.state.drawer = !SF.state.drawer; var p = document.querySelector(".panel"); if (p) p.classList.toggle("open", SF.state.drawer); };
   /* where I am looking: the whole town (everything in it) or one village of it */
-  SF.areaQ = function () { var a = (SF.state.areas || []).filter(function (x) { return x.id === SF.state.areaId && x.cityId === SF.state.cityId; })[0]; return a ? "&areaId=" + encodeURIComponent(a.id) : ""; };
+  SF.areaQ = function () { return ""; };   // no villages: lists are never narrowed by place
   SF.actions.city = function () {
     var ar = (SF.state.areas || []).filter(function (x) { return x.cityId === SF.state.cityId; }), cur = SF.areaQ() ? SF.state.areaId : "";
     SF.modal('<button class="mx" data-act="closemodal" aria-label="' + t("btn.close") + '">' + I("x", 20) + '</button><h2 class="h2">' + t("profile.city") + '</h2><div class="citylist">' + SF.state.cities.map(function (c) {
@@ -79,17 +79,27 @@
       else if (!server && fresh.length && !force) refresh();
     }).catch(function (e) { if (e && e.status === 401) SF.logout(true); });
   };
-  setInterval(function () { if (document.hidden) return; SF.poll(); if (server && server.version() !== lastVer) { lastVer = server.version(); refresh(); } }, 2500);
+  /* how often to ask the server: shops, couriers and admins every 2.5 s (new orders ring at once);
+     customers every 4 s while looking at an order, otherwise every 10 s — far fewer requests when many people are on the site */
+  function pollEvery() { var u = SF.state.user; if (server) return 2500; if (!u) return 10000; if (u.role !== "customer") return 2500; return /^\/o\//.test(SF.path ? SF.path() : "") ? 4000 : 10000; }
+  (function loop() { setTimeout(function () { if (!document.hidden) { SF.poll(); if (server && server.version() !== lastVer) { lastVer = server.version(); refresh(); } } loop(); }, pollEvery()); })();
+  document.addEventListener("visibilitychange", function () { if (!document.hidden && SF.state.user) SF.poll(); });
   setInterval(function () { if (!document.hidden && SF.live && /^\/o\/|^\/courier$|^\/rest\/orders/.test(SF.path())) refresh(); }, 5000);
 
   /* ---------- boot ---------- */
   var tok = SF.ls.get("token", null);
   if (tok) SF.api.setToken(tok);
-  Promise.all([SF.api.get("/cities"), SF.api.get("/categories"), SF.api.get("/settings/public"), SF.api.get("/categories?shop=1").catch(function () { return []; }), tok ? SF.api.get("/auth/me").catch(function () { SF.api.setToken(null); SF.ls.set("token", null); return null; }) : null, SF.api.get("/areas").catch(function () { return []; })]).then(function (a) {
+  /* fast start: the answers of the last visit are drawn at once, the fresh ones replace them a moment later
+     (on a slow or just-woken server the app does not sit on a blank screen) */
+  function applyBoot(a) {
     SF.state.cities = a[0]; SF.state.categories = a[1]; SF.state.pub = a[2]; SF.state.shopCats = a[3]; SF.state.user = a[4]; SF.state.areas = a[5] || []; SF.state.areaId = SF.ls.get("area", "") || "";
-    var saved = SF.ls.get("city", null); SF.state.cityId = a[0].some(function (c) { return c.id === saved; }) ? saved : a[2].defaultCityId;
+    var saved = SF.ls.get("city", null); SF.state.cityId = a[0].some(function (c) { return c.id === saved; }) ? saved : a[2].defaultCityId; }
+  var cachedBoot = cfg.api ? SF.ls.get("boot", null) : null, early = false;
+  if (cachedBoot && cachedBoot.v === 2 && cachedBoot.a && cachedBoot.a[2]) { try { if (!tok) cachedBoot.a[4] = null; applyBoot(cachedBoot.a); early = true; SF.render(); } catch (e) { early = false; } }
+  Promise.all([SF.api.get("/cities"), SF.api.get("/categories"), SF.api.get("/settings/public"), SF.api.get("/categories?shop=1").catch(function () { return []; }), tok ? SF.api.get("/auth/me").catch(function () { SF.api.setToken(null); SF.ls.set("token", null); return null; }) : null, SF.api.get("/areas").catch(function () { return []; })]).then(function (a) {
+    applyBoot(a); if (cfg.api) SF.ls.set("boot", { v: 2, a: a });
     if (SF.state.user) { SF.poll(true); }
-    if (SF.state.pub.demo) { var fab = document.createElement("button"); fab.className = "demofab"; fab.setAttribute("data-act", "demo"); fab.innerHTML = I("users", 18) + "<span>Demo</span>"; document.body.appendChild(fab); }
-    return SF.render();
-  }).catch(function (e) { document.getElementById("app").innerHTML = '<div class="empty">' + esc(SF.err(e)) + "</div>"; });
+    if (SF.state.pub.demo && !document.querySelector(".demofab")) { var fab = document.createElement("button"); fab.className = "demofab"; fab.setAttribute("data-act", "demo"); fab.innerHTML = I("users", 18) + "<span>Demo</span>"; document.body.appendChild(fab); }
+    return SF.render(early ? { quiet: true } : undefined);
+  }).catch(function (e) { if (!early) document.getElementById("app").innerHTML = '<div class="empty">' + esc(SF.err(e)) + "</div>"; });
 })();

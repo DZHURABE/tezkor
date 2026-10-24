@@ -170,6 +170,25 @@ public class MainActivity extends Activity {
             });
         }
 
+        /** on duty: new orders ring loud even when the app is closed (see DutyService) */
+        @JavascriptInterface
+        public void startDuty(final String api, final String token) {
+            if (api == null || token == null || token.isEmpty()) return;
+            String base = api.startsWith("http") ? api : home + (api.startsWith("/") ? api : "/" + api);
+            DutyService.start(MainActivity.this, base, token);
+            askBatteryOnce();
+        }
+
+        @JavascriptInterface
+        public void stopDuty() {
+            DutyService.stop(MainActivity.this);
+        }
+
+        @JavascriptInterface
+        public boolean onDuty() {
+            return getSharedPreferences(DutyService.PREFS, MODE_PRIVATE).getBoolean("on", false);
+        }
+
         @JavascriptInterface
         public String version() {
             return BuildInfo.version(MainActivity.this);
@@ -233,6 +252,37 @@ public class MainActivity extends Activity {
             fileCallback.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(result, data));
             fileCallback = null;
         }
+    }
+
+    /** while the app is on screen the page itself rings; the duty service stays quiet */
+    static volatile boolean visible;
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        visible = true;
+        DutyService.silence(this);   // the person opened the app: the bell may stop
+    }
+
+    @Override
+    protected void onPause() {
+        visible = false;
+        super.onPause();
+    }
+
+    /** once: ask Android not to put the app to sleep, otherwise the phone may stop checking for orders */
+    private void askBatteryOnce() {
+        if (Build.VERSION.SDK_INT < 23) return;
+        android.content.SharedPreferences p = getSharedPreferences(DutyService.PREFS, MODE_PRIVATE);
+        if (p.getBoolean("askedBattery", false)) return;
+        p.edit().putBoolean("askedBattery", true).apply();
+        android.os.PowerManager pm = (android.os.PowerManager) getSystemService(POWER_SERVICE);
+        if (pm == null || pm.isIgnoringBatteryOptimizations(getPackageName())) return;
+        runOnUiThread(() -> {
+            try {
+                startActivity(new Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:" + getPackageName())));
+            } catch (Exception ignored) { }
+        });
     }
 
     @Override

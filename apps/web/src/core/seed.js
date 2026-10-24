@@ -103,8 +103,8 @@
         { id: "pr3", code: "WELCOME20", type: "percent", value: 20, minOrder: 60, maxUses: 100, uses: 100, active: true, expiresAt: null }
       ],
       banners: [
-        { id: "b1", title: L("Ҳафтаи палав", "Неделя плова", "Plov week"), sub: L("−10% бо рамзи TEZ10", "−10% по коду TEZ10", "−10% with code TEZ10"), restaurantId: "r1", art: "plov", tone: "#E8590C", active: true },
-        { id: "b2", title: L("Расонидан аз 10 сомонӣ", "Доставка от 10 сомони", "Delivery from 10 TJS"), sub: L("Дар тамоми Шаҳритус · то 5 км", "По всему Шаартузу · до 5 км", "All over Shahrituz · up to 5 km"), restaurantId: null, art: "scooter", tone: "#0B8A5A", active: true },
+        { id: "b1", title: L("Ҳафтаи палав", "Неделя плова", "Plov week"), sub: L("Палави тӯйона — гарм ва бо нархи хуб", "Свадебный плов — горячий и по хорошей цене", "Wedding plov — hot and at a good price"), restaurantId: "r1", art: "plov", tone: "#E8590C", active: true },
+        { id: "b2", title: L("Расонидан аз 10 сомонӣ", "Доставка от 10 сомони", "Delivery from 10 TJS"), sub: L("Тез ва бехатар — то дари хона", "Быстро и аккуратно — до двери", "Fast and careful — to your door"), restaurantId: null, art: "scooter", tone: "#0B8A5A", active: true },
         { id: "b3", title: L("Ширинӣ барои шом", "Сладкое на вечер", "Sweet evening"), sub: L("Пахлава ва торт", "Пахлава и торты", "Baklava and cakes"), restaurantId: "r6", art: "dessert", tone: "#7A3E9D", active: true }
       ] };
     function uid(p) { db.meta.seq++; return p + db.meta.seq; }

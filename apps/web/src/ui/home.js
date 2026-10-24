@@ -20,9 +20,9 @@
   function svcTile(x, i) { var on = SF.svcOn(x[0]) && x[3];
     return (on ? '<a href="#' + x[3] + '"' : '<button type="button" data-act="soon" data-k="' + x[0] + '"') + ' class="svt' + (on ? " on" : "") + '" style="--sb:' + x[2] + ";--i:" + i + '">' +
       SF.svVis(x[0]) + "<b>" + t("svs." + x[0]) + "</b>" + (on ? '<small class="ok">' + t("sa.live") + "</small>" : SF.soonBadge(true)) + (on ? "</a>" : "</button>"); }
-  SF.svcGrid = function (all) { var list = all ? SF.SERVICES : SF.SERVICES.slice(0, 7);
-    return '<nav class="svgrid" aria-label="' + t("sv.title") + '">' + list.map(svcTile).join("") +
-      (all ? "" : '<a href="#/services" class="svt more" style="--sb:#F2F4F3;--i:7"><span class="sve" aria-hidden="true">' + I("grid", 26) + "</span><b>" + t("sa.all") + "</b><small>" + t("sa.allSub", { n: SF.SERVICES.length }) + "</small></a>") + "</nav>"; };
+  /* only the services the owner switched on — nothing «coming soon» */
+  SF.svcGrid = function () { var list = SF.SERVICES.filter(function (x) { return SF.svcOn(x[0]) && x[3]; });
+    return list.length ? '<nav class="svgrid n' + list.length + '" aria-label="' + t("sv.title") + '">' + list.map(svcTile).join("") + "</nav>" : ""; };
 
   /* «coming soon» / closed service: a calm gradient poster (or the admin's own photo) with the name and what it will give — no stickers */
   SF.soonHero = function (k) { var L = SV_LOOK[k] || ["#9AA6A1", "#5E6964"], ph = ((SF.state.pub || {}).svcPhotos || {})[k];
@@ -33,41 +33,60 @@
 
   /* ---------- Home ---------- */
   function etaMin(r) { return parseInt(String(r.eta || "").split(/[–-]/)[0], 10) || 99; }
+  /* the home page of the last visit is shown at once; the fresh one replaces it as soon as the server answers */
+  var homeNext = null;
+  function homeKey() { var u = SF.state.user; return [SF.state.lang, u ? u.id : "", (window.SOMON_BUILD || "")].join("|"); }
   SF.route("/", { title: "nav.home", render: function (p, q) {
     if (q.cat) { setTimeout(function () { SF.go("/food?cat=" + q.cat); }, 0); return ""; }       // old links
+    if (homeNext) { var ready = homeNext; homeNext = null; return ready; }
+    var fresh = homeBuild(), cached = SF.ls.get("home", null), keep = function (h) { if (h && h.length < 450000) SF.ls.set("home", { k: homeKey(), h: h }); return h; };
+    if (cached && cached.k === homeKey() && cached.h) {
+      fresh.then(function (h) { keep(h); if (SF.path().split("?")[0] === "/" && h !== cached.h) { homeNext = h; SF.render({ quiet: true }); } }, function () {});
+      return cached.h; }
+    return fresh.then(keep);
+  } });
+  function homeBuild() { var q = {};
     var cq = "cityId=" + encodeURIComponent(SF.state.cityId) + SF.areaQ(), soft = function (u) { return api().get(u).catch(function () { return null; }); };
-    return Promise.all([api().get("/banners"), api().get("/restaurants?" + cq), SF.svcOn("ads") ? soft("/ads/search?svc=ads&limit=4&" + cq) : null, SF.svcOn("shops") ? soft("/shops/goods?limit=8&" + cq) : null,
-      SF.svcOn("shops") ? soft("/restaurants?kind=shop&" + cq).then(function (l) { var o = (l || []).filter(function (x) { return x.own; })[0]; return o ? soft("/restaurants/" + o.id) : null; }) : null]).then(function (res) {
+    /* every listing service that is on: the newest ads of all of them go into one grid of squares */
+    var listSv = Object.keys(SF.LISTINGS || {}).filter(function (k) { return SF.svcOn(k); });
+    var adsAll = Promise.all(listSv.map(function (k) { return soft("/ads/search?svc=" + k + "&sort=new&limit=12"); })).then(function (rs) { var l = []; rs.forEach(function (r) { if (r && r.list) l = l.concat(r.list); });
+      return { list: l.sort(function (a, b) { return (b.vip ? 1 : 0) - (a.vip ? 1 : 0) || (b.publishedAt || b.createdAt) - (a.publishedAt || a.createdAt); }).slice(0, 12) }; });
+    return Promise.all([api().get("/banners"), SF.svcOn("food") ? api().get("/restaurants?" + cq) : Promise.resolve([]), adsAll, SF.svcOn("shops") ? soft("/shops/goods?limit=16&sort=new&" + cq) : null,
+      soft("/restaurants?kind=shop&" + cq).then(function (l) { var o = (l || []).filter(function (x) { return x.own; })[0]; return o ? soft("/restaurants/" + o.id) : null; })]).then(function (res) {
       var banners = res[0], rests = res[1], newAds = res[2], newGoods = res[3], ownShop = res[4];
-      return Promise.all(rests.slice(0, 12).map(function (r) { return api().get("/restaurants/" + r.id).then(function (f) { return Object.assign(f, { orderCount: r.orderCount, hasSale: r.hasSale, isNew: r.isNew }); }); })).then(function (full) {
-        full.forEach(function (r) { var ps = (r.products || []).filter(function (x) { return x.available; }), ks = ps.filter(function (x) { return x.popular; }).concat(ps).map(function (x) { return x.kind; }); r.art1 = ks[0]; });
-        var u = SF.state.user, h = new Date().getHours(), greet = h < 12 ? "home.morning" : h < 18 ? "home.day" : "home.evening";
-        var sale = 0; full.forEach(function (r) { (r.products || []).forEach(function (x) { if (x.available && x.oldPrice > x.price) sale = Math.max(sale, SF.sale(x)); }); });
+      /* no extra request per restaurant: the list already says enough for the home screen (it used to ask 12 more times) */
+      return Promise.resolve(rests.slice(0, 12)).then(function (full) {
+        var u = SF.state.user, greet = SF.greetKey();
+        var sale = 0;
         var pop = full.slice().sort(function (a, b) { return (b.isOpenNow ? 1 : 0) - (a.isOpenNow ? 1 : 0) || (b.orderCount || 0) - (a.orderCount || 0) || (b.rating || 0) - (a.rating || 0); }).slice(0, 8);
         var open = full.filter(function (r) { return r.isOpenNow; }).map(etaMin), eta = open.length ? Math.min.apply(null, open) : 0;
         /* 1. greeting + search across Tezkor */
-        var head = '<section class="sahead"><p class="sahi">' + t(greet) + (u ? ", <b>" + esc(u.name.split(" ")[0]) + "</b>" : "") + '</p>' +
-          '<form class="sasearch" data-form="search" role="search">' + I("search", 20) + '<input name="q" placeholder="' + t("sa.searchPh") + '" aria-label="' + t("sa.searchPh") + '" enterkeyhint="search"><button class="sago" aria-label="' + t("btn.find") + '">' + I("chevR", 18) + "</button></form></section>";
-        /* 2. big food banner first, then the restaurants' own ads; they slide by themselves and by finger */
-        var live = SF.SERVICES.filter(function (x) { return SF.svcOn(x[0]) && x[3]; }).slice(0, 4);
-        var hero = '<a class="banner sahero gen" href="#/services"><div><b class="sht">' + t("sa.heroG1") + " <em>" + t("sa.heroG2") + "</em></b>" +
-          '<span class="shf">' + live.map(function (x) { return "<i>" + t("svs." + x[0]) + "</i>"; }).join("") + "</span>" +
-          '<em class="shgo">' + t("sa.allSv") + I("chevR", 16) + "</em></div></a>";
-        var slides = [hero].concat(banners.map(function (b) { return SF.bannerHtml(b, "a"); }));
-        var ban = '<section class="banners b3 sabanners" id="banners" aria-label="' + t("home.offers") + '">' + slides.join("") + "</section>" + (slides.length > 1 ? '<div class="bdots" aria-hidden="true">' + slides.map(function (b, i) { return '<i class="' + (i ? "" : "on") + '"></i>'; }).join("") + "</div>" : "");
-        /* 3. services */
-        var svc = '<section class="sasect"><div class="sect2"><div><h2>' + t("sv.title") + '</h2><span class="muted">' + t("sa.oneAcc") + "</span></div></div>" + SF.svcGrid() + "</section>";
-        /* 4. a real discount (only when a restaurant really has one) */
+        /* ======== the home page, top to bottom ========
+           1. a green hero: greeting, the big search, the services as one row of round icons
+           2. the offers (banners) right under it, one card at a time
+           3. the owner's «Тезкор» store: one card with its goods
+           4. the newest listings as squares · 5. other shops' goods · 6. food */
+        var first = u ? esc(u.name.split(" ")[0]) : "";
+        var svOn = SF.SERVICES.filter(function (x) { return SF.svcOn(x[0]) && x[3]; });
+        var hero = '<section class="hm-hero"><i class="hm-orn" aria-hidden="true"></i>' +
+          '<div class="hm-hi"><p>' + t(greet) + (first ? ", <b>" + first + "</b>" : "") + "</p><h1>" + t("hm.title") + "</h1></div>" +
+          '<form class="hm-search" data-form="search" role="search">' + I("search", 20) + '<input name="q" placeholder="' + t("sa.searchPh") + '" aria-label="' + t("sa.searchPh") + '" enterkeyhint="search"><button class="hm-go" aria-label="' + t("btn.find") + '">' + I("chevR", 18) + "</button></form>" +
+          (svOn.length ? '<nav class="hm-sv" aria-label="' + t("sv.title") + '">' + svOn.map(function (x, i) { return '<a href="#' + x[3] + '" style="--i:' + i + '">' + SF.svVis(x[0]) + "<span>" + t("svs." + x[0]) + "</span></a>"; }).join("") + "</nav>" : "") + "</section>";
+        var slides = banners.map(function (b) { return SF.bannerHtml(b, "a"); });
+        var ban = !slides.length ? "" : '<section class="hm-offers"><div class="banners hm-ban" id="banners" aria-label="' + t("home.offers") + '">' + slides.join("") + "</div>" + (slides.length > 1 ? '<div class="bdots" aria-hidden="true">' + slides.map(function (b, i) { return '<i class="' + (i ? "" : "on") + '"></i>'; }).join("") + "</div>" : "") + "</section>";
+        function sect(title, sub, href, body, cls) { return '<section class="hm-sect' + (cls ? " " + cls : "") + '"><div class="hm-h"><div><h2>' + title + "</h2>" + (sub ? "<p>" + sub + "</p>" : "") + "</div>" + (href ? '<a href="#' + href + '">' + t("sa.allR") + I("chevR", 14) + "</a>" : "") + "</div>" + body + "</section>"; }
         var promo = sale ? '<a class="sapromo" href="#/food"><div><b>' + t("sa.saleT", { n: sale }) + "</b><span>" + t("sa.saleSub") + '</span><em class="shgo">' + t("sa.look") + I("chevR", 16) + '</em></div><img src="' + SF.PHOTO.burger + '" alt=""></a>' : "";
-        /* 5. popular restaurants */
-        var popH = pop.length ? '<section class="sasect"><div class="sect2"><div><h2>' + t("hs.popRest") + '</h2></div><a class="link" href="#/food">' + t("sa.allR") + "</a></div>" + '<div class="hscroll rrowscroll">' + pop.map(SF.restCard).join("") + "</div></section>" : "";
-        var adsH = newAds && newAds.list && newAds.list.length ? '<section class="sasect"><div class="sect2"><div><h2>' + t("sa.newAds") + '</h2></div><a class="link" href="#/ads">' + t("sa.allR") + '</a></div><div class="adlist">' + newAds.list.map(function (x) { return SF.adRow(x); }).join("") + "</div></section>" : "";
+        var popH = pop.length ? sect(t("hs.popRest"), "", "/food", '<div class="hscroll rrowscroll">' + pop.map(SF.restCard).join("") + "</div>") : "";
+        var ads = newAds && newAds.list ? newAds.list.slice(0, 6) : [];
+        var adsH = ads.length ? sect(t("sa.newAds"), t("hm.adsSub"), (SF.LISTINGS[listSv[0]] || { base: "/ads" }).base, '<div class="adtiles">' + ads.map(SF.adTile).join("") + "</div>") : "";
         if (newGoods && newGoods.list) SF.rememberProducts(newGoods.list);
-        var gdH = newGoods && newGoods.list && newGoods.list.length ? '<section class="sasect"><div class="sect2"><div><h2>' + t("sa.newGoods") + '</h2></div><a class="link" href="#/shops/goods">' + t("sa.allR") + '</a></div><div class="hscroll goodsrow">' + newGoods.list.map(goodCard).join("") + "</div></section>" : "";
-        return '<div class="sahome">' + (SF.installBar ? SF.installBar() : "") + head + (SF.ownShopHero ? SF.ownShopHero(ownShop) : "") + svc + ban + (SF.soonBlock ? SF.soonBlock() : "") + adsH + gdH + promo + popH + "</div>";
+        var goods = ((newGoods && newGoods.list) || []).filter(function (x) { return !ownShop || x.restaurantId !== ownShop.id; }).slice(0, 16); SF.rememberProducts(goods);
+        var gdH = goods.length ? sect(t("sv.shops"), t("hm.goodsSub"), "/shops/goods", '<div class="hscroll goodsrow onerow">' + goods.map(goodCard).join("") + "</div>") : "";
+        var store = SF.ownShopHero ? SF.ownShopHero(ownShop) : "";
+        return '<div class="sahome hm">' + (SF.installBar ? SF.installBar() : "") + hero + ban + store + adsH + gdH + (SF.soonBlock ? SF.soonBlock() : "") + (SF.svcOn("food") ? promo + popH : "") + "</div>";
       });
     });
-  } });
+  }
 
   /* all services with a line about each */
   SF.route("/services", { title: "sa.all", render: function () {

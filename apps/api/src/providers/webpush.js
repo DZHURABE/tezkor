@@ -71,11 +71,11 @@ function create(env, opts) {
       let body; try { body = encrypt(sub, JSON.stringify(payload)); } catch (e) { return resolve({ gone: true }); }
       const req = https.request({ method: "POST", hostname: u.hostname, port: u.port || 443, path: u.pathname + u.search, timeout: 10000, headers: {
         Authorization: "vapid t=" + sign(u.origin) + ", k=" + keys.pub, "Content-Encoding": "aes128gcm", "Content-Type": "application/octet-stream",
-        "Content-Length": body.length, TTL: String(payload.ttl || 86400), Urgency: "high" } }, (res) => { res.resume(); resolve({ ok: res.statusCode < 300, gone: res.statusCode === 404 || res.statusCode === 410, status: res.statusCode }); });
+        "Content-Length": body.length, TTL: String(payload.ttl || 86400), Urgency: "high" } }, (res) => { res.resume(); resolve({ ok: res.statusCode < 300, gone: res.statusCode === 404 || res.statusCode === 410 || res.statusCode === 403, status: res.statusCode }); });
       req.on("timeout", () => req.destroy()); req.on("error", () => resolve({ ok: false }));
       req.end(body);
     });
   }
-  return { publicKey: keys.pub, send, text };
+  return { publicKey: keys.pub, keys, send, text };
 }
 module.exports = { create, encrypt, decrypt, texts };

@@ -7,27 +7,30 @@
       return '<button type="button" class="democard" data-act="demologin" data-phone="' + d[1] + '">' + I(d[2], 20) + "<b>" + t("role." + d[0]) + '</b><small class="num">' + SF.phone("+992" + d[1]) + "</small></button>"; }).join("") +
       '</div><p class="fine">' + t("auth.demoPass") + "</p></div>";
   }
-  function layout(form) {
-    /* sign-in: a real food photo slowly drifting under a dark shade, a soft warm light passing over it, and a clean glass card */
-    return '<div class="auth4"><div class="a4bg" style="background-image:url(' + SF.PHOTO.hero + ')" aria-hidden="true"></div><div class="a4shade" aria-hidden="true"></div><i class="a4glow" aria-hidden="true"></i>' +
-      '<div class="a4in"><section class="a4side"><div class="a4brand">' + SF.mark(52) + '<b class="a4word">' + esc(SF.brand().slice(0, 3)) + "<em>" + esc(SF.brand().slice(3)) + "</em></b></div>" +
-        '<h1 class="a4t">' + t("a4.t1") + " <em>" + t("a4.t2") + '</em></h1><p class="a4s">' + t("auth.heroSub") + "</p>" +
-        '<ul class="a4pts"><li>' + I("bolt", 16) + t("a4.p1") + "</li><li>" + I("shield", 16) + t("a4.p2") + "</li><li>" + I("users", 16) + t("a4.p3") + "</li></ul></section>" +
-      '<div class="aglass a4card"><div class="authtop"><a href="#/" class="link">' + I("chevL", 16) + t("auth.toShop") + "</a>" + SF.langSel() + "</div>" + form + "</div></div></div>";
+  /* sign-in / sign-up: one clean page for the whole app (shop, ads, jobs, delivery) — two big tabs so nobody misses «Sign up» */
+  function layout(form, mode) {
+    var sv = [["cart", "au.s1"], ["megaphone", "au.s2"], ["briefcase", "au.s3"], ["scooter", "au.s4"]];
+    return '<div class="auth5"><i class="a5o o1" aria-hidden="true"></i><i class="a5o o2" aria-hidden="true"></i>' +
+      '<div class="a5in"><div class="a5top"><a href="#/" class="a5back">' + I("chevL", 16) + t("auth.toShop") + "</a>" + SF.langSel() + "</div>" +
+      '<section class="a5brand">' + SF.mark(76) + '<b class="a5word">' + esc(SF.brand().slice(0, 3)) + "<em>" + esc(SF.brand().slice(3)) + '</em></b><p class="a5tag">' + t("au.tag") + "</p>" +
+        '<ul class="a5sv">' + sv.map(function (x, i) { return '<li style="--i:' + i + '">' + I(x[0], 16) + t(x[1]) + "</li>"; }).join("") + "</ul></section>" +
+      '<div class="a5card"><nav class="a5tabs" role="tablist"><a role="tab" href="#/login" aria-selected="' + (mode === "login") + '" class="' + (mode === "login" ? "on" : "") + '">' + t("auth.login") + '</a><a role="tab" href="#/register" aria-selected="' + (mode === "register") + '" class="' + (mode === "register" ? "on" : "") + '">' + t("auth.register") + "</a></nav>" + form + "</div></div></div>";
   }
   SF.route("/login", { guest: true, shell: SF.shells.bare, title: "auth.login", render: function () {
-    return layout('<form class="stack" data-form="login"><h2 class="h1">' + t("auth.welcome") + '</h2><p class="muted">' + t("auth.loginSub") + "</p>" +
+    return layout('<form class="stack" data-form="login"><p class="muted a5lead">' + t("au.loginLead") + "</p>" +
       '<label class="f">' + t("auth.phone") + '<span class="phonein"><i>+992</i><input name="phone" inputmode="tel" autocomplete="username" placeholder="93 123 45 67" value="' + esc(SF.ls.get("lastPhone", "") || "") + '" required></span></label>' +
       '<label class="f">' + t("auth.password") + SF.pwInput("password", "current-password", " required") + "</label>" +
       '<button type="button" class="link forgot" data-act="forgot">' + t("pw.forgot") + "</button>" +
-      '<button class="btn primary block lg">' + t("auth.login") + '</button>' + (SF.state.pub.demo ? '<p class="fine demonote">' + I("info", 14) + t("auth.demoLocal") + "</p>" : "") + '<p class="center muted">' + t("auth.noAccount") + ' <a href="#/register" class="link">' + t("auth.register") + "</a></p></form>" + (SF.state.pub.demo ? demoBlock() : ""));
+      '<button class="btn primary block lg">' + t("auth.login") + "</button>" +
+      '<div class="a5or"><span>' + t("au.new") + '</span></div><a class="btn ghost block lg a5reg" href="#/register">' + I("user", 18) + t("au.create") + "</a>" +
+      (SF.state.pub.demo ? '<p class="fine demonote">' + I("info", 14) + t("auth.demoLocal") + "</p>" : "") + "</form>" + (SF.state.pub.demo ? demoBlock() : ""), "login");
   } });
   SF.route("/register", { guest: true, shell: SF.shells.bare, title: "auth.register", render: function () {
-    return layout('<form class="stack" data-form="register"><h2 class="h1">' + t("auth.register") + '</h2><p class="muted">' + t("auth.regSub") + "</p>" +
-      '<label class="f">' + t("profile.name") + '<input name="name" autocomplete="name" required></label>' +
+    return layout('<form class="stack" data-form="register"><p class="muted a5lead">' + t("au.regLead") + "</p>" +
+      '<label class="f">' + t("profile.name") + '<input name="name" autocomplete="name" required placeholder="' + t("au.namePh") + '"></label>' +
       '<label class="f">' + t("auth.phone") + '<span class="phonein"><i>+992</i><input name="phone" inputmode="tel" autocomplete="username" placeholder="93 123 45 67" required></span></label>' +
       '<label class="f">' + t("auth.password") + SF.pwInput("password", "new-password", ' minlength="' + (SF.state.pub.demo ? 4 : 6) + '" required') + '<small class="hint">' + t("pw.hint", { n: SF.state.pub.demo ? 4 : 6 }) + "</small></label>" +
-      '<button class="btn primary block lg">' + t("auth.create") + '</button><p class="center muted">' + t("auth.haveAccount") + ' <a href="#/login" class="link">' + t("auth.login") + '</a></p><p class="fine">' + t("auth.partnerNote") + "</p></form>");
+      '<button class="btn primary block lg">' + t("auth.create") + '</button><p class="center muted">' + t("auth.haveAccount") + ' <a href="#/login" class="link">' + t("auth.login") + "</a></p></form>", "register");
   } });
   function enter(res, typed) {
     SF.ls.set("lastPhone", String(res.user.phone || "").replace(/^\+992/, ""));

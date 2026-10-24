@@ -62,7 +62,17 @@
     (function shopCats() { if (!db || !db.categories) return; var ch = false; SHOP_CATS.forEach(function (c, i) { var ex = db.categories.filter(function (x) { return x.id === c[0]; })[0];
       if (!ex) { db.categories.push({ id: c[0], name: { tg: c[1], ru: c[2], en: c[3] }, icon: "box", shopIcon: c[4], shop: true, types: c[5], active: true, sort: 100 + i }); ch = true; } else if (!ex.types) { ex.types = c[5]; ch = true; } });
       (db.restaurants || []).forEach(function (r) { if (r.kind === "shop" && !r.shopType) { r.shopType = "general"; ch = true; } }); if (ch) store.save(db); })();
-    /* villages of the town: an ad / shop can say «Шаҳритус, Шоҳ»; choosing the town shows everything, choosing a village narrows it */
+    /* villages: removed (see oneRegion above); kept only so old data loads */
+    /* no towns and villages any more: the app works wherever the owner puts a shop on the map.
+       Internally one "home" place stays (the map's starting point); everything is moved onto it, villages are removed. */
+    (function oneRegion() { if (!db || !db.cities || !db.cities.length || db.meta.oneRegion) return;
+      var home = find(db.cities, db.settings.defaultCityId) || db.cities[0]; db.settings.defaultCityId = home.id; home.active = true;
+      (db.restaurants || []).forEach(function (r) { r.cityId = home.id; r.areaId = null; }); (db.users || []).forEach(function (u) { u.cityId = home.id; });
+      (db.ads || []).forEach(function (a) { a.cityId = home.id; a.areaId = null; }); (db.orders || []).forEach(function (o) { if (Rules.ACTIVE.indexOf(o.status) >= 0) o.cityId = home.id; });
+      home.name = { tg: "Ҳама ҷо", ru: "Везде", en: "Everywhere" };   // no town name anywhere
+      db.cities = [home]; db.areas = []; db.meta.oneRegion = true; store.save(db); })();
+    /* «direct» mode and «closed to me» are gone from the panel: only the daily break stays */
+    (function noDirect() { if (!db || !db.settings || db.meta.noDirect) return; db.settings.direct = { on: false, until: null }; db.settings.closedToMe = false; db.meta.noDirect = true; store.save(db); })();
     (function areasInit() { if (!db || db.areas) return; db.areas = [["a_shoh", "Шоҳ", "Шох", "Shoh"], ["a_qabodiyon", "Қабодиён", "Кабодиён", "Qabodiyon"]].map(function (a, i) { return { id: a[0], cityId: "c5", name: { tg: a[1], ru: a[2], en: a[3] }, active: true, sort: i }; }); store.save(db); })();
     function areaList() { return db.areas || (db.areas = []); }
     function areaName(id) { var a = id && find(areaList(), id); return a ? a.name : null; }
@@ -83,25 +93,49 @@
     function photoField(v, cur, pfx) { if (v === undefined || v === cur) return cur; if (cur) media.del(cur); return v ? image(v, pfx) : null; }
     var TONES = ["#E8590C", "#0B8A5A", "#7A3E9D", "#1F6FB2", "#C2185B", "#B7791F", "#1F1A17"];
     function route(method, path, roles, fn) {
+      /* a courier is also a buyer: every customer screen works with the same account, no second phone number */
+      if (Array.isArray(roles) && roles.indexOf("customer") >= 0 && roles.indexOf("courier") < 0) roles = roles.concat("courier");
       var keys = [], re = new RegExp("^" + path.replace(/:(\w+)/g, function (_, k) { keys.push(k); return "([^/]+)"; }) + "$");
       routes.push({ method: method, re: re, keys: keys, roles: roles, fn: fn });
     }
 
     /* ---------- shaping ---------- */
     function pubUser(u) { if (!u) return null; var o = { id: u.id, role: u.role, name: u.name, phone: u.phone, cityId: u.cityId, active: u.active, lang: u.lang, createdAt: u.createdAt };
-      if (u.mustChange) o.mustChange = true; if (u.staff) { o.staff = true; o.staffRole = ["manager", "waiter"].indexOf(u.staffRole) >= 0 ? u.staffRole : "worker"; if (u.tipCard) o.tipCard = u.tipCard; } if (u.avatar) o.avatar = u.avatar; if (u.favs) o.favs = u.favs; if (u.pwResetAt) o.pwResetAt = u.pwResetAt; if (u.phoneVerified) o.phoneVerified = u.phoneVerified;
+      if (u.role === "customer") o.bonus = bonusOf(u); if (u.mustChange) o.mustChange = true; if (u.staff) { o.staff = true; o.staffRole = ["manager", "waiter"].indexOf(u.staffRole) >= 0 ? u.staffRole : "worker"; if (u.tipCard) o.tipCard = u.tipCard; } if (u.avatar) o.avatar = u.avatar; if (u.favs) o.favs = u.favs; if (u.pwResetAt) o.pwResetAt = u.pwResetAt; if (u.phoneVerified) o.phoneVerified = u.phoneVerified;
       if (u.restaurantId) { o.restaurantId = u.restaurantId; var rk = find(db.restaurants, u.restaurantId); o.restKind = rk && rk.kind === "shop" ? "shop" : "food"; if (rk && rk.kind === "shop") o.shopType = rk.shopType || "general"; } if (u.courier) { o.courier = Object.assign({}, u.courier, courierRating(u)); if (crests(u).length) { var rr = find(db.restaurants, crests(u)[0]); o.courier.restaurantName = rr ? rr.name : null; o.courier.restaurantIds = crests(u); o.courier.restaurantNames = crests(u).map(function (x) { var q = find(db.restaurants, x); return q ? q.name : null; }).filter(Boolean); } } if (u.addresses) o.addresses = u.addresses; return o; }
     function courierRating(u) { var rs = db.orders.filter(function (o) { return o.courierId === u.id && o.review && o.review.courierRating; });
       if (!rs.length) return { rating: u.courier ? u.courier.rating : null, ratingCount: u.courier ? u.courier.ratingCount : 0 };
       var base = (u.courier.rating || 0) * (u.courier.ratingCount || 0), sum = rs.reduce(function (s, o) { return s + o.review.courierRating; }, 0);
       var n = (u.courier.ratingCount || 0) + rs.length; return { rating: Math.round((base + sum) / n * 10) / 10, ratingCount: n }; }
-    function cityOf(id) { return find(db.cities, id) || db.cities[0]; }
-    function cardOn() { return !PROD || !!opts.cardProvider; }
-    function payOn(m) { var s = db.settings; return m === "card" ? cardOn() : m === "transfer" ? s.payTransfer !== false : m === "cash" ? s.payCash !== false : false; }
+    /* courier vehicle: the four known kinds by key, anything else as the admin typed it («Нексия», «Мопед») */
+    function vehOf(v, cur) { v = str(v, 30); if (!v) return cur || "scooter"; var low = v.toLowerCase(), K = { scooter: ["scooter", "скутер", "мопед", "мото"], car: ["car", "мошин", "мошина", "авто", "машина", "мошини"], bike: ["bike", "велосипед", "вело"], foot: ["foot", "пиёда", "пешком", "пешеход"] };
+      for (var k in K) if (K[k].indexOf(low) >= 0) return k; return v; }
+    function cityOf(id) { return find(db.cities, id) || homeCity(); }
+    function homeCity() { return find(db.cities, db.settings.defaultCityId) || db.cities[0]; }
+    function cardOn() { return false; }   // no online card form: customers pay by transfer (wallet / card number) or cash
+    /* three ways to pay, each switched on and off by the owner: an e-wallet (by phone number), a bank card number (transfer), cash */
+    function payOn(m) { var s = db.settings; return m === "card" ? cardOn() : m === "wallet" ? s.payTransfer !== false && s.payWallet !== false : m === "cardtr" ? s.payTransfer !== false && s.payCardTr !== false : m === "transfer" ? payOn("wallet") || payOn("cardtr") : m === "cash" ? s.payCash !== false : false; }
     /* subscription: a restaurant is shown to customers only while its paid period lasts (no date = no limit) */
     var DAY = 86400000;
     function setting(k) { var d = { heavyStepKg: 25, heavyStepFee: 5, heavyFreeKg: 20, maxOrderKg: 0, subFee: 300, trialDays: 30, handoffMin: 7, escalMin: 4, receiptDays: 30, archiveDays: 90 }; return db.settings[k] == null ? d[k] : db.settings[k]; }
-    function paid(r) { return !r.paidUntil || r.paidUntil > clock(); }
+    /* ---------- bonus points, invitations and orders for a chosen time (settings: admin → Бонус) ----------
+       Bonus points are paid by the platform: the restaurant always gets its full share (see Rules.split). 1 point = 1 сомонӣ. */
+    function loyalty() { var d = { on: true, pct: 3, maxPct: 30, refOn: true, refBonus: 10, refWelcome: 10, schedOn: true, schedLeadMin: 40, schedDays: 3 }, s = db.settings.loyalty || {}, o = {};
+      Object.keys(d).forEach(function (k) { o[k] = s[k] == null ? d[k] : s[k]; }); o.on = false; o.refOn = false; return o; }   // bonus points and invitations are switched off: only orders for a chosen time remain
+    function bonusOf(u) { return Math.max(0, Math.floor((u && u.bonus) || 0)); }
+    function bonusMove(u, amount, kind, o) { if (!u || !amount) return; u.bonus = bonusOf(u) + amount;
+      var l = u.bonusLog || (u.bonusLog = []); l.unshift({ at: clock(), amount: amount, kind: kind, orderId: o ? o.id : null, n: o ? o.number : null }); if (l.length > 50) l.length = 50; }
+    function refCodeOf(u) { if (!u.refCode) { var c; do { c = ""; for (var i = 0; i < 6; i++) c += "ABCDEFGHJKLMNPQRSTUVWXYZ23456789".charAt(Math.floor(Math.random() * 32)); } while (db.users.some(function (x) { return x.refCode === c; })); u.refCode = c; } return u.refCode; }
+    /* an order for later: from 30 minutes ahead up to schedDays; the kitchen must be open when it gets the order (schedLeadMin before) and at that time */
+    function schedOf(r, b) { if (b.scheduledAt == null || b.scheduledAt === "") return null; var lo = loyalty(), at = Number(b.scheduledAt), t = clock();
+      if (b.dineIn || !lo.schedOn) E(400, "SCHED_OFF"); if (!Number.isFinite(at) || at < t + 30 * 60000) E(400, "SCHED_TOO_SOON"); if (at > t + lo.schedDays * DAY) E(400, "SCHED_TOO_FAR", { days: lo.schedDays });
+      if (!Rules.isOpenAt(r.hours, new Date(at)) || !Rules.isOpenAt(r.hours, new Date(Math.max(t, at - lo.schedLeadMin * 60000)))) E(409, "SCHED_CLOSED", { from: r.hours && r.hours.from, to: r.hours && r.hours.to });
+      return Math.floor(at / 60000) * 60000; }
+    /* "23.10 13:30" in Tajikistan time, for messages */
+    function tjWhen(at) { var d = new Date(at + 5 * 3600000), p2 = function (n) { return (n < 10 ? "0" : "") + n; }; return p2(d.getUTCDate()) + "." + p2(d.getUTCMonth() + 1) + " " + p2(d.getUTCHours()) + ":" + p2(d.getUTCMinutes()); }
+    /* a paid order goes to the kitchen now, or waits for its time */
+    function release(o) { setStatus(o, o.scheduledAt && clock() < o.scheduledAt - loyalty().schedLeadMin * 60000 ? "scheduled" : "pending", null); }
+    function paid(r) { return true; }   // no subscriptions: the owner runs his own shops
     function live(r) { return r.active && paid(r); }
     /* shown in lists only when a customer can really order: dishes on the menu and a way to pay */
     function orderable(r) { return live(r) && db.products.some(function (p) { return p.restaurantId === r.id && p.available; }) && (payOn("cash") || cardOn() || (payOn("transfer") && r.payCard && r.payCard.number)); }
@@ -138,7 +172,7 @@
         courier: co ? Object.assign({ id: co.id, name: co.name, phone: co.phone, vehicle: co.courier.vehicle }, courierRating(co)) : null,
         courierPos: courierPos(o), waiter: wOf(o) });
       /* phone numbers are shared only while they are needed: during an active order, between the people working on it */
-      var live = Rules.ACTIVE.indexOf(o.status) >= 0, role = viewer && viewer.role;
+      var live = Rules.ACTIVE.indexOf(o.status) >= 0, role = viewer && (o.customerId === viewer.id ? "customer" : viewer.role);   // a courier looking at his own purchase sees it as a customer
       if (role !== "admin") {
         var seesCustomer = live && (role === "customer" || role === "restaurant" || (role === "courier" && o.courierId === viewer.id));
         if (!seesCustomer) { if (x.customer) x.customer = { id: x.customer.id, name: x.customer.name.split(" ")[0] }; delete x.phone; }
@@ -146,14 +180,20 @@
       }
       if (viewer && viewer.role === "courier") { delete x.commission; delete x.restaurantPayout; delete x.platform; }
       if (viewer && viewer.role !== "admin") { delete x.escalated; delete x.escalWhy; delete x.escalatedAt; delete x.sourceNote; }
-      if (viewer && viewer.role === "customer") { delete x.commission; delete x.restaurantPayout; delete x.platform; delete x.courierPay; }
+      if (viewer && (viewer.role === "customer" || o.customerId === viewer.id)) { delete x.commission; delete x.restaurantPayout; delete x.platform; delete x.courierPay; }
       return x;
     }
 
     /* ---------- notifications ---------- */
     function notify(target, key, params, orderId) { if (/^u:(null|undefined)$/.test(target)) return; db.notifications.unshift({ id: id("n"), target: target, key: key, params: params || {}, orderId: orderId || null, at: clock(), readBy: {}, gone: false });
       if (db.notifications.length > 400) db.notifications.length = 400;
-      try { pushTo(target, key, params || {}, orderId || null); } catch (e) {} }
+      try { pushTo(target, key, params || {}, orderId || null); } catch (e) {}
+      try { smsAlert(target, key, params || {}); } catch (e) {} }
+    /* ---------- SMS for new orders (optional, paid by the SMS provider): shops, couriers on line and admins get a text ---------- */
+    var SMS_KEYS = { "n.newOrder": "Тезкор: новый заказ №{n} · {sum} с.", "n.courierNew": "Тезкор: новый заказ на доставку №{n}", "n.courierAssigned": "Тезкор: вам назначен заказ №{n}", "n.courierAuto": "Тезкор: вам назначен заказ №{n}", "n.ready": "Тезкор: заказ №{n} готов — заберите", "n.orderEsc": "Тезкор: заказ №{n} ждёт решения" };
+    function smsAlert(target, key, params) { if (!opts.alertSms || !db.settings.smsAlerts || !SMS_KEYS[key]) return;
+      var text = SMS_KEYS[key].replace(/\{(\w+)\}/g, function (_, k) { return params[k] == null ? "" : params[k]; });
+      db.users.forEach(function (u) { if (!u.deleted && u.active && u.phone && u.role !== "customer" && targetsOf(u).indexOf(target) >= 0) opts.alertSms(u.phone, text); }); }
     /* ---------- Web Push: the phone gets the signal even when the app is closed or the screen is off ----------
        opts.push = { publicKey, send(sub, payload) → Promise<{gone}>, text(key, params, lang) → {title, body} } (the Node API only) */
     function pushSubs() { return db.pushSubs || (db.pushSubs = []); }
@@ -223,10 +263,12 @@
       if (db.settings.direct && db.settings.direct.on && db.settings.direct.until && t >= db.settings.direct.until) { db.settings.direct = { on: false, until: null }; changed = true; notify("admins", "n.directOff", {}, null); }
       db.orders.forEach(function (o) { if (o.delivery === "mixed" && !o.handedOff && !o.courierId && !o.selfDelivery && (o.status === "cooking" || o.status === "ready") && o.cookingAt && t - o.cookingAt >= ms) {
         o.handedOff = true; changed = true; var r = find(db.restaurants, o.restaurantId); notify("couriers:" + o.cityId, "n.courierNew", { n: o.number, rest: r.name, km: o.km }, o.id); } });
+      /* orders for a chosen time reach the kitchen schedLeadMin before that time */
+      var lead = loyalty().schedLeadMin * 60000; db.orders.forEach(function (o) { if (o.status === "scheduled" && o.scheduledAt && t >= o.scheduledAt - lead) { setStatus(o, "pending", null); changed = true; } });
       /* an order nobody has accepted yet: the shop's phone is nudged again every 2 minutes (5 times) */
-      if (opts.push) db.orders.forEach(function (o) { if (o.status === "pending" && !o.escalated && (o.pushNag || 0) < 5 && t - (o.pushNagAt || o.createdAt) >= 120000) { o.pushNag = (o.pushNag || 0) + 1; o.pushNagAt = t; changed = true; pushTo("rest:" + o.restaurantId, "n.newOrder", { n: o.number, sum: o.subtotal }, o.id); } });
+      if (opts.push) db.orders.forEach(function (o) { if (o.status === "pending" && !o.escalated && (o.pushNag || 0) < 5 && t - (o.pushNagAt || o.pendingAt || o.createdAt) >= 120000) { o.pushNag = (o.pushNag || 0) + 1; o.pushNagAt = t; changed = true; pushTo("rest:" + o.restaurantId, "n.newOrder", { n: o.number, sum: o.subtotal }, o.id); } });
       /* a shop that does not accept in time: the order moves to the admin */
-      db.orders.forEach(function (o) { if (o.status === "pending" && !o.escalated && !o.dineIn && t - o.createdAt >= setting("escalMin") * 60000 && escalate(o, "late")) changed = true; });
+      db.orders.forEach(function (o) { if (o.status === "pending" && !o.escalated && !o.dineIn && t - (o.pendingAt || o.createdAt) >= setting("escalMin") * 60000 && escalate(o, "late")) changed = true; });
       db.orders.forEach(function (o) { if (o.status === "awaiting_payment" && o.payment && o.payment.method === "transfer" && t - o.createdAt > 2 * 3600000) { setStatus(o, "cancelled", null); o.cancelReason = "unpaid"; changed = true; } });
       if (changed) save();
       if (!db.meta.lastCleanup || t - db.meta.lastCleanup.at > DAY) cleanup(); }
@@ -261,7 +303,8 @@
       if (!Rules.canTransition(o.status, to, role)) E(409, "BAD_TRANSITION", { from: o.status, to: to });
       var t = clock(); o.status = to; o.updatedAt = t; o.history.push({ status: to, at: t, by: actor ? actor.id : "system" });
       var r = find(db.restaurants, o.restaurantId), num = o.number;
-      if (to === "pending") orderArrived(o);
+      if (to === "pending") { o.pendingAt = t; orderArrived(o); }
+      if (to === "scheduled") notify("rest:" + o.restaurantId, "n.schedNew", { n: num, time: tjWhen(o.scheduledAt) }, o.id);
       if (to === "picked_up" && o.dineIn) o.pickedAt = t;
       if ((to === "cancelled" || to === "rejected") && o.stockTaken) { o.stockTaken = false; o.items.forEach(function (it) { stockMove(it, 1); }); }
       if (to === "cooking") { hideFor(o.id, "rest:" + o.restaurantId); notify("u:" + o.customerId, "n.accepted", { n: num, min: o.prepMin }, o.id); o.cookingAt = t; if (!o.dineIn && !o.pickup && !o.selfDelivery) { if (!((o.delivery || "platform") !== "platform" && autoAssign(o))) notify(offerTarget(o), "n.courierNew", { n: num, rest: r.name, km: o.km }, o.id); } }
@@ -269,20 +312,26 @@
       if (to === "picked_up") { o.pickedAt = t; notify("u:" + o.customerId, "n.onTheWay", { n: num, total: o.total, cash: o.payment.method === "cash" }, o.id); }
       if (to === "delivered") { o.deliveredAt = t; if (o.payment.method === "cash") o.payment.status = "paid";
         o.items.forEach(function (it) { var pr = baseOf(it); if (pr) pr.sold = (pr.sold || 0) + it.qty; });
-        var dc = o.courierId && find(db.users, o.courierId); o.ownDelivery = !dc || !!(dc.courier && crests(dc).indexOf(o.restaurantId) >= 0); Object.assign(o, Rules.split(o, r, db.settings)); hideFor(o.id); notify("u:" + o.customerId, "n.delivered", { n: num }, o.id); }
-      if (to === "rejected" || to === "cancelled") { hideFor(o.id); if (o.payment.status === "paid") { o.payment.status = "refunded"; db.payments.forEach(function (p) { if (p.orderId === o.id) p.status = "refunded"; }); }
+        var dc = o.courierId && find(db.users, o.courierId); o.ownDelivery = !dc || !!(dc.courier && crests(dc).indexOf(o.restaurantId) >= 0); Object.assign(o, Rules.split(o, r, db.settings)); hideFor(o.id); notify("u:" + o.customerId, "n.delivered", { n: num }, o.id);
+        /* bonus points for the order, and the invitation reward after a friend's first delivered order */
+        var cu = !o.dineIn && find(db.users, o.customerId), lo = loyalty();
+        if (cu && cu.role === "customer" && lo.on && !o.bonusEarned) { var earn = Math.floor((o.subtotal - (o.discount || 0) - (o.bonusUsed || 0)) * lo.pct / 100); if (earn > 0) { o.bonusEarned = earn; bonusMove(cu, earn, "earn", o); notify("u:" + cu.id, "n.bonusEarned", { sum: earn, total: bonusOf(cu) }, o.id); } }
+        if (cu && cu.referredBy && !cu.refRewarded && lo.refOn) { cu.refRewarded = true; var inv = find(db.users, cu.referredBy);
+          if (inv && !inv.deleted && lo.refBonus > 0) { bonusMove(inv, lo.refBonus, "ref", o); notify("u:" + inv.id, "n.refBonus", { sum: lo.refBonus, name: cu.name }, null); }
+          if (lo.refWelcome > 0) { bonusMove(cu, lo.refWelcome, "welcome", o); notify("u:" + cu.id, "n.refWelcome", { sum: lo.refWelcome }, null); } } }
+      if (to === "rejected" || to === "cancelled") { hideFor(o.id); if (o.bonusUsed && !o.bonusBack) { o.bonusBack = true; bonusMove(find(db.users, o.customerId), o.bonusUsed, "refund", o); } if (o.payment.status === "paid") { o.payment.status = "refunded"; db.payments.forEach(function (p) { if (p.orderId === o.id) p.status = "refunded"; }); }
         if (to === "rejected") notify("u:" + o.customerId, "n.rejected", { n: num }, o.id); else if (role !== "customer") notify("u:" + o.customerId, "n.cancelled", { n: num }, o.id);
         if (role === "customer") notify("rest:" + o.restaurantId, "n.customerCancelled", { n: num }, o.id); }
     }
     /* orders the admin has taken over (or that waits for him) are no longer the shop's: it neither sees nor sells them */
     function shopOrders(rid) { return by(db.orders, "restaurantId", rid).filter(function (o) { return !o.byAdmin && !o.escalated; }); }
     function orderFor(req, oid) { var o = find(db.orders, oid); if (!o) E(404, "NOT_FOUND"); var u = req.user;
-      var allowed = u.role === "admin" || (u.role === "customer" && o.customerId === u.id) || (u.role === "restaurant" && o.restaurantId === u.restaurantId && !o.byAdmin && !o.escalated) || (u.role === "courier" && (o.courierId === u.id || offerable(o, u)));
+      var allowed = u.role === "admin" || ((u.role === "customer" || u.role === "courier") && o.customerId === u.id) || (u.role === "restaurant" && o.restaurantId === u.restaurantId && !o.byAdmin && !o.escalated) || (u.role === "courier" && (o.courierId === u.id || offerable(o, u)));
       if (!allowed) E(403, "FORBIDDEN"); return o; }
     /* an order line: a plain product, or one size of it — the cart key is «productId~variantId» */
     function nameV(nm, label) { var o = {}; ["tg", "ru", "en"].forEach(function (l) { o[l] = ((nm && (nm[l] || nm.tg)) || "") + " · " + label; }); return o; }
     /* «50 кг», «0,5 л», «250 г» → kilograms (a litre counts as a kilo); anything else weighs nothing here */
-    function kgOf(txt) { var m = /(\d+(?:[.,]\d+)?)\s*(кг|kg|г|g|л|l)(?![A-Za-zА-Яа-яЁё])/i.exec(String(txt || "")); if (!m) return 0; var n = Number(m[1].replace(",", ".")), u = m[2].toLowerCase(); return u === "г" || u === "g" ? n / 1000 : n; }
+    function kgOf(txt) { var m = /(\d+(?:[.,]\d+)?)\s*(кг|kg|мл|ml|г|g|л|l)(?![A-Za-zА-Яа-яЁё])/i.exec(String(txt || "")); if (!m) return 0; var n = Number(m[1].replace(",", ".")), u = m[2].toLowerCase(); return u === "г" || u === "g" || u === "мл" || u === "ml" ? n / 1000 : n; }
     function heavyFeeS(st0, fee, free, kg) { var st = Math.max(1, st0); if (!fee || kg <= free) return 0; return Math.ceil((kg - free) / st) * fee; }
     function heavyFee(kg) { return heavyFeeS(setting("heavyStepKg"), setting("heavyStepFee"), setting("heavyFreeKg"), kg); }
     function lineOf(r, it, maxQ) { var k = String(it.productId || ""), i = k.indexOf("~"), pid = i < 0 ? k : k.slice(0, i), vid = i < 0 ? (it.variantId || null) : k.slice(i + 1), q = int(it.qty);
@@ -301,8 +350,9 @@
       if (pr.stock == null) return false; pr.stock = dir < 0 ? Math.max(0, pr.stock - it.qty) : pr.stock + it.qty; ledger(pr, null, dir < 0 ? "sale" : "return", dir * it.qty, pr.stock, null, null); if (dir < 0 && !pr.stock) pr.available = false; if (dir > 0 && pr.stock > 0) pr.available = true; return true; }
     function quote(req, b) {
       var r = find(db.restaurants, b.restaurantId); if (!r || !live(r)) E(404, "RESTAURANT_NOT_FOUND");
-      var pz = !b.dineIn && pauseNow(); if (pz) E(409, "PLATFORM_PAUSED", { from: pz.from, to: pz.to });
-      if (!openNow(r) && !(r.kind === "shop" && !r.own && closedToMe())) E(409, "RESTAURANT_CLOSED");
+      var sched = schedOf(r, b);
+      if (!sched) { var pz = !b.dineIn && pauseNow(); if (pz) E(409, "PLATFORM_PAUSED", { from: pz.from, to: pz.to });
+        if (!openNow(r) && !(r.kind === "shop" && !r.own && closedToMe())) E(409, "RESTAURANT_CLOSED"); }
       if (!Array.isArray(b.items) || !b.items.length) E(400, "CART_EMPTY");
       var items = b.items.map(function (it) { return lineOf(r, it, 50); });
       var subtotal = items.reduce(function (s, x) { return s + x.price * x.qty; }, 0);
@@ -311,13 +361,15 @@
       /* «I'll pick it up myself»: no address, no delivery fee (only where the place allows it) */
       if (b.pickup && !b.dineIn) { if (!r.pickup) E(409, "NO_PICKUP"); km = 0; fee = 0; }
       else if (typeof a.lat === "number" && typeof a.lng === "number") { var city = cityOf(r.cityId); var zk = Rules.distanceKm(city, a), zmax = db.settings.zoneKm || 5;
-        /* the area the admin drew on the map; without one — a circle of zoneKm around the town centre */
+        /* the area the admin drew on the map; without one — a circle of zoneKm around the shop */
         if (r.zone && r.zone.length >= 3) { if (!Rules.inPolygon(a, r.zone)) E(422, "OUT_OF_AREA"); }   // the restaurant's own area, drawn by the admin
-        else if (city.zone && city.zone.length >= 3) { if (!Rules.inPolygon(a, city.zone)) E(422, "OUT_OF_AREA"); }
-        else if (zk > zmax) E(422, "OUT_OF_ZONE", { km: Math.round(zk * 10) / 10, max: zmax }); km = Math.round(Rules.distanceKm(r, a) * 10) / 10; fee = Rules.deliveryFee(db.settings, km) + heavy; }
+        else { zk = Rules.distanceKm(r, a); if (zk > zmax) E(422, "OUT_OF_ZONE", { km: Math.round(zk * 10) / 10, max: zmax }); }   /* no drawn area: a circle of zoneKm around the shop */
+        km = Math.round(Rules.distanceKm(r, a) * 10) / 10; fee = Rules.deliveryFee(db.settings, km) + heavy; }
       var discount = 0, promo = null;
       if (b.promoCode) { promo = db.promos.filter(function (p) { return p.code === str(b.promoCode).toUpperCase(); })[0]; var pd = Rules.promoDiscount(promo, subtotal, clock()); if (!pd.ok) E(409, pd.code, { min: pd.min }); discount = pd.discount; }
-      return { tooHeavy: (setting("maxOrderKg") && weightKg > setting("maxOrderKg") && !(b.pickup && !b.dineIn)) ? setting("maxOrderKg") : 0, restaurant: r, items: items, weightKg: weightKg, heavyFee: fee == null ? 0 : heavy, subtotal: subtotal, km: km, deliveryFee: fee, discount: discount, promo: promo, total: subtotal - discount + (fee || 0) };
+      /* bonus points: up to maxPct of the goods, never more than the customer has */
+      var lo = loyalty(), bonusAvail = req && req.user && req.user.role === "customer" && lo.on && !b.dineIn ? Math.min(bonusOf(req.user), Math.floor(subtotal * lo.maxPct / 100), subtotal - discount) : 0, bonusUsed = b.useBonus ? bonusAvail : 0;
+      return { sched: sched, bonusAvail: bonusAvail, bonusUsed: bonusUsed, tooHeavy: (setting("maxOrderKg") && weightKg > setting("maxOrderKg") && !(b.pickup && !b.dineIn)) ? setting("maxOrderKg") : 0, restaurant: r, items: items, weightKg: weightKg, heavyFee: fee == null ? 0 : heavy, subtotal: subtotal, km: km, deliveryFee: fee, discount: discount, promo: promo, total: subtotal - discount - bonusUsed + (fee || 0) };
     }
 
     /* ---------- auth ---------- */
@@ -334,9 +386,11 @@
       var ex = db.users.filter(function (x) { return x.phone === phone; })[0];
       if (ex) E(409, ex.role === "restaurant" || ex.role === "courier" ? "STAFF_PHONE" : "PHONE_TAKEN");
       var v = b.verifyId ? usableVerification(b.verifyId, "register", phone) : null;
-      if (verifyRequired() && !v) E(403, "VERIFY_REQUIRED");
+      /* sign-up is just a name, a phone and a password: no Telegram / SMS step (the owner's choice) */
       var u = { id: id("u"), role: "customer", name: name, phone: phone, pass: hashPw(pw), active: true, cityId: b.cityId && find(db.cities, b.cityId) ? b.cityId : db.settings.defaultCityId, createdAt: clock(), lang: b.lang || "tg", addresses: [] };
       if (v) { v.status = "used"; u.phoneVerified = v.channel; if (v.chatId) u.tgChatId = v.chatId; }
+      /* came through a friend's invitation link: both get bonus points after the first delivered order */
+      var ref = str(b.ref, 12).toUpperCase(); if (ref && loyalty().refOn) { var inv = db.users.filter(function (x) { return x.refCode === ref && !x.deleted && x.role === "customer"; })[0]; if (inv) u.referredBy = inv.id; }
       db.users.push(u); var tok = newToken(); db.sessions[tok] = { userId: u.id, at: clock() }; save();
       return { token: tok, user: pubUser(u) };
     });
@@ -436,6 +490,18 @@
     route("POST", "/auth/me/favorites", "*", function (req, b) { var u = req.user, ty = b.type === "p" ? "p" : b.type === "a" ? "a" : "r", list = ty === "p" ? db.products : ty === "a" ? (db.ads || []) : db.restaurants;
       if (!find(list, b.id)) E(404, "NOT_FOUND"); u.favs = u.favs || { r: [], p: [] }; u.favs[ty] = (u.favs[ty] || []).filter(function (x) { return x !== b.id; });
       if (b.on !== false) u.favs[ty].unshift(b.id); u.favs[ty].length = Math.min(u.favs[ty].length, 100); save(); return pubUser(u); });
+    route("GET", "/auth/me/bonus", ["customer"], function (req) { var u = req.user, lo = loyalty(), had = !!u.refCode, code = lo.refOn ? refCodeOf(u) : null; if (code && !had) save();
+      var inv = db.users.filter(function (x) { return x.referredBy === u.id && !x.deleted; });
+      return { balance: bonusOf(u), log: (u.bonusLog || []).slice(0, 30), refCode: code, invited: inv.length, invitedDone: inv.filter(function (x) { return x.refRewarded; }).length,
+        cfg: { on: lo.on, pct: lo.pct, maxPct: lo.maxPct, refOn: lo.refOn, refBonus: lo.refBonus, refWelcome: lo.refWelcome } }; });
+    route("GET", "/admin/loyalty", ["admin"], function () { var lo = loyalty(), cs = db.users.filter(function (u) { return u.role === "customer" && !u.deleted; });
+      return Object.assign(lo, { outstanding: cs.reduce(function (s, u) { return s + bonusOf(u); }, 0), holders: cs.filter(function (u) { return bonusOf(u) > 0; }).length,
+        spent: db.orders.reduce(function (s, o) { return s + (o.status === "delivered" ? o.bonusUsed || 0 : 0); }, 0), referred: cs.filter(function (u) { return u.referredBy; }).length,
+        referredDone: cs.filter(function (u) { return u.refRewarded; }).length, scheduled: db.orders.filter(function (o) { return o.status === "scheduled"; }).length }); });
+    route("PATCH", "/admin/loyalty", ["admin"], function (req, b) { var lo = loyalty(), lim = { pct: [0, 30], maxPct: [0, 100], refBonus: [0, 1000], refWelcome: [0, 1000], schedLeadMin: [10, 180], schedDays: [1, 14] };
+      Object.keys(lim).forEach(function (k) { if (b[k] == null || b[k] === "") return; var v = int(Number(b[k])); if (!(v >= lim[k][0] && v <= lim[k][1])) E(400, "BAD_VALUE", { min: lim[k][0], max: lim[k][1] }); lo[k] = v; });
+      ["on", "refOn", "schedOn"].forEach(function (k) { if (b[k] != null) lo[k] = b[k] === true || b[k] === "1" || b[k] === "on" || b[k] === 1; });
+      db.settings.loyalty = lo; save(); return lo; });
     route("GET", "/auth/me/favorites", "*", function (req) { var f = req.user.favs || { r: [], p: [] };
       return { restaurants: (f.r || []).map(function (id) { return find(db.restaurants, id); }).filter(function (r) { return r && r.active; }).map(pubRest),
         ads: (f.a || []).map(function (id) { return find(db.ads || [], id); }).filter(function (a) { return a && a.status === "active"; }).map(function (a) { return pubAd(a, req.user); }),
@@ -454,7 +520,7 @@
       .sort(function (a, b) { return (b.own ? 1 : 0) - (a.own ? 1 : 0) || (b.updatedAt || 0) - (a.updatedAt || 0); })
       /* a restaurant's ad shows its town (and its real menu link for the QR code) */
       .map(function (b) { var r = b.restaurantId && find(db.restaurants, b.restaurantId); return r ? Object.assign({}, b, { place: (cityOf(r.cityId) || {}).name || null, restName: r.name }) : b; }); });
-    route("GET", "/settings/public", null, function () { var s = db.settings; return { pause: pauseCfg() ? { on: true, from: s.pause.from, to: s.pause.to } : null, deliveryBase: s.deliveryBase, deliveryPerKm: s.deliveryPerKm, deliveryMin: s.deliveryMin, currency: s.currency, defaultCityId: s.defaultCityId, supportPhone: s.supportPhone, courierPct: s.courierPct, zoneKm: s.zoneKm || 5, handoffMin: setting("handoffMin"), verify: { channels: vChannels().map(function (c) { return { id: c.id, kind: c.kind }; }), required: verifyRequired() }, apk: !!(opts.apkAvailable && opts.apkAvailable()), cardEnabled: cardOn(), cashEnabled: payOn("cash"), soon: soonList().map(function (x) { return { id: x.id, name: x.name, photo: x.photo || null }; }), services: svcMap(), svcPhotos: db.settings.svcPhotos || {}, adsPaid: adCfg().paid, transferEnabled: payOn("transfer"), demo: !PROD }; });
+    route("GET", "/settings/public", null, function () { var s = db.settings; return { loyalty: (function (lo) { return { on: lo.on, pct: lo.pct, maxPct: lo.maxPct, refOn: lo.refOn, refBonus: lo.refBonus, refWelcome: lo.refWelcome, schedOn: lo.schedOn, schedLeadMin: lo.schedLeadMin, schedDays: lo.schedDays }; })(loyalty()), pause: pauseCfg() ? { on: true, from: s.pause.from, to: s.pause.to } : null, deliveryBase: s.deliveryBase, deliveryPerKm: s.deliveryPerKm, deliveryMin: s.deliveryMin, deliveryTiers: s.deliveryTiers || null, deliveryExtraKm: s.deliveryExtraKm || 0, weatherOn: !!s.weatherOn, weatherFee: s.weatherFee || 0, currency: s.currency, defaultCityId: s.defaultCityId, supportPhone: s.supportPhone, courierPct: s.courierPct, zoneKm: s.zoneKm || 5, handoffMin: setting("handoffMin"), verify: { channels: vChannels().map(function (c) { return { id: c.id, kind: c.kind }; }), required: verifyRequired() }, apk: !!(opts.apkAvailable && opts.apkAvailable()), cardEnabled: cardOn(), cashEnabled: payOn("cash"), soon: soonList().map(function (x) { return { id: x.id, name: x.name, photo: x.photo || null }; }), services: svcMap(), svcPhotos: db.settings.svcPhotos || {}, adsPaid: adCfg().paid, transferEnabled: payOn("transfer"), walletEnabled: payOn("wallet"), cardTrEnabled: payOn("cardtr"), demo: !PROD }; });
     route("GET", "/restaurants", null, function (req, b, q) {
       var wantShop = q.kind === "shop", list = db.restaurants.filter(function (r) { return orderable(r) && (!q.cityId || r.cityId === q.cityId) && (!q.areaId || r.areaId === q.areaId) && isShop(r) === wantShop; });
       if (q.categoryId) list = list.filter(function (r) { return db.products.some(function (p) { return p.restaurantId === r.id && p.categoryId === q.categoryId && p.available; }); });
@@ -497,18 +563,20 @@
       var r = Rules.promoDiscount(p, Number(b.subtotal) || 0, clock()); if (!r.ok) E(409, r.code, { min: r.min }); return { code: p.code, discount: r.discount, type: p.type, value: p.value }; });
 
     /* ---------- customer ---------- */
-    route("POST", "/orders/quote", ["customer"], function (req, b) { var q = quote(req, b); return { subtotal: q.subtotal, km: q.km, deliveryFee: q.deliveryFee, weightKg: q.weightKg, heavyFee: q.heavyFee, tooHeavy: q.tooHeavy, discount: q.discount, total: q.total }; });
+    route("POST", "/orders/quote", ["customer"], function (req, b) { var q = quote(req, b); return { subtotal: q.subtotal, km: q.km, deliveryFee: q.deliveryFee, weightKg: q.weightKg, heavyFee: q.heavyFee, tooHeavy: q.tooHeavy, discount: q.discount, bonusAvail: q.bonusAvail, bonusUsed: q.bonusUsed, scheduledAt: q.sched, total: q.total }; });
     route("POST", "/orders", ["customer"], function (req, b) {
       /* a second tap on "Order" within 20 s with the same basket returns the order already made */
       var sig = JSON.stringify([b.restaurantId, (b.items || []).map(function (i) { return [i.productId, i.qty]; }), b.paymentMethod]);
-      var dup = db.orders.filter(function (o) { return o.customerId === req.user.id && o.sig === sig && clock() - o.createdAt < 20000 && ["pending", "awaiting_payment"].indexOf(o.status) >= 0; })[0]; if (dup) return pubOrder(dup, req.user);
+      var dup = db.orders.filter(function (o) { return o.customerId === req.user.id && o.sig === sig && clock() - o.createdAt < 20000 && ["pending", "awaiting_payment", "scheduled"].indexOf(o.status) >= 0; })[0]; if (dup) return pubOrder(dup, req.user);
       if (b.name != null) { var nm = str(b.name, 60); if (nm.length < 2) E(400, "BAD_NAME"); if (nm !== req.user.name) req.user.name = nm; }
       var q = quote(req, b), a = b.address || {}; if (q.tooHeavy) E(422, "TOO_HEAVY", { max: q.tooHeavy });
       var pick = !!(b.pickup && q.restaurant.pickup); if (q.km == null) E(400, "ADDRESS_PIN_REQUIRED"); if (!pick && str(a.text).length < 3) E(400, "ADDRESS_TEXT_REQUIRED");
       var phone = Rules.normPhone(b.phone || req.user.phone); if (!phone) E(400, "BAD_PHONE");
       var method = ["card", "cash", "transfer"].indexOf(b.paymentMethod) >= 0 ? b.paymentMethod : "cash", t = clock();
       if (!payOn(method)) E(400, method === "card" ? "CARD_DISABLED" : "PAY_METHOD_OFF");
-      var receiptId = null, later = false;
+      var trKind = method === "transfer" ? (b.trKind === "card" ? "card" : b.trKind === "phone" ? "phone" : null) : null;
+      if (trKind && !payOn(trKind === "card" ? "cardtr" : "wallet")) E(400, "PAY_METHOD_OFF");
+      var receiptId = null, later = false, lead = loyalty().schedLeadMin * 60000;
       if (method === "transfer") {
         if (!q.restaurant.payCard || !q.restaurant.payCard.number) E(409, "NO_PAY_CARD");
         var rc = String(b.receipt || ""); later = !rc;      /* no receipt yet: the order waits and the customer pays from the order page */
@@ -521,13 +589,18 @@
         pickup: pick || undefined, selfDelivery: pick ? { pickup: true, name: "" } : undefined,
         payment: { method: method, status: method === "card" ? "pending" : method === "transfer" ? (later ? "waiting" : "review") : "none", provider: method === "card" ? (b.provider || "mock") : method },
         delivery: q.restaurant.delivery || "platform", sig: sig,
-        status: method === "card" || later ? "awaiting_payment" : "pending", prepMin: null, createdAt: t, updatedAt: t, history: [{ status: method === "card" || later ? "awaiting_payment" : "pending", at: t, by: req.user.id }] };
+        bonusUsed: q.bonusUsed || 0, scheduledAt: q.sched || undefined,
+        status: method === "card" || later ? "awaiting_payment" : q.sched && t < q.sched - lead ? "scheduled" : "pending", prepMin: null, createdAt: t, updatedAt: t, history: [] };
+      o.history.push({ status: o.status, at: t, by: req.user.id }); if (o.status === "pending") o.pendingAt = t;
+      if (o.bonusUsed) bonusMove(req.user, -o.bonusUsed, "spend", o);
+      if (trKind) o.payment.trKind = trKind;
       if (method === "transfer") { if (!later) { receiptId = "rc" + o.number; files.put(receiptId, String(b.receipt)); o.payment.receiptId = receiptId; } o.payment.toCard = q.restaurant.payCard.number.slice(-4); }
       db.orders.unshift(o); if (q.promo) q.promo.uses++;
       /* goods with a counted stock: take them off the shelf (given back if the order is cancelled) */
       o.items.forEach(function (it) { if (stockMove(it, -1)) o.stockTaken = true; });
       if (method === "card") db.payments.unshift({ id: "pay" + o.number, orderId: o.id, amount: o.total, method: "card", provider: o.payment.provider, status: "pending", createdAt: t });
       else if (later) { /* the restaurant hears about it when the receipt arrives */ }
+      else if (o.status === "scheduled") notify("rest:" + o.restaurantId, "n.schedNew", { n: o.number, time: tjWhen(o.scheduledAt) }, o.id);
       else orderArrived(o);
       var u = req.user; u.addresses = u.addresses || []; if (!pick && !u.addresses.some(function (x) { return x.text === o.address.text; })) { u.addresses.unshift(o.address); u.addresses.length = Math.min(u.addresses.length, 5); }
       save(); return pubOrder(o, req.user);
@@ -539,21 +612,21 @@
       if (!/^\d{3}$/.test(String(b.cvc || ""))) E(400, "CARD_CVC");
       if (num.slice(-4) === "0002") { db.payments.forEach(function (x) { if (x.orderId === o.id) x.status = "failed"; }); save(); E(402, "PAYMENT_DECLINED"); }
       o.payment.status = "paid"; o.payment.last4 = num.slice(-4); db.payments.forEach(function (x) { if (x.orderId === o.id) { x.status = "paid"; x.last4 = num.slice(-4); } });
-      setStatus(o, "pending", null); save(); return pubOrder(o, req.user);
+      release(o); save(); return pubOrder(o, req.user);
     });
     /* «Оплата» on the order: the customer sends the receipt of the transfer; only now the restaurant sees the order */
     route("POST", "/orders/:id/receipt", ["customer"], function (req, b, q, p) { var o = orderFor(req, p.id);
       if (o.payment.method !== "transfer" || o.status !== "awaiting_payment") E(409, "NOT_AWAITING_PAYMENT");
       var rc = String(b.receipt || ""); if (!/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+\/=]+$/.test(rc)) E(400, "RECEIPT_REQUIRED"); if (rc.length > 3500000) E(413, "RECEIPT_TOO_BIG");
       var rid = "rc" + o.number; files.put(rid, rc); o.payment.receiptId = rid; o.payment.status = "review"; o.payment.sentAt = clock();
-      setStatus(o, "pending", null); save(); return pubOrder(o, req.user); });
+      release(o); save(); return pubOrder(o, req.user); });
     /* the Node API reads the receipt bytes from its storage after this check */
     route("GET", "/orders/:id/receipt-ref", "*", function (req, b, q, p) { var o = orderFor(req, p.id); if (req.user.role === "courier") E(403, "FORBIDDEN"); if (!o.payment.receiptId) E(404, "NOT_FOUND"); return { receiptId: o.payment.receiptId }; });
     route("GET", "/orders/:id/receipt", "*", function (req, b, q, p) { var o = orderFor(req, p.id); if (req.user.role === "courier") E(403, "FORBIDDEN");
       var img = o.payment.receiptId ? files.get(o.payment.receiptId) : null; if (!img) E(404, "NOT_FOUND"); return { image: img }; });
     route("GET", "/orders/my", ["customer"], function (req) { return by(db.orders, "customerId", req.user.id).map(function (o) { return pubOrder(o, req.user); }); });
     route("GET", "/orders/:id", "*", function (req, b, q, p) { return pubOrder(orderFor(req, p.id), req.user); });
-    route("POST", "/orders/:id/cancel", ["customer"], function (req, b, q, p) { var o = orderFor(req, p.id); setStatus(o, "cancelled", req.user); save(); return pubOrder(o, req.user); });
+    route("POST", "/orders/:id/cancel", ["customer"], function (req, b, q, p) { var o = orderFor(req, p.id); if (o.customerId !== req.user.id && req.user.role !== "customer") E(403, "FORBIDDEN"); setStatus(o, "cancelled", { id: req.user.id, role: "customer" });   /* a courier cancels his own purchase as a buyer */ save(); return pubOrder(o, req.user); });
     route("POST", "/orders/:id/review", ["customer"], function (req, b, q, p) {
       var o = orderFor(req, p.id); applyReview(o, b); save(); return pubOrder(o, req.user); });
     /* one review: the restaurant (stars), the courier or the waiter (stars), and each dish (👍 / 👎) — liked dishes rise in «Popular» */
@@ -625,6 +698,7 @@
     route("GET", "/restaurant/orders", ["restaurant"], function (req, b, q) { var r = myRest(req), list = shopOrders(r.id).filter(function (o) { return o.status !== "awaiting_payment"; });
       if (q.scope === "new") list = list.filter(function (o) { return o.status === "pending"; });
       else if (q.scope === "active") list = list.filter(function (o) { return ["cooking", "ready", "picked_up"].indexOf(o.status) >= 0; });
+      else if (q.scope === "soon") list = list.filter(function (o) { return o.status === "scheduled"; }).sort(function (a, b) { return a.scheduledAt - b.scheduledAt; });
       else if (q.scope === "history") list = list.filter(function (o) { return Rules.FINAL.indexOf(o.status) >= 0; }).slice(0, 60);
       return list.map(function (o) { return pubOrder(o, req.user); }); });
     route("POST", "/restaurant/orders/:id/accept", ["restaurant"], function (req, b, q, p) { var o = orderFor(req, p.id), m = int(b.prepMin);
@@ -812,11 +886,15 @@
       Object.keys(db.sessions).forEach(function (k) { if (db.sessions[k].userId === u.id) delete db.sessions[k]; }); save(); return { phone: u.phone, password: tmp }; });
     function validProduct(b, partial, rest) {
       var x = {};
+      /* one size only («50 кг», «1 л») is simply the article's own size and price, not a list of sizes */
+      if (b.variants !== undefined && Array.isArray(b.variants) && b.variants.length === 1) { var v1 = b.variants[0] || {}, l1 = str(v1.label, 24), p1 = int(Number(v1.price));
+        if (!(p1 >= 1 && p1 <= 500000)) E(400, "BAD_PRICE"); b = Object.assign({}, b, { price: p1, weight: l1 || b.weight, variants: [] });
+        if (v1.stock !== undefined && v1.stock !== null && v1.stock !== "") b.stock = v1.stock; }
       if (!partial || b.name != null) { var n = str(b.name, 60); if (n.length < 2) E(400, "BAD_NAME"); x.name = L(n); }
       var hasV = Array.isArray(b.variants) && b.variants.length > 0;
       if ((!partial || b.price != null) && !hasV) { var pr = int(b.price); if (!(pr >= 1 && pr <= 500000)) E(400, "BAD_PRICE"); x.price = pr; }
       /* sizes of one article (0,5 л / 1 л / 1,5 л · 5 кг / 50 кг): one card, one photo, a price for each size */
-      if (b.variants !== undefined) { var vs = Array.isArray(b.variants) ? b.variants : []; if (vs.length === 1 || vs.length > 20) E(400, "BAD_VARIANT"); var seenV = {};
+      if (b.variants !== undefined) { var vs = Array.isArray(b.variants) ? b.variants : []; if (vs.length > 20) E(400, "BAD_VARIANT"); var seenV = {};
         x.variants = vs.map(function (v) { var lb = str(v && v.label, 24), pv = int(v && v.price); if (!lb || seenV[lb.toLowerCase()]) E(400, "BAD_VARIANT"); seenV[lb.toLowerCase()] = 1; if (!(pv >= 1 && pv <= 500000)) E(400, "BAD_PRICE");
           var o = { id: str(v.id, 14) || id("v"), label: lb, price: pv, available: v.available !== false }; var op = v.oldPrice ? int(v.oldPrice) : null; if (op && op > pv && op <= 500000) o.oldPrice = op;
           if (v.stock !== undefined && v.stock !== null && v.stock !== "") { var sk0 = int(v.stock); if (!(sk0 >= 0 && sk0 <= 100000)) E(400, "BAD_STOCK"); o.stock = sk0; } return o; });
@@ -922,7 +1000,7 @@
     function activeOf(uid) { return db.orders.filter(function (o) { return o.courierId === uid && ["cooking", "ready", "picked_up"].indexOf(o.status) >= 0; })[0] || null; }
     route("PATCH", "/courier/me", ["courier"], function (req, b) { var u = meCourier(req);
       if (b.online != null) { if (!b.online && activeOf(u.id)) E(409, "HAS_ACTIVE_ORDER"); u.courier.online = !!b.online; }
-      if (b.vehicle && ["scooter", "bike", "car", "foot"].indexOf(b.vehicle) >= 0) u.courier.vehicle = b.vehicle;
+      if (b.vehicle) u.courier.vehicle = vehOf(b.vehicle, u.courier.vehicle);
       if (b.lat != null && b.lng != null) { var la = Number(b.lat), ln = Number(b.lng); if (isFinite(la) && isFinite(ln) && Math.abs(la) <= 90 && Math.abs(ln) <= 180) { u.courier.lat = la; u.courier.lng = ln; u.courier.locAt = clock(); } }
       save(); return pubUser(u); });
     route("GET", "/courier/orders/available", ["courier"], function (req) { var u = meCourier(req); if (!u.courier.online) return [];
@@ -1013,18 +1091,19 @@
     route("GET", "/admin/subscriptions", ["admin"], function (req, b, q) { var l = db.subs || []; if (q.restaurantId) l = l.filter(function (s) { return s.restaurantId === q.restaurantId; });
       return l.slice(0, 200).map(function (s) { var r = find(db.restaurants, s.restaurantId); return Object.assign({}, s, { restaurantName: r ? r.name : null }); }); });
     route("POST", "/admin/restaurants", ["admin"], function (req, b) {
-      var name = str(b.name, 60), city = find(db.cities, b.cityId), phone = Rules.normPhone(b.ownerPhone), com = int(b.commissionPct == null ? 15 : b.commissionPct);
-      if (name.length < 2) E(400, "BAD_NAME"); if (!city) E(400, "BAD_CITY"); if (!phone) E(400, "BAD_PHONE"); if (!(com >= 0 && com <= 50)) E(400, "BAD_COMMISSION");
+      var name = str(b.name, 60), city = homeCity(), phone = Rules.normPhone(b.ownerPhone), com = int(b.commissionPct == null ? 0 : b.commissionPct);
+      if (name.length < 2) E(400, "BAD_NAME"); if (!phone) E(400, "BAD_PHONE"); if (!(com >= 0 && com <= 50)) E(400, "BAD_COMMISSION");
       if (db.users.some(function (u) { return u.phone === phone; })) E(409, "PHONE_TAKEN");
       var tmp, rid = id("r"), owner = { id: id("u"), role: "restaurant", name: str(b.ownerName, 60) || name, phone: phone, pass: hashPw(tmp = newPassword()), mustChange: true, active: true, cityId: city.id, restaurantId: rid, createdAt: clock(), lang: "tg" };
-      var la = Number(b.lat), ln = Number(b.lng), hasPin = isFinite(la) && isFinite(ln) && b.lat != null && Rules.distanceKm(city, { lat: la, lng: ln }) <= 60;
-      var r = { id: rid, areaId: b.areaId ? areaCheck(b.areaId, b.cityId) : null, kind: b.kind === "shop" ? "shop" : "food", shopType: b.kind === "shop" ? (SHOP_TYPES.indexOf(b.shopType) >= 0 ? b.shopType : "general") : undefined, pinned: !!b.pinned, pickup: b.kind === "shop" ? b.pickup !== false : !!b.pickup, name: L(name), cityId: city.id, ownerId: owner.id, cuisine: L(str(b.cuisine, 60) || "—"), tone: "#FFE3CC", eta: "30–45", rating: null, ratingCount: 0, hours: { from: "09:00", to: "22:00" }, open: false, active: true, commissionPct: com, minOrder: 20, lat: hasPin ? la : city.lat + 0.004, lng: hasPin ? ln : city.lng - 0.004, address: L(str(b.address, 80)), phone: phone, createdAt: clock() };
+      var la = Number(b.lat), ln = Number(b.lng), hasPin = isFinite(la) && isFinite(ln) && b.lat != null && Math.abs(la) < 90 && Math.abs(ln) < 180;
+      var r = { id: rid, areaId: null, kind: b.kind === "shop" ? "shop" : "food", shopType: b.kind === "shop" ? (SHOP_TYPES.indexOf(b.shopType) >= 0 ? b.shopType : "general") : undefined, pinned: !!b.pinned, pickup: b.kind === "shop" ? b.pickup !== false : !!b.pickup, name: L(name), cityId: city.id, ownerId: owner.id, cuisine: L(str(b.cuisine, 60) || "—"), tone: "#FFE3CC", eta: "30–45", rating: null, ratingCount: 0, hours: { from: "09:00", to: "22:00" }, open: false, active: true, commissionPct: com, minOrder: 20, lat: hasPin ? la : city.lat + 0.004, lng: hasPin ? ln : city.lng - 0.004, address: L(str(b.address, 80)), phone: phone, createdAt: clock() };
       if (["platform", "own", "mixed"].indexOf(b.delivery) >= 0) r.delivery = b.delivery;
       /* where the restaurant delivers — drawn by the admin on the map (optional) */
-      if (Array.isArray(b.zone) && b.zone.length) { if (b.zone.length < 3 || b.zone.length > 200) E(400, "BAD_ZONE"); r.zone = b.zone.map(function (x) { var a1 = Number(x.lat), a2 = Number(x.lng); if (!(isFinite(a1) && isFinite(a2)) || Rules.distanceKm(city, { lat: a1, lng: a2 }) > 60) E(400, "BAD_ZONE"); return { lat: Math.round(a1 * 1e6) / 1e6, lng: Math.round(a2 * 1e6) / 1e6 }; }); }
+      if (Array.isArray(b.zone) && b.zone.length) { if (b.zone.length < 3 || b.zone.length > 200) E(400, "BAD_ZONE"); r.zone = b.zone.map(function (x) { var a1 = Number(x.lat), a2 = Number(x.lng); if (!(isFinite(a1) && isFinite(a2)) || Rules.distanceKm(hasPin ? { lat: la, lng: ln } : city, { lat: a1, lng: a2 }) > 60) E(400, "BAD_ZONE"); return { lat: Math.round(a1 * 1e6) / 1e6, lng: Math.round(a2 * 1e6) / 1e6 }; }); }
       /* access: a free trial of N days, or N paid months (1–12) */
       db.subs = db.subs || [];
-      if (b.months != null && int(b.months) > 0) { var mo = int(b.months), amt0 = int(b.amount || 0); if (!(mo >= 1 && mo <= 24)) E(400, "BAD_MONTHS"); if (!(amt0 >= 0 && amt0 <= 1000000)) E(400, "BAD_PRICE");
+      if (b.months == null && b.trialDays == null) { r.paidUntil = null; r.trial = false; }
+      else if (b.months != null && int(b.months) > 0) { var mo = int(b.months), amt0 = int(b.amount || 0); if (!(mo >= 1 && mo <= 24)) E(400, "BAD_MONTHS"); if (!(amt0 >= 0 && amt0 <= 1000000)) E(400, "BAD_PRICE");
         r.paidUntil = addMonths(clock(), mo); r.trial = false; db.subs.unshift({ id: id("s"), restaurantId: rid, kind: "paid", months: mo, amount: amt0, note: str(b.note, 120), from: clock(), until: r.paidUntil, at: clock(), by: req.user.id }); }
       else { var td = b.trialDays == null ? setting("trialDays") : int(b.trialDays); if (!(td >= 0 && td <= 365)) E(400, "BAD_TRIAL");
         r.paidUntil = clock() + td * DAY; r.trial = td > 0;
@@ -1060,9 +1139,9 @@
       /* the admin corrects what was typed when the restaurant was added: name, kitchen, city, address, phones, the owner's name and login number */
       if (b.name != null) { var nm = str(b.name, 60); if (nm.length < 2) E(400, "BAD_NAME"); r.name = L(nm); }
       if (b.cuisine != null) r.cuisine = L(str(b.cuisine, 60) || "—"); if (b.address != null) r.address = L(str(b.address, 80));
-      if (b.cityId != null) { var cc = find(db.cities, b.cityId); if (!cc) E(400, "BAD_CITY"); if (cc.id !== r.cityId) { r.cityId = cc.id; r.lat = cc.lat + 0.004; r.lng = cc.lng - 0.004; } }
+      /* towns are gone: the place is set with the pin on the map */
       if (b.phone != null) { var rp = Rules.normPhone(b.phone); if (!rp) E(400, "BAD_PHONE"); r.phone = rp; }
-      if (b.lat != null && b.lng != null) { var pl = { lat: Number(b.lat), lng: Number(b.lng) }; if (!isFinite(pl.lat) || !isFinite(pl.lng) || Rules.distanceKm(cityOf(r.cityId), pl) > 60) E(400, "BAD_LOCATION"); r.lat = pl.lat; r.lng = pl.lng; }
+      if (b.lat != null && b.lng != null) { var pl = { lat: Number(b.lat), lng: Number(b.lng) }; if (!isFinite(pl.lat) || !isFinite(pl.lng) || Math.abs(pl.lat) >= 90 || Math.abs(pl.lng) >= 180) E(400, "BAD_LOCATION"); r.lat = pl.lat; r.lng = pl.lng; }
       var ow = find(db.users, r.ownerId);
       if (ow && b.ownerName != null) { var on = str(b.ownerName, 60); if (on.length < 2) E(400, "BAD_NAME"); ow.name = on; }
       if (ow && b.ownerPhone != null) { var op = Rules.normPhone(b.ownerPhone); if (!op) E(400, "BAD_PHONE");
@@ -1122,12 +1201,12 @@
     function newCourier(b, city, restaurantId) { var name = str(b.name, 60), phone = Rules.normPhone(b.phone);
       if (name.length < 2) E(400, "BAD_NAME"); if (!phone) E(400, "BAD_PHONE"); if (db.users.some(function (u) { return u.phone === phone; })) E(409, "PHONE_TAKEN");
       var tmp = newPassword(), u = { id: id("u"), role: "courier", name: name, phone: phone, pass: hashPw(tmp), mustChange: true, active: true, cityId: city.id, createdAt: clock(), lang: "tg",
-        courier: { online: false, vehicle: ["scooter", "bike", "car", "foot"].indexOf(b.vehicle) >= 0 ? b.vehicle : "scooter", carNumber: str(b.carNumber, 20).toUpperCase() || null, passport: str(b.passport, 30).toUpperCase() || null, rating: null, ratingCount: 0, lat: city.lat, lng: city.lng, restaurantId: restaurantId || null, restaurantIds: restaurantId ? [restaurantId] : [] } };
+        courier: { online: false, vehicle: vehOf(b.vehicle), carNumber: str(b.carNumber, 20).toUpperCase() || null, passport: str(b.passport, 30).toUpperCase() || null, rating: null, ratingCount: 0, lat: city.lat, lng: city.lng, restaurantId: restaurantId || null, restaurantIds: restaurantId ? [restaurantId] : [] } };
       db.users.push(u); return { user: u, login: { phone: phone, password: tmp } }; }
     /* the admin corrects a courier's card: vehicle, car / moto number, passport, town, name */
     route("PATCH", "/admin/couriers/:id", ["admin"], function (req, b, q, p) { var u = find(db.users, p.id); if (!u || !u.courier) E(404, "NOT_FOUND");
       if (b.name != null) { var nm = str(b.name, 60); if (nm.length < 2) E(400, "BAD_NAME"); u.name = nm; }
-      if (b.vehicle != null && ["scooter", "bike", "car", "foot"].indexOf(b.vehicle) >= 0) u.courier.vehicle = b.vehicle;
+      if (b.vehicle != null && String(b.vehicle).trim()) u.courier.vehicle = vehOf(b.vehicle, u.courier.vehicle);
       if (b.carNumber != null) u.courier.carNumber = str(b.carNumber, 20).toUpperCase() || null; if (b.passport != null) u.courier.passport = str(b.passport, 30).toUpperCase() || null;
       if (b.cityId != null) { if (!find(db.cities, b.cityId)) E(400, "BAD_CITY"); u.cityId = b.cityId; }
       /* attach to one restaurant (its own courier) or back to all Тезкор orders */
@@ -1234,30 +1313,44 @@
     route("GET", "/admin/storage", ["admin"], function () { return { info: opts.storageInfo ? opts.storageInfo() : null, lastCleanup: db.meta.lastCleanup || null, archived: db.meta.archived || null,
       receiptDays: setting("receiptDays"), archiveDays: setting("archiveDays"), orders: db.orders.length }; });
     route("POST", "/admin/cleanup", ["admin"], function () { var r = cleanup(); if (opts.afterCleanup) try { r.media = opts.afterCleanup(db); } catch (e) {} return r; });
-    route("GET", "/admin/settings", ["admin"], function () { return Object.assign({ verifyStatus: opts.verifyStatus ? opts.verifyStatus() : null, verifyChannels: vChannels().map(function (c) { return c.id; }), verifyActive: verifyRequired(),  subFee: setting("subFee"), trialDays: setting("trialDays"), handoffMin: setting("handoffMin"), receiptDays: setting("receiptDays"), archiveDays: setting("archiveDays") }, db.settings); });
+    route("GET", "/admin/settings", ["admin"], function () { return Object.assign({ smsReady: !!opts.alertSms, smsAlerts: !!db.settings.smsAlerts, verifyStatus: opts.verifyStatus ? opts.verifyStatus() : null, verifyChannels: vChannels().map(function (c) { return c.id; }), verifyActive: verifyRequired(),  subFee: setting("subFee"), trialDays: setting("trialDays"), handoffMin: setting("handoffMin"), receiptDays: setting("receiptDays"), archiveDays: setting("archiveDays") }, db.settings); });
     /* what a delivery would cost for typical orders — with the numbers typed in (or the current ones); the same formula as a real order */
+    /* a price table typed by the owner: [{ m: 100, fee: 1 }, { m: 300, fee: 3 }, …] — distances growing, at most 20 rows */
+    function tiersIn(v) { if (v == null) return undefined; if (!Array.isArray(v) || !v.length) return null; if (v.length > 20) E(400, "BAD_TIERS");
+      var prev = 0; return v.map(function (x) { var m = int(Number(x && x.m)), f = int(Number(x && x.fee)); if (!(m > prev && m <= 100000) || !(f >= 0 && f <= 1000)) E(400, "BAD_TIERS"); prev = m; return { m: m, fee: f }; }); }
+    function priceCfg(b) { var s = db.settings, c = { deliveryBase: s.deliveryBase, deliveryPerKm: s.deliveryPerKm, deliveryMin: s.deliveryMin, deliveryTiers: s.deliveryTiers || null, deliveryExtraKm: s.deliveryExtraKm || 0, weatherOn: !!s.weatherOn, weatherFee: s.weatherFee || 0 };
+      var tv = tiersIn(b.deliveryTiers); if (tv !== undefined) c.deliveryTiers = tv;
+      ["deliveryExtraKm", "weatherFee"].forEach(function (k) { if (b[k] != null && b[k] !== "") { var v = int(Number(b[k])); if (!(v >= 0 && v <= 500)) E(400, "BAD_SETTINGS", { field: k }); c[k] = v; } });
+      if (b.weatherOn != null) c.weatherOn = b.weatherOn === true || b.weatherOn === "1" || b.weatherOn === 1 || b.weatherOn === "on"; return c; }
+    route("POST", "/admin/delivery-prices", ["admin"], function (req, b) { var c = priceCfg(b);
+      ["heavyStepKg", "heavyStepFee", "heavyFreeKg", "maxOrderKg"].forEach(function (k) { if (b[k] != null && b[k] !== "") { var v = int(Number(b[k])); if (!(v >= 0 && v <= (k === "maxOrderKg" ? 20000 : 500))) E(400, "BAD_SETTINGS", { field: k }); c[k] = v; } });
+      Object.assign(db.settings, c); save(); return c; });
     route("POST", "/admin/delivery-preview", ["admin"], function (req, b) { var s = db.settings;
       function pick(k, cur) { var v = b[k] == null || b[k] === "" ? cur : int(b[k]); return v >= 0 && v <= 500 ? v : cur; }
       var cfg = { deliveryBase: pick("deliveryBase", s.deliveryBase), deliveryPerKm: pick("deliveryPerKm", s.deliveryPerKm), deliveryMin: pick("deliveryMin", s.deliveryMin) }, fk = pick("heavyFreeKg", setting("heavyFreeKg")), sk = pick("heavyStepKg", setting("heavyStepKg")), sf = pick("heavyStepFee", setting("heavyStepFee")), kms = [1, 3, 5];
-      return { cfg: { deliveryBase: cfg.deliveryBase, deliveryPerKm: cfg.deliveryPerKm, deliveryMin: cfg.deliveryMin, heavyFreeKg: fk, heavyStepKg: sk, heavyStepFee: sf, maxOrderKg: setting("maxOrderKg") }, kms: kms, rows: [5, 9, 25, 50, 250, 500].map(function (kg) { return { kg: kg, fees: kms.map(function (km) { return Rules.deliveryFee(cfg, km) + heavyFeeS(sk, sf, fk, kg); }) }; }) }; });
+      var pc = priceCfg(b); cfg = pc; kms = [0.1, 0.3, 1, 2, 3, 5];
+      return { cfg: Object.assign({}, pc, { heavyFreeKg: fk, heavyStepKg: sk, heavyStepFee: sf, maxOrderKg: setting("maxOrderKg") }), kms: kms, rows: [5, 9, 25, 50, 250, 500].map(function (kg) { return { kg: kg, fees: kms.map(function (km) { return Rules.deliveryFee(cfg, km) + heavyFeeS(sk, sf, fk, kg); }) }; }) }; });
     route("PATCH", "/admin/settings", ["admin"], function (req, b) { var s = db.settings, keys = ["heavyStepKg", "heavyStepFee", "heavyFreeKg", "maxOrderKg", "deliveryBase", "deliveryPerKm", "deliveryMin", "courierPct", "zoneKm", "subFee", "trialDays", "handoffMin", "receiptDays", "archiveDays"];
-      if (b.payCash != null) s.payCash = !!b.payCash; if (b.payTransfer != null) s.payTransfer = !!b.payTransfer; if (b.verifyRequired != null) s.verifyRequired = !!b.verifyRequired;
-      if (s.payCash === false && s.payTransfer === false && !cardOn()) E(400, "NO_PAY_METHOD");
+      var was = { payCash: s.payCash, payWallet: s.payWallet, payCardTr: s.payCardTr, payTransfer: s.payTransfer };
+      if (b.payCash != null) s.payCash = !!b.payCash; if (b.payTransfer != null) s.payTransfer = !!b.payTransfer;
+      if (b.payWallet != null) { s.payWallet = !!b.payWallet; s.payTransfer = true; } if (b.payCardTr != null) { s.payCardTr = !!b.payCardTr; s.payTransfer = true; }
+      if (!payOn("cash") && !payOn("wallet") && !payOn("cardtr") && !cardOn()) { Object.assign(s, was); E(400, "NO_PAY_METHOD"); } if (b.smsAlerts != null) s.smsAlerts = !!b.smsAlerts && !!opts.alertSms; if (b.verifyRequired != null) s.verifyRequired = !!b.verifyRequired;
       var next = {}; keys.forEach(function (k) { var v = b[k] == null ? (s[k] == null ? setting(k) : s[k]) : int(b[k]); if (!(v >= (k === "zoneKm" || k === "handoffMin" ? 1 : k === "receiptDays" ? 7 : k === "archiveDays" ? 30 : 0) && v <= (k === "courierPct" ? 100 : k === "zoneKm" ? 30 : k === "subFee" ? 100000 : k === "trialDays" ? 365 : k === "handoffMin" ? 60 : k === "receiptDays" ? 3650 : k === "archiveDays" ? 3650 : k === "maxOrderKg" ? 20000 : 500))) E(400, "BAD_SETTINGS", { field: k }); next[k] = v; });
       if (b.supportPhone != null) { if (!Rules.normPhone(b.supportPhone)) E(400, "BAD_PHONE"); next.supportPhone = Rules.fmtPhone(Rules.normPhone(b.supportPhone)); }
       Object.assign(s, next); save(); return s; });
     /* ---------- Tezkor services: one account, many services. Only the ones with a ready module can be switched on;
        the admin switches them on and off himself, the apps read the switches from /settings/public ---------- */
+    /* taxi, grocery delivery and pharmacies are «coming soon»: shown in the admin panel, switched on when their module is ready */
     var SERVICES = [["food", true], ["taxi"], ["shops", true], ["ads", true], ["masters", true], ["jobs", true], ["grocery"], ["pharmacy"], ["realty", true]];
     function svcMap() { var s = db.settings.services || {}, o = {}; SERVICES.forEach(function (x) { o[x[0]] = x[0] === "food" ? s.food !== false : !!(x[1] && s[x[0]]); }); return o; }
     function svcOn(k) { return !!svcMap()[k]; }
     function needSvc(k, req) { if (!svcOn(k) && !(req && req.user && req.user.role === "admin")) E(403, "SERVICE_OFF", { service: k }); }
-    route("GET", "/admin/services", ["admin"], function () { var m = svcMap(), ph = db.settings.svcPhotos || {}; return SERVICES.map(function (x) { return { key: x[0], ready: !!x[1], on: m[x[0]], core: x[0] === "food", photo: ph[x[0]] || null, count: svcCount(x[0]) }; }); });
+    route("GET", "/admin/services", ["admin"], function () { var m = svcMap(), ph = db.settings.svcPhotos || {}; return SERVICES.map(function (x) { return { key: x[0], ready: !!x[1], on: m[x[0]], core: false, photo: ph[x[0]] || null, count: svcCount(x[0]) }; }); });
     /* the admin's own photo for a service tile (a real taxi, a real shop…) */
     route("POST", "/admin/services/:key/photo", ["admin"], function (req, b, q, p) { if (!SERVICES.some(function (s) { return s[0] === p.key; })) E(404, "NOT_FOUND");
       var ph = db.settings.svcPhotos = db.settings.svcPhotos || {}; ph[p.key] = photoField(b.photo, ph[p.key] || null, "sv"); if (!ph[p.key]) delete ph[p.key]; save(); return ph; });
     route("PATCH", "/admin/services/:key", ["admin"], function (req, b, q, p) { var x = SERVICES.filter(function (s) { return s[0] === p.key; })[0]; if (!x) E(404, "NOT_FOUND");
-      if (x[0] === "food") E(409, "SERVICE_CORE"); if (!x[1] && b.on) E(409, "SERVICE_NOT_READY");
+      if (!x[1] && b.on) E(409, "SERVICE_NOT_READY");   // food delivery can be switched off too
       db.settings.services = db.settings.services || {}; db.settings.services[x[0]] = !!b.on; save(); return svcMap(); });
 
     /* ---------- classifieds (эълонҳо) ----------
@@ -1398,7 +1491,7 @@
       if (b.holder != null) c.holder = str(b.holder, 60); if (b.bank != null) c.bank = str(b.bank, 40); if (b.label != null) c.label = str(b.label, 30);
       if (b.dayLimit != null) { var dl = int(b.dayLimit); if (!(dl >= 0 && dl <= 1e7)) E(400, "BAD_SETTINGS", { field: "dayLimit" }); c.dayLimit = dl; }
       if (b.active != null) c.active = !!b.active; }
-    route("POST", "/admin/pay-cards", ["admin"], function (req, b) { var c = { id: id("pc"), number: "", active: true, createdAt: clock() }; cardIn(c, b); if (!c.number) E(400, "CARD_NUMBER"); payCards().push(c); save(); return c; });
+    route("POST", "/admin/pay-cards", ["admin"], function (req, b) { var c = { id: id("pc"), number: "", active: true, createdAt: clock() }; cardIn(c, b); if (!c.number && !c.phone) E(400, "BAD_PHONE"); payCards().push(c); save(); return c; });
     route("PATCH", "/admin/pay-cards/:id", ["admin"], function (req, b, q, p) { var c = find(payCards(), p.id); if (!c) E(404, "NOT_FOUND"); cardIn(c, b); save(); return c; });
     route("DELETE", "/admin/pay-cards/:id", ["admin"], function (req, b, q, p) { var c = find(payCards(), p.id); if (!c) E(404, "NOT_FOUND");
       if (adPays().some(function (x) { return x.cardId === c.id && x.status === "awaiting"; })) E(409, "CARD_BUSY"); db.settings.payCards = payCards().filter(function (x) { return x !== c; }); save(); return true; });
@@ -1432,16 +1525,19 @@
     function luhn(n) { if (!/^\d{12,19}$/.test(n)) return false; var s = 0, alt = false; for (var i = n.length - 1; i >= 0; i--) { var d = +n[i]; if (alt) { d *= 2; if (d > 9) d -= 9; } s += d; alt = !alt; } return s % 10 === 0; }
 
     /* ---------- dispatcher ---------- */
+    var lastTick = -1e15;
     function handle(method, url, body, token) {
       var parts = String(url).split("?"), path = parts[0], query = {};
       (parts[1] || "").split("&").forEach(function (kv) { if (!kv) return; var i = kv.indexOf("="); query[decodeURIComponent(i < 0 ? kv : kv.slice(0, i))] = i < 0 ? "" : decodeURIComponent(kv.slice(i + 1)); });
+      delete query.cityId; delete query.areaId;   // one region: lists are never narrowed by town or village
       try {
         for (var i = 0; i < routes.length; i++) {
           var rt = routes[i]; if (rt.method !== method) continue; var m = path.match(rt.re); if (!m) continue;
           var params = {}; rt.keys.forEach(function (k, j) { params[k] = decodeURIComponent(m[j + 1]); });
           var req = { token: token, user: null };
           if (token && db.sessions[token]) { var u = find(db.users, db.sessions[token].userId); if (u && u.active) { req.user = u; if (u.staff) u.lastSeenAt = clock(); } }
-          tick();
+          /* time-based housekeeping walks every order: at most once a second, not on every request */
+          var nowT = clock(); if (!(nowT - lastTick < 1000 && nowT >= lastTick)) { lastTick = nowT; tick(); }
           if (rt.roles) { if (!req.user) E(401, "UNAUTHORIZED"); if (rt.roles !== "*" && rt.roles.indexOf(req.user.role) < 0 && !(req.user.role === "admin" && req.user.restaurantId && rt.roles.indexOf("restaurant") >= 0)) E(403, "FORBIDDEN"); }
           var data = rt.fn(req, body || {}, query, params);
           return { status: 200, body: { ok: true, data: JSON.parse(JSON.stringify(data)) } };

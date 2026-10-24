@@ -16,9 +16,20 @@ const usedMedia = db => { const used = new Set(), add = u => { if (u && String(u
 function fileBackend(DATA_FILE) {
   const DIR = path.dirname(DATA_FILE), BACKUPS = path.join(DIR, "backups"), RECEIPTS = path.join(DIR, "receipts"), MEDIA = path.join(DIR, "media"), ARCHIVE = path.join(DIR, "archive");
   let lastBackup = 0;
+  /* writes are grouped: many changes within SAVE_MS become one write of the file, so a busy minute does not
+     stall the server with hundreds of full rewrites. flush() (on stop) writes at once. */
+  const SAVE_MS = process.env.SAVE_MS != null && process.env.SAVE_MS !== "" ? Math.max(0, +process.env.SAVE_MS || 0) : 300;
+  let pendingDb = null, timer = null;
+  function writeNow() {
+    clearTimeout(timer); timer = null; const db = pendingDb; pendingDb = null; if (!db) return;
+    try { writeFile(db); } catch (e) { console.error("data write failed, retrying:", e.message); pendingDb = pendingDb || db; timer = setTimeout(writeNow, 2000); }
+  }
   const store = {
     load() { if (!fs.existsSync(DATA_FILE)) return null; return JSON.parse(fs.readFileSync(DATA_FILE, "utf8")); },   // a corrupt file stops the start instead of starting empty
-    save(db) {
+    save(db) { pendingDb = db; if (!SAVE_MS) return writeNow(); if (!timer) timer = setTimeout(writeNow, SAVE_MS); },
+  };
+  function writeFile(db) {
+    {
       fs.mkdirSync(DIR, { recursive: true });
       const tmp = DATA_FILE + ".tmp"; fs.writeFileSync(tmp, JSON.stringify(db)); fs.renameSync(tmp, DATA_FILE);
       if (Date.now() - lastBackup > 3600e3) {   // hourly compressed copy: the last 24 hours + one a day for 14 days
@@ -29,8 +40,8 @@ function fileBackend(DATA_FILE) {
         Object.keys(days).sort().slice(-14).forEach(d => keep.add(days[d]));
         all.forEach(f => { if (!keep.has(f)) fs.unlinkSync(path.join(BACKUPS, f)); });
       }
-    },
-  };
+    }
+  }
   const clean = id => String(id).replace(/[^\w-]/g, "");
   const files = {
     put(id, dataUrl) { const m = IMG.exec(dataUrl); if (!m) return; fs.mkdirSync(RECEIPTS, { recursive: true }); fs.writeFileSync(path.join(RECEIPTS, clean(id) + "." + m[1]), Buffer.from(m[2], "base64")); },
@@ -63,7 +74,7 @@ function fileBackend(DATA_FILE) {
     kind: "file", where: DATA_FILE, store, files, media, archive, storageInfo, sweepMedia,
     async readReceipt(id) { return files.get(id); },
     async readMedia(name) { const m = /^[\w-]+\.(jpeg|png|webp)$/.exec(name); if (!m) return null; try { return { mime: "image/" + m[1], buf: fs.readFileSync(path.join(MEDIA, name)) }; } catch { return null; } },
-    async flush() {}, async backup() {},
+    async flush() { writeNow(); }, async backup() { writeNow(); },
   };
 }
 
@@ -84,7 +95,7 @@ async function pgBackend(url, opts = {}) {
     if (writing) return; writing = true;
     try {
       while (dirty) {
-        const json = dirty, arch = archiveQ.splice(0); dirty = null;
+        const json = typeof dirty === "string" ? dirty : JSON.stringify(dirty), arch = archiveQ.splice(0); dirty = null;   // serialised here, once per write, not on every change
         const sql = arch.map(a => `insert into tezkor_archive (month, orders) values (${lit(a.month)}, ${lit(a.orders)});`).join("\n") +
           `insert into tezkor_state (id, data, updated_at) values (1, ${lit(json)}, now()) on conflict (id) do update set data = excluded.data, updated_at = now();`;
         try { await pg.query(sql); failures = 0; }
@@ -92,7 +103,7 @@ async function pgBackend(url, opts = {}) {
       }
     } finally { writing = false; idle.splice(0).forEach(f => f()); }
   }
-  const store = { load: () => initial, save(db) { dirty = JSON.stringify(db); setImmediate(flushLoop); } };
+  const store = { load: () => initial, save(db) { dirty = db; setTimeout(flushLoop, 200); } };
 
   /* pictures and receipts: kept in memory until written, so they can be shown at once */
   const pending = new Map();

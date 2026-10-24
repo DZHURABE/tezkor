@@ -40,12 +40,12 @@ const errs = [];
   console.log("zoom:", await page.evaluate(() => SF.state.tmv.co.z));
   await step("addr");
   await page.fill('[data-input=co][data-k=text]', "кӯчаи Рӯдакӣ 45, хонаи 12").catch(()=>{});
-  await page.click('[data-act=paym][data-v=card]'); await step("paym card"); await shot(page, "d-checkout"); console.log("fee line:", (await page.textContent(".sum")).replace(/\s+/g," ").slice(0,160));
+  await page.click('[data-act=paym][data-v=cash]'); await step("paym cash"); await shot(page, "d-checkout"); console.log("fee line:", (await page.textContent(".sum")).replace(/\s+/g," ").slice(0,160));
   await page.click("[data-act=placeorder]"); await step("placeorder");
-  await page.fill("[name=cardNumber]", "4242424242424242"); await page.fill("[name=exp]", "12/29"); await page.fill("[name=cvc]", "123");
-  const nm = await page.$("[name=holder]"); if (nm) await nm.fill("TEST USER");
+  /* no online card form any more: cash order goes straight to tracking */
+
   await shot(page, "d-pay");
-  await page.click("form[data-form=pay] button:not([type=button])"); await page.waitForTimeout(1500); await step("paid");
+  await page.waitForTimeout(800); await step("placed");
   const oid = page.url().split("/o/")[1]; console.log("order", oid);
   await shot(page, "d-track-pending");
   await login("900000101"); await page.evaluate(() => location.hash = "/rest/orders"); await step("rest orders"); await shot(page, "d-rest-orders");
@@ -57,7 +57,7 @@ const errs = [];
   await shot(page, "d-courier-offers");
   const take = await page.$(`[data-act=take][data-id="${oid}"]`) || await page.$("[data-act=take]"); await take.click(); await step("take");
   await page.click("[data-act=pickup]"); await step("pickup"); await shot(page, "d-courier-active");
-  console.log("nav:", await page.$$eval(".navbtns a", as => as.map(a => a.href)), await page.textContent("#coords-text"));
+  console.log("nav:", await page.$$eval(".cv-nav", as => as.map(a => a.href)));
   await page.click("[data-act=deliver]"); await step("deliver");
   await login("900000301"); await page.evaluate(h => location.hash = "/o/" + h, oid); await step("track"); await shot(page, "d-track-done");
   const st = await page.$$("[data-act=star]"); console.log("stars", st.length); if (st.length) { await st[4].click(); await page.waitForTimeout(200); const st2 = await page.$$("[data-act=star]"); if (st2[9]) await st2[9].click(); await page.click("[data-act=sendreview]"); await step("review"); }
