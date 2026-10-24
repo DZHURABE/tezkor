@@ -2408,3 +2408,11 @@ body{font-size:15.5px;letter-spacing:-.005em;-webkit-font-smoothing:antialiased;
 :root[data-theme="dark"] .aglass.a4card{background:rgba(23,29,27,.9);color:#EEF2EF;border-color:rgba(255,255,255,.08)}
 :root[data-theme="dark"] .hm-hero{background:radial-gradient(120% 140% at 100% 0%,#145C3E 0%,#0C3A28 50%,#07241A 100%)}
 :root[data-theme="dark"] .svb-t.big{background:var(--surface-2)} :root[data-theme="dark"] .svb-t.big::after{border-color:rgba(255,255,255,.05)}
+/* dark theme: shop panel and later cards had light backgrounds with light text */
+:root[data-theme="dark"] :is(.mhbtn,.quick a,.slbig>div,.stcat,.csearch,.crow,.bktile,.bkrow,.vchip,.soonchip,.bankchips .chip,.oscat,.adcov,.gprow .addrbar,.gpanel .bigsearch,[data-role="restaurant"] .side){background:var(--surface);border-color:var(--line);color:var(--ink)}
+:root[data-theme="dark"] :is(.mhmore,.soonrow,.soonbox,.cim,.nophoto2,.sooncimg,.bktile.big,.dctl.on,.posp.in,.posq.in,[data-role="restaurant"] .pmain){background:var(--surface-2);border-color:var(--line);color:var(--ink)}
+:root[data-theme="dark"] :is(.soonform input,.vbulk input){background:var(--surface-2);border-color:var(--line);color:var(--ink)}
+:root[data-theme="dark"] :is(.mhbtn .mhi,.slnum,.rnew,.lk.on,.likec,.grpchips .fchip.grp,[data-role="restaurant"] .sidenav a.on){background:var(--green-soft);color:var(--green-text)}
+:root[data-theme="dark"] :is(.mhbtn small,.mhmore small){color:var(--muted)}
+:root[data-theme="dark"] :is(.pausebar,.stockl,.unver){background:var(--gold-soft);color:var(--gold-text)}
+:root[data-theme="dark"] .slbar{background:var(--surface-2)}
