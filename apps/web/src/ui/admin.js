@@ -379,9 +379,15 @@
   /* a new corner goes where it lengthens the outline least: corners tapped out of order never make crossed lines */
   function zinsert(pts, p) { if (pts.length < 3) { pts.push(p); return; } var best = pts.length, bc = Infinity;
     for (var i = 0; i < pts.length; i++) { var a = pts[i], b = pts[(i + 1) % pts.length], c = zd(a, p) + zd(p, b) - zd(a, b); if (c < bc) { bc = c; best = i + 1; } }
-    pts.splice(best, 0, p); }
+    pts.splice(best, 0, p); zuntangle(pts); }
+  /* any two crossing sides are swapped round (2-opt) until the outline has no crossings at all, whatever order the corners came in */
+  function zcross(a, b, c, d) { var o = function (p, q, r) { var v = (q.lng - p.lng) * (r.lat - p.lat) - (q.lat - p.lat) * (r.lng - p.lng); return v > 0 ? 1 : v < 0 ? -1 : 0; };
+    return o(a, b, c) * o(a, b, d) < 0 && o(c, d, a) * o(c, d, b) < 0; }
+  function zuntangle(pts) { var n = pts.length; if (n < 4) return; for (var guard = 0, again = true; again && guard < 500; guard++) { again = false;
+      for (var i = 0; i < n - 1 && !again; i++) for (var j = i + 2; j < n && !again; j++) { if (i === 0 && j === n - 1) continue;
+        if (zcross(pts[i], pts[i + 1], pts[j], pts[(j + 1) % n])) { var seg = pts.slice(i + 1, j + 1).reverse(); Array.prototype.splice.apply(pts, [i + 1, seg.length].concat(seg)); again = true; } } } }
   function zoneEditor(o) {
-    var Z = SF.state.zoneEdit; if (!Z || Z.key !== o.key) { Z = SF.state.zoneEdit = { key: o.key, url: o.url, pinUrl: o.pinUrl, back: o.back, mode: "zone", pin: o.pinUrl ? { lat: o.center.lat, lng: o.center.lng } : null, moved: false, marks: [], parts: zfromFlat(o.zone), hist: [] }; Z.cur = Math.max(0, Z.parts.length - 1); }
+    var Z = SF.state.zoneEdit; if (!Z || Z.key !== o.key) { Z = SF.state.zoneEdit = { key: o.key, url: o.url, pinUrl: o.pinUrl, back: o.back, mode: "zone", pin: o.pinUrl ? { lat: o.center.lat, lng: o.center.lng } : null, moved: false, marks: [], parts: zfromFlat(o.zone), hist: [] }; Z.parts.forEach(function (pt) { zuntangle(pt.pts); }); Z.cur = Math.max(0, Z.parts.length - 1); }
     var has = o.zone && o.zone.length > 2; Z.marks.length = 0; Z.marks.push(Z.pin ? { lat: Z.pin.lat, lng: Z.pin.lng, type: "rest", label: o.mark } : { lat: o.center.lat, lng: o.center.lng, type: "rest", label: o.mark });
     return '<a class="backlink" href="#' + o.back + '">' + I("chevL", 18) + esc(o.backLabel) + '</a><section class="card stack"><h3>' + t("zn.title") + " · " + esc(o.name) + '</h3><p class="fine">' + t(o.how) + "</p>" +
       /* a restaurant: two modes — move its place («R»), or draw its area */
@@ -391,7 +397,7 @@
         labels: function () { var z = SF.state.zoneEdit; if (!z) return []; return z.parts.map(function (pt, i) { if (pt.pts.length < 3) return null; var la = 0, ln = 0; pt.pts.forEach(function (q) { la += q.lat; ln += q.lng; });
           return { lat: la / pt.pts.length, lng: ln / pt.pts.length, text: (pt.n || t("zn.pnamePh", { n: i + 1 })) + (pt.fee !== "" ? " · " + SF.money(+pt.fee) : "") }; }).filter(Boolean); },
         onDrag: function (i, ll) { var z = SF.state.zoneEdit; if (!z || z.mode !== "zone") return; var f = zflat(z)[i]; if (!f) return; z.parts[f._p].pts[f._i] = ll; },
-        onDragEnd: function (i) { var z = SF.state.zoneEdit; if (!z) return; var f = zflat(z)[i]; if (f && f._p !== z.cur) { z.cur = f._p; zlist(); } },
+        onDragEnd: function (i) { var z = SF.state.zoneEdit; if (!z) return; var f = zflat(z)[i]; if (!f) return; zuntangle(z.parts[f._p].pts); if (f._p !== z.cur) { z.cur = f._p; zlist(); } },
         onTap: function (pt) { var z = SF.state.zoneEdit; if (!z) return; if (z.mode === "pin" && z.pinUrl) { z.pin = pt; z.moved = true; z.marks.length = 0; z.marks.push({ lat: pt.lat, lng: pt.lng, type: "rest", label: o.mark }); return; }
           if (zflat(z).length >= 600) return; if (!z.parts.length) { z.parts.push({ n: "", fee: "", pts: [] }); z.cur = 0; }
           var part = z.parts[z.cur] || z.parts[z.parts.length - 1]; zinsert(part.pts, pt); z.hist.push(pt); zlist(); } }) + "</div>" +
