@@ -94,10 +94,12 @@
     for (var i = 0, j = poly.length - 1; i < poly.length; j = i++) { var a = poly[i], b = poly[j];
       if ((a.lat > p.lat) !== (b.lat > p.lat) && p.lng < (b.lng - a.lng) * (p.lat - a.lat) / (b.lat - a.lat) + a.lng) inside = !inside; }
     return inside; }
+  /* which part holds the point: { i, name, fee } or null; fee is the part's own delivery price (null = by distance) */
+  function zonePartOf(p, poly) { var ps = zoneParts(poly); for (var i = 0; i < ps.length; i++) if (ps[i].length >= 3 && inOne(p, ps[i])) { var h = ps[i][0]; return { i: i, name: h.n || "", fee: typeof h.fee === "number" ? h.fee : null }; } return null; }
   function inPolygon(p, poly) { var parts = zoneParts(poly).filter(function (x) { return x.length >= 3; }); if (!parts.length) return true;
     return parts.some(function (x) { return inOne(p, x); }); }
 
-  return { inPolygon: inPolygon, zoneParts: zoneParts, ROLES: ROLES, ORDER_FLOW: ORDER_FLOW, ACTIVE: ACTIVE, FINAL: FINAL, canTransition: canTransition,
+  return { inPolygon: inPolygon, zoneParts: zoneParts, zonePartOf: zonePartOf, ROLES: ROLES, ORDER_FLOW: ORDER_FLOW, ACTIVE: ACTIVE, FINAL: FINAL, canTransition: canTransition,
     distanceKm: distanceKm, deliveryFee: deliveryFee, promoDiscount: promoDiscount, split: split,
     isOpenAt: isOpenAt, normPhone: normPhone, fmtPhone: fmtPhone };
 });

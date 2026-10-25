@@ -98,4 +98,15 @@ t('минтақа: бир неча алоҳида қисм (деҳалар), о�
   err(call('POST', '/admin/restaurants/r1/zone', { zone: two.slice(0, 5) }, A), 'BAD_ZONE');
   ok(call('POST', '/admin/restaurants/r1/zone', { zone: [] }, A)); });
 
+t('минтақа: ҳар бир қисмнинг ўз етказиш нархи бор', () => {
+  const r1 = ok(call('GET', '/restaurants/r1')), la = r1.lat, ln = r1.lng, sq = (c, d, extra) => [Object.assign({ lat: c[0] - d, lng: c[1] - d }, extra), { lat: c[0] - d, lng: c[1] + d }, { lat: c[0] + d, lng: c[1] + d }, { lat: c[0] + d, lng: c[1] - d }];
+  const zone = sq([la, ln], 0.01, { n: 'Марказ', fee: 3 }).concat(sq([la + 0.05, ln], 0.01, { cut: 1, n: 'Деҳаи боло' })).concat(sq([la - 0.05, ln], 0.01, { cut: 1, n: 'Поён', fee: 12 }));
+  ok(call('POST', '/admin/restaurants/r1/zone', { zone }, A));
+  const q = (lat, lng) => call('POST', '/orders/quote', { restaurantId: 'r1', items, address: { text: 'x', lat, lng } }, friend);
+  const a1 = ok(q(la + 0.002, ln)); assert.equal(a1.deliveryFee - 0, 3); assert.equal(a1.areaName, 'Марказ');
+  const a3 = ok(q(la - 0.05, ln)); assert.equal(a3.deliveryFee, 12);
+  const a2 = ok(q(la + 0.05, ln)); assert.ok(a2.deliveryFee > 0 && a2.deliveryFee !== 3 && a2.deliveryFee !== 12, 'no price — by distance');
+  err(q(la + 0.025, ln), 'OUT_OF_AREA');
+  ok(call('POST', '/admin/restaurants/r1/zone', { zone: [] }, A)); });
+
 console.log(`\n${pass} tests passed`);

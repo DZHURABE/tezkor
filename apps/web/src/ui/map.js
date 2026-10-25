@@ -91,7 +91,8 @@
     var g = "";
     var pd = function (pts, close) { return pts.map(function (p, i) { var q = P(p); return (i ? "L" : "M") + q.x.toFixed(1) + " " + q.y.toFixed(1); }).join("") + (close ? "Z" : ""); };
     var parts = function (pts) { return window.SomonRules && SomonRules.zoneParts ? SomonRules.zoneParts(pts) : [pts]; };
-    if (o.edit) { var ep = o.edit(); if (ep.length) g += parts(ep).map(function (pp) { return '<path class="tm-zone tm-edit" d="' + pd(pp, pp.length > 2) + '"/>'; }).join("") + ep.map(function (p, i) { var q = P(p); return '<circle class="tm-vx' + (i === ep.length - 1 ? " last" : "") + '" cx="' + q.x.toFixed(1) + '" cy="' + q.y.toFixed(1) + '" r="7"/>'; }).join(""); }
+    if (o.labels) g += o.labels().map(function (l) { var q = P(l); return '<g class="tm-plab" transform="translate(' + q.x.toFixed(1) + "," + q.y.toFixed(1) + ')"><text>' + esc(l.text) + "</text></g>"; }).join("");
+    if (o.edit) { var ep = o.edit(); if (ep.length) g += parts(ep).map(function (pp) { return '<path class="tm-zone tm-edit' + (o.curPart && o.curPart() === pp[0]._p ? " cur" : "") + '" d="' + pd(pp, pp.length > 2) + '"/>'; }).join("") + ep.map(function (p, i) { var q = P(p); return '<circle class="tm-vx' + (i === ep.length - 1 ? " last" : "") + '" cx="' + q.x.toFixed(1) + '" cy="' + q.y.toFixed(1) + '" r="7"/>'; }).join(""); }
     if (o.zone) { var zc = P(o.zone), r = o.zone.km * 1000 / mpp(o.zone.lat, z);
       g += (o.zone.poly ? parts(o.zone.poly).map(function (pp) { return '<path class="tm-zone" d="' + pd(pp, true) + '"/>'; }).join("") : '<circle class="tm-zone" cx="' + zc.x.toFixed(1) + '" cy="' + zc.y.toFixed(1) + '" r="' + r.toFixed(1) + '"/>') +
         '<g class="tm-center" transform="translate(' + zc.x.toFixed(1) + "," + zc.y.toFixed(1) + ')"><circle r="5"/><text y="20">' + esc(o.zone.name || "") + "</text></g>"; }
@@ -123,16 +124,22 @@
   function mount(el) {
     var o = specs[el.dataset.tmap]; if (!o || el._m) return; el._m = 1; el._tiles = {};
     viewFor(o, el); draw(el);
-    var ptrs = {}, start = null, pinch = null, moved = 0, lastTap = 0;
+    var ptrs = {}, start = null, pinch = null, moved = 0, lastTap = 0, grab = -1;
+    /* an editable area: a corner under the finger is dragged instead of the map */
+    function vertexAt(cx, cy) { if (!o.edit || !o.onDrag) return -1; var v = SF.state.tmv[o.key], rc = el.getBoundingClientRect(), ox = wx(v.lng, v.z) - rc.width / 2, oy = wy(v.lat, v.z) - rc.height / 2, best = -1, bd = 22;
+      o.edit().forEach(function (p, i) { var d = Math.hypot(wx(p.lng, v.z) - ox - (cx - rc.left), wy(p.lat, v.z) - oy - (cy - rc.top)); if (d < bd) { bd = d; best = i; } }); return best; }
+    function llAt(cx, cy) { var v = SF.state.tmv[o.key], rc = el.getBoundingClientRect(); return { lng: lngOf(wx(v.lng, v.z) - rc.width / 2 + cx - rc.left, v.z), lat: latOf(wy(v.lat, v.z) - rc.height / 2 + cy - rc.top, v.z) }; }
     el.addEventListener("pointerdown", function (e) {
       if (e.target.closest(".tm-zoom") || e.target.closest("[data-tlayer]")) return;
       el.setPointerCapture && el.setPointerCapture(e.pointerId); ptrs[e.pointerId] = { x: e.clientX, y: e.clientY };
+      if (Object.keys(ptrs).length === 1) { grab = vertexAt(e.clientX, e.clientY); if (grab >= 0) { moved = 0; start = null; el.classList.add("vdrag"); return; } }
       var ids = Object.keys(ptrs), v = SF.state.tmv[o.key];
       if (ids.length === 1) { start = { x: e.clientX, y: e.clientY, cx: wx(v.lng, v.z), cy: wy(v.lat, v.z) }; moved = 0; el.classList.add("drag"); }
       else if (ids.length === 2) { var a = ptrs[ids[0]], b = ptrs[ids[1]]; pinch = { d: Math.hypot(a.x - b.x, a.y - b.y) }; }
     });
     el.addEventListener("pointermove", function (e) {
       if (!ptrs[e.pointerId]) return; ptrs[e.pointerId] = { x: e.clientX, y: e.clientY };
+      if (grab >= 0) { moved = 5; o.onDrag(grab, llAt(e.clientX, e.clientY)); if (!el._raf) el._raf = requestAnimationFrame(function () { el._raf = 0; draw(el); }); return; }
       var ids = Object.keys(ptrs), v = SF.state.tmv[o.key];
       if (pinch && ids.length === 2) { var a = ptrs[ids[0]], b = ptrs[ids[1]], r = Math.hypot(a.x - b.x, a.y - b.y) / pinch.d;
         if (r > 1.45 || r < 0.69) { var rc = el.getBoundingClientRect(); zoomBy(el, r > 1 ? 1 : -1, (a.x + b.x) / 2 - rc.left, (a.y + b.y) / 2 - rc.top); pinch.d = Math.hypot(a.x - b.x, a.y - b.y); start = null; } return; }
@@ -142,11 +149,12 @@
     });
     function up(e) {
       if (!ptrs[e.pointerId]) return; delete ptrs[e.pointerId]; el.classList.remove("drag");
+      if (grab >= 0) { var g0 = grab; grab = -1; el.classList.remove("vdrag"); if (o.onDragEnd) o.onDragEnd(g0, moved > 4); draw(el); return; }
       if (Object.keys(ptrs).length < 2) pinch = null;
       if (!Object.keys(ptrs).length) {
         if (moved > 4) settle(el);
         else if (start && e.type === "pointerup") { var now = Date.now(), rc = el.getBoundingClientRect();
-          if (now - lastTap < 320) zoomBy(el, 1, e.clientX - rc.left, e.clientY - rc.top);
+          if (now - lastTap < 320 && !o.edit) zoomBy(el, 1, e.clientX - rc.left, e.clientY - rc.top);
           else if (o.onTap) { var v0 = SF.state.tmv[o.key]; o.onTap({ lng: lngOf(wx(v0.lng, v0.z) - rc.width / 2 + e.clientX - rc.left, v0.z), lat: latOf(wy(v0.lat, v0.z) - rc.height / 2 + e.clientY - rc.top, v0.z) }); draw(el); }
           else if (o.picker) { // single tap: move the pin to the tapped spot
             var v = SF.state.tmv[o.key]; v.lng = lngOf(wx(v.lng, v.z) + (e.clientX - rc.left - rc.width / 2), v.z); v.lat = latOf(wy(v.lat, v.z) + (e.clientY - rc.top - rc.height / 2), v.z); clampView(o, v); draw(el); settle(el); }

@@ -362,14 +362,17 @@
       if (b.pickup && !b.dineIn) { if (!r.pickup) E(409, "NO_PICKUP"); km = 0; fee = 0; }
       else if (typeof a.lat === "number" && typeof a.lng === "number") { var city = cityOf(r.cityId); var zk = Rules.distanceKm(city, a), zmax = db.settings.zoneKm || 5;
         /* the area the admin drew on the map; without one — a circle of zoneKm around the shop */
-        if (r.zone && r.zone.length >= 3) { if (!Rules.inPolygon(a, r.zone)) E(422, "OUT_OF_AREA"); }   // the restaurant's own area, drawn by the admin
+        var part = null;
+        if (r.zone && r.zone.length >= 3) { if (!Rules.inPolygon(a, r.zone)) E(422, "OUT_OF_AREA"); part = Rules.zonePartOf(a, r.zone); }   // the restaurant's own area, drawn by the admin
         else { zk = Rules.distanceKm(r, a); if (zk > zmax) E(422, "OUT_OF_ZONE", { km: Math.round(zk * 10) / 10, max: zmax }); }   /* no drawn area: a circle of zoneKm around the shop */
-        km = Math.round(Rules.distanceKm(r, a) * 10) / 10; fee = Rules.deliveryFee(db.settings, km) + heavy; }
+        km = Math.round(Rules.distanceKm(r, a) * 10) / 10;
+        /* a part (village) with its own price: that price, plus rain and weight surcharges */
+        fee = (part && part.fee != null ? part.fee + (db.settings.weatherOn ? db.settings.weatherFee || 0 : 0) : Rules.deliveryFee(db.settings, km)) + heavy; var areaName = part && part.name || null; }
       var discount = 0, promo = null;
       if (b.promoCode) { promo = db.promos.filter(function (p) { return p.code === str(b.promoCode).toUpperCase(); })[0]; var pd = Rules.promoDiscount(promo, subtotal, clock()); if (!pd.ok) E(409, pd.code, { min: pd.min }); discount = pd.discount; }
       /* bonus points: up to maxPct of the goods, never more than the customer has */
       var lo = loyalty(), bonusAvail = req && req.user && req.user.role === "customer" && lo.on && !b.dineIn ? Math.min(bonusOf(req.user), Math.floor(subtotal * lo.maxPct / 100), subtotal - discount) : 0, bonusUsed = b.useBonus ? bonusAvail : 0;
-      return { sched: sched, bonusAvail: bonusAvail, bonusUsed: bonusUsed, tooHeavy: (setting("maxOrderKg") && weightKg > setting("maxOrderKg") && !(b.pickup && !b.dineIn)) ? setting("maxOrderKg") : 0, restaurant: r, items: items, weightKg: weightKg, heavyFee: fee == null ? 0 : heavy, subtotal: subtotal, km: km, deliveryFee: fee, discount: discount, promo: promo, total: subtotal - discount - bonusUsed + (fee || 0) };
+      return { areaName: typeof areaName === "undefined" ? null : areaName, sched: sched, bonusAvail: bonusAvail, bonusUsed: bonusUsed, tooHeavy: (setting("maxOrderKg") && weightKg > setting("maxOrderKg") && !(b.pickup && !b.dineIn)) ? setting("maxOrderKg") : 0, restaurant: r, items: items, weightKg: weightKg, heavyFee: fee == null ? 0 : heavy, subtotal: subtotal, km: km, deliveryFee: fee, discount: discount, promo: promo, total: subtotal - discount - bonusUsed + (fee || 0) };
     }
 
     /* ---------- auth ---------- */
@@ -563,7 +566,7 @@
       var r = Rules.promoDiscount(p, Number(b.subtotal) || 0, clock()); if (!r.ok) E(409, r.code, { min: r.min }); return { code: p.code, discount: r.discount, type: p.type, value: p.value }; });
 
     /* ---------- customer ---------- */
-    route("POST", "/orders/quote", ["customer"], function (req, b) { var q = quote(req, b); return { subtotal: q.subtotal, km: q.km, deliveryFee: q.deliveryFee, weightKg: q.weightKg, heavyFee: q.heavyFee, tooHeavy: q.tooHeavy, discount: q.discount, bonusAvail: q.bonusAvail, bonusUsed: q.bonusUsed, scheduledAt: q.sched, total: q.total }; });
+    route("POST", "/orders/quote", ["customer"], function (req, b) { var q = quote(req, b); return { subtotal: q.subtotal, km: q.km, areaName: q.areaName, deliveryFee: q.deliveryFee, weightKg: q.weightKg, heavyFee: q.heavyFee, tooHeavy: q.tooHeavy, discount: q.discount, bonusAvail: q.bonusAvail, bonusUsed: q.bonusUsed, scheduledAt: q.sched, total: q.total }; });
     route("POST", "/orders", ["customer"], function (req, b) {
       /* a second tap on "Order" within 20 s with the same basket returns the order already made */
       var sig = JSON.stringify([b.restaurantId, (b.items || []).map(function (i) { return [i.productId, i.qty]; }), b.paymentMethod]);
@@ -1299,10 +1302,12 @@
     route("POST", "/admin/cities", ["admin"], function (req, b) { var n = str(b.name, 40), la = Number(b.lat), ln = Number(b.lng); if (n.length < 2) E(400, "BAD_NAME");
       if (!(la > 36 && la < 41.5 && ln > 67 && ln < 75.5)) E(400, "BAD_COORDS"); var c = { id: id("c"), name: L(n), lat: la, lng: ln, active: true }; db.cities.push(c); save(); return c; });
     /* the delivery area of a town: points the admin taps on the map (3–200); an empty list goes back to the circle */
+    /* the first corner of each part carries its name and its own delivery price */
+    function partMeta(q, x, head) { if (!head) return; var n = str(x.n, 40); if (n) q.n = n; if (x.fee !== "" && x.fee != null && isFinite(Number(x.fee))) { var f = Math.round(Number(x.fee)); if (f < 0 || f > 1000) E(400, "BAD_ZONE"); q.fee = f; } }
     function setZone(o, b) { var pts = Array.isArray(b.zone) ? b.zone : [];
       if (!pts.length) { delete o.zone; save(); return; }
       if (pts.length < 3 || pts.length > 600) E(400, "BAD_ZONE");
-      o.zone = pts.map(function (x, i) { var la = Number(x.lat), ln = Number(x.lng); if (!(isFinite(la) && isFinite(ln) && Math.abs(la) < 90 && Math.abs(ln) < 180) || Rules.distanceKm(o, { lat: la, lng: ln }) > 60) E(400, "BAD_ZONE"); var q = { lat: Math.round(la * 1e6) / 1e6, lng: Math.round(ln * 1e6) / 1e6 }; if (x.cut && i) q.cut = 1; return q; });
+      o.zone = pts.map(function (x, i) { var la = Number(x.lat), ln = Number(x.lng); if (!(isFinite(la) && isFinite(ln) && Math.abs(la) < 90 && Math.abs(ln) < 180) || Rules.distanceKm(o, { lat: la, lng: ln }) > 60) E(400, "BAD_ZONE"); var q = { lat: Math.round(la * 1e6) / 1e6, lng: Math.round(ln * 1e6) / 1e6 }; if (x.cut && i) q.cut = 1; partMeta(q, x, !i || x.cut); return q; });
       if (Rules.zoneParts(o.zone).some(function (x) { return x.length < 3; }) || Rules.zoneParts(o.zone).length > 12) E(400, "BAD_ZONE");
       save(); }
     route("POST", "/admin/cities/:id/zone", ["admin"], function (req, b, q, p) { var c = find(db.cities, p.id); if (!c) E(404, "NOT_FOUND"); setZone(c, b); return c; });
