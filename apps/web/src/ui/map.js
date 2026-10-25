@@ -90,9 +90,10 @@
     function P(p) { return { x: wx(p.lng, z) - ox, y: wy(p.lat, z) - oy }; }
     var g = "";
     var pd = function (pts, close) { return pts.map(function (p, i) { var q = P(p); return (i ? "L" : "M") + q.x.toFixed(1) + " " + q.y.toFixed(1); }).join("") + (close ? "Z" : ""); };
-    if (o.edit) { var ep = o.edit(); if (ep.length) g += '<path class="tm-zone tm-edit" d="' + pd(ep, ep.length > 2) + '"/>' + ep.map(function (p, i) { var q = P(p); return '<circle class="tm-vx' + (i === ep.length - 1 ? " last" : "") + '" cx="' + q.x.toFixed(1) + '" cy="' + q.y.toFixed(1) + '" r="7"/>'; }).join(""); }
+    var parts = function (pts) { return window.SomonRules && SomonRules.zoneParts ? SomonRules.zoneParts(pts) : [pts]; };
+    if (o.edit) { var ep = o.edit(); if (ep.length) g += parts(ep).map(function (pp) { return '<path class="tm-zone tm-edit" d="' + pd(pp, pp.length > 2) + '"/>'; }).join("") + ep.map(function (p, i) { var q = P(p); return '<circle class="tm-vx' + (i === ep.length - 1 ? " last" : "") + '" cx="' + q.x.toFixed(1) + '" cy="' + q.y.toFixed(1) + '" r="7"/>'; }).join(""); }
     if (o.zone) { var zc = P(o.zone), r = o.zone.km * 1000 / mpp(o.zone.lat, z);
-      g += (o.zone.poly ? '<path class="tm-zone" d="' + pd(o.zone.poly, true) + '"/>' : '<circle class="tm-zone" cx="' + zc.x.toFixed(1) + '" cy="' + zc.y.toFixed(1) + '" r="' + r.toFixed(1) + '"/>') +
+      g += (o.zone.poly ? parts(o.zone.poly).map(function (pp) { return '<path class="tm-zone" d="' + pd(pp, true) + '"/>'; }).join("") : '<circle class="tm-zone" cx="' + zc.x.toFixed(1) + '" cy="' + zc.y.toFixed(1) + '" r="' + r.toFixed(1) + '"/>') +
         '<g class="tm-center" transform="translate(' + zc.x.toFixed(1) + "," + zc.y.toFixed(1) + ')"><circle r="5"/><text y="20">' + esc(o.zone.name || "") + "</text></g>"; }
     if (o.route && o.route[0] && o.route[1] && o.route[1].lat != null) { var a = P(o.route[0]), b = P(o.route[1]), mx = (a.x + b.x) / 2, my = Math.min(a.y, b.y) - Math.min(60, Math.abs(a.x - b.x) / 4 + 12);
       g += '<path class="m-route" d="M' + a.x.toFixed(1) + " " + a.y.toFixed(1) + " Q " + mx.toFixed(1) + " " + my.toFixed(1) + " " + b.x.toFixed(1) + " " + b.y.toFixed(1) + '"/>'; }

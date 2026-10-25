@@ -1099,7 +1099,7 @@
       var r = { id: rid, areaId: null, kind: b.kind === "shop" ? "shop" : "food", shopType: b.kind === "shop" ? (SHOP_TYPES.indexOf(b.shopType) >= 0 ? b.shopType : "general") : undefined, pinned: !!b.pinned, pickup: b.kind === "shop" ? b.pickup !== false : !!b.pickup, name: L(name), cityId: city.id, ownerId: owner.id, cuisine: L(str(b.cuisine, 60) || "—"), tone: "#FFE3CC", eta: "30–45", rating: null, ratingCount: 0, hours: { from: "09:00", to: "22:00" }, open: false, active: true, commissionPct: com, minOrder: 20, lat: hasPin ? la : city.lat + 0.004, lng: hasPin ? ln : city.lng - 0.004, address: L(str(b.address, 80)), phone: phone, createdAt: clock() };
       if (["platform", "own", "mixed"].indexOf(b.delivery) >= 0) r.delivery = b.delivery;
       /* where the restaurant delivers — drawn by the admin on the map (optional) */
-      if (Array.isArray(b.zone) && b.zone.length) { if (b.zone.length < 3 || b.zone.length > 200) E(400, "BAD_ZONE"); r.zone = b.zone.map(function (x) { var a1 = Number(x.lat), a2 = Number(x.lng); if (!(isFinite(a1) && isFinite(a2)) || Rules.distanceKm(hasPin ? { lat: la, lng: ln } : city, { lat: a1, lng: a2 }) > 60) E(400, "BAD_ZONE"); return { lat: Math.round(a1 * 1e6) / 1e6, lng: Math.round(a2 * 1e6) / 1e6 }; }); }
+      if (Array.isArray(b.zone) && b.zone.length) { if (b.zone.length < 3 || b.zone.length > 600) E(400, "BAD_ZONE"); r.zone = b.zone.map(function (x, zi) { var a1 = Number(x.lat), a2 = Number(x.lng); if (!(isFinite(a1) && isFinite(a2)) || Rules.distanceKm(hasPin ? { lat: la, lng: ln } : city, { lat: a1, lng: a2 }) > 60) E(400, "BAD_ZONE"); var q = { lat: Math.round(a1 * 1e6) / 1e6, lng: Math.round(a2 * 1e6) / 1e6 }; if (x.cut && zi) q.cut = 1; return q; }); if (Rules.zoneParts(r.zone).some(function (x) { return x.length < 3; })) E(400, "BAD_ZONE"); }
       /* access: a free trial of N days, or N paid months (1–12) */
       db.subs = db.subs || [];
       if (b.months == null && b.trialDays == null) { r.paidUntil = null; r.trial = false; }
@@ -1301,8 +1301,9 @@
     /* the delivery area of a town: points the admin taps on the map (3–200); an empty list goes back to the circle */
     function setZone(o, b) { var pts = Array.isArray(b.zone) ? b.zone : [];
       if (!pts.length) { delete o.zone; save(); return; }
-      if (pts.length < 3 || pts.length > 200) E(400, "BAD_ZONE");
-      o.zone = pts.map(function (x) { var la = Number(x.lat), ln = Number(x.lng); if (!(isFinite(la) && isFinite(ln) && Math.abs(la) < 90 && Math.abs(ln) < 180) || Rules.distanceKm(o, { lat: la, lng: ln }) > 60) E(400, "BAD_ZONE"); return { lat: Math.round(la * 1e6) / 1e6, lng: Math.round(ln * 1e6) / 1e6 }; });
+      if (pts.length < 3 || pts.length > 600) E(400, "BAD_ZONE");
+      o.zone = pts.map(function (x, i) { var la = Number(x.lat), ln = Number(x.lng); if (!(isFinite(la) && isFinite(ln) && Math.abs(la) < 90 && Math.abs(ln) < 180) || Rules.distanceKm(o, { lat: la, lng: ln }) > 60) E(400, "BAD_ZONE"); var q = { lat: Math.round(la * 1e6) / 1e6, lng: Math.round(ln * 1e6) / 1e6 }; if (x.cut && i) q.cut = 1; return q; });
+      if (Rules.zoneParts(o.zone).some(function (x) { return x.length < 3; }) || Rules.zoneParts(o.zone).length > 12) E(400, "BAD_ZONE");
       save(); }
     route("POST", "/admin/cities/:id/zone", ["admin"], function (req, b, q, p) { var c = find(db.cities, p.id); if (!c) E(404, "NOT_FOUND"); setZone(c, b); return c; });
     /* each restaurant can have its own delivery area: "this kitchen delivers up to here" */

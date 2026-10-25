@@ -91,4 +91,11 @@ t('тўлов: ҳамён, корт, нақд — алоҳида ёқиб-ўчи
   ok(call('PATCH', '/admin/settings', { payCash: true, payWallet: true, payCardTr: true }, A)); assert.equal(ok(call('GET', '/settings/public')).cardTrEnabled, true); });
 t('админ: фармоиши пешакӣ танзимоти', () => { ok(call('PATCH', '/admin/loyalty', { schedLeadMin: 60 }, A)); assert.equal(ok(call('GET', '/settings/public')).loyalty.schedLeadMin, 60);
   err(call('PATCH', '/admin/loyalty', { schedDays: 99 }, A), 'BAD_VALUE'); ok(call('PATCH', '/admin/loyalty', { schedLeadMin: 40 }, A)); });
+t('минтақа: бир неча алоҳида қисм (деҳалар), орасидаги дашт кирмайди', () => {
+  const two = [{ lat: 37.21, lng: 68.04 }, { lat: 37.21, lng: 68.06 }, { lat: 37.19, lng: 68.05 }, { lat: 37.31, lng: 68.04, cut: 1 }, { lat: 37.31, lng: 68.06 }, { lat: 37.29, lng: 68.05 }];
+  assert.ok(Rules.inPolygon({ lat: 37.205, lng: 68.05 }, two)); assert.ok(Rules.inPolygon({ lat: 37.305, lng: 68.05 }, two)); assert.ok(!Rules.inPolygon({ lat: 37.25, lng: 68.05 }, two));
+  const r = ok(call('POST', '/admin/restaurants/r1/zone', { zone: two }, A)); assert.equal(r.zone.filter(x => x.cut).length, 1);
+  err(call('POST', '/admin/restaurants/r1/zone', { zone: two.slice(0, 5) }, A), 'BAD_ZONE');
+  ok(call('POST', '/admin/restaurants/r1/zone', { zone: [] }, A)); });
+
 console.log(`\n${pass} tests passed`);
