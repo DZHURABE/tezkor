@@ -170,7 +170,7 @@
         /* a known number: how many orders this customer has already received — new or regular */
         customer: cu ? { id: cu.id, name: cu.name, phone: cu.phone, verified: !!cu.phoneVerified, orders: db.orders.filter(function (x) { return x.customerId === cu.id && x.status === "delivered" && x.id !== o.id; }).length } : null,
         courier: co ? Object.assign({ id: co.id, name: co.name, phone: co.phone, vehicle: co.courier.vehicle }, courierRating(co)) : null,
-        courierPos: courierPos(o), waiter: wOf(o) });
+        courierPos: courierPos(o), waiter: wOf(o), claims: claimsOf(o.id).map(pubClaim) });
       /* phone numbers are shared only while they are needed: during an active order, between the people working on it */
       var live = Rules.ACTIVE.indexOf(o.status) >= 0, role = viewer && (o.customerId === viewer.id ? "customer" : viewer.role);   // a courier looking at his own purchase sees it as a customer
       if (role !== "admin") {
@@ -340,7 +340,7 @@
       var vs = p.variants || [], v = null;
       if (vs.length) { v = vs.filter(function (x) { return x.id === vid; })[0]; if (!v) E(400, "VARIANT_REQUIRED", { name: p.name }); if (v.available === false || v.stock === 0) E(409, "PRODUCT_UNAVAILABLE", { name: nameV(p.name, v.label) }); if (v.stock != null && q > v.stock) E(409, "OUT_OF_STOCK", { name: nameV(p.name, v.label), left: v.stock }); }
       else if (p.stock != null && q > p.stock) E(409, "OUT_OF_STOCK", { name: p.name, left: p.stock });
-      return { unitKg: v ? kgOf(v.label) : kgOf(p.weight), productId: v ? p.id + "~" + v.id : p.id, baseId: p.id, variantId: v ? v.id : null, variant: v ? v.label : null, name: v ? nameV(p.name, v.label) : p.name, price: v ? v.price : p.price, qty: q, kind: p.kind, photo: p.photo && p.photo.charAt(0) === "/" ? p.photo : null }; }
+      return { unitKg: v ? kgOf(v.label) : kgOf(p.weight), productId: v ? p.id + "~" + v.id : p.id, baseId: p.id, variantId: v ? v.id : null, variant: v ? v.label : null, name: v ? nameV(p.name, v.label) : p.name, price: v ? v.price : p.price, qty: q, kind: p.kind, photo: p.photo && p.photo.charAt(0) === "/" ? p.photo : null, warrantyMonths: p.warrantyMonths || undefined, returnDays: p.returnDays || undefined }; }
     function baseOf(it) { return find(db.products, it.baseId || it.productId); }
     /* goods with a counted stock leave the shelf (sizes count separately) and come back when the order is cancelled */
     function stockMove(it, dir) { var pr = baseOf(it); if (!pr) return false;
@@ -630,6 +630,27 @@
     route("GET", "/orders/my", ["customer"], function (req) { return by(db.orders, "customerId", req.user.id).map(function (o) { return pubOrder(o, req.user); }); });
     route("GET", "/orders/:id", "*", function (req, b, q, p) { return pubOrder(orderFor(req, p.id), req.user); });
     route("POST", "/orders/:id/cancel", ["customer"], function (req, b, q, p) { var o = orderFor(req, p.id); if (o.customerId !== req.user.id && req.user.role !== "customer") E(403, "FORBIDDEN"); setStatus(o, "cancelled", { id: req.user.id, role: "customer" });   /* a courier cancels his own purchase as a buyer */ save(); return pubOrder(o, req.user); });
+    /* guarantee and return: the customer asks the shop about one article of a delivered order, while the promise lasts */
+    function claimsList() { return db.claims || (db.claims = []); }
+    function claimsOf(oid) { return (db.claims || []).filter(function (c) { return c.orderId === oid; }); }
+    function pubClaim(c) { return { id: c.id, orderId: c.orderId, number: c.number, productId: c.productId, name: c.name, kind: c.kind, text: c.text, status: c.status, answer: c.answer || null, at: c.at, doneAt: c.doneAt || null }; }
+    function claimUntil(o, it, kind) { var d = kind === "return" ? it.returnDays : it.warrantyMonths ? it.warrantyMonths * 30 : 0; return d ? (o.deliveredAt || o.updatedAt) + d * 864e5 : 0; }
+    route("POST", "/orders/:id/claim", ["customer"], function (req, b, q, p) { var o = orderFor(req, p.id);
+      if (o.status !== "delivered") E(409, "NOT_DELIVERED"); var kind = b.kind === "return" ? "return" : b.kind === "warranty" ? "warranty" : null; if (!kind) E(400, "BAD_CLAIM");
+      var it = o.items.filter(function (x) { return x.productId === b.productId; })[0]; if (!it) E(404, "NOT_FOUND");
+      var until = claimUntil(o, it, kind); if (!until) E(409, "NO_GUARANTEE"); if (clock() > until) E(409, "CLAIM_EXPIRED");
+      var text = str(b.text, 300); if (text.length < 3) E(400, "BAD_CLAIM");
+      if (claimsOf(o.id).some(function (c) { return c.productId === it.productId && c.status === "open"; })) E(409, "CLAIM_OPEN");
+      var c = { id: id("cl"), orderId: o.id, number: o.number, restaurantId: o.restaurantId, customerId: o.customerId, productId: it.productId, name: it.name, qty: it.qty, price: it.price, kind: kind, text: text, status: "open", at: clock() };
+      claimsList().unshift(c); if (db.claims.length > 2000) db.claims.length = 2000;
+      notify("rest:" + o.restaurantId, kind === "return" ? "n.claimRet" : "n.claimWar", { n: o.number, name: tx0(it.name) }, o.id); save(); return pubOrder(o, req.user); });
+    function tx0(n) { return n && typeof n === "object" ? n.ru || n.tg || n.en || "" : String(n || ""); }
+    route("GET", "/restaurant/claims", ["restaurant"], function (req) { var r = myRest(req);
+      return claimsList().filter(function (c) { return c.restaurantId === r.id; }).slice(0, 200).map(function (c) { var cu = find(db.users, c.customerId); return Object.assign(pubClaim(c), { qty: c.qty, price: c.price, customer: cu ? { name: cu.name, phone: cu.phone } : null }); }); });
+    route("POST", "/restaurant/claims/:id", ["restaurant"], function (req, b, q, p) { var r = myRest(req), c = claimsList().filter(function (x) { return x.id === p.id && x.restaurantId === r.id; })[0]; if (!c) E(404, "NOT_FOUND");
+      var st = b.status === "done" ? "done" : b.status === "rejected" ? "rejected" : null; if (!st) E(400, "BAD_CLAIM");
+      c.status = st; c.answer = str(b.answer, 200) || null; c.doneAt = clock();
+      notify("u:" + c.customerId, st === "done" ? "n.claimDone" : "n.claimNo", { n: c.number, name: tx0(c.name) }, c.orderId); save(); return pubClaim(c); });
     route("POST", "/orders/:id/review", ["customer"], function (req, b, q, p) {
       var o = orderFor(req, p.id); applyReview(o, b); save(); return pubOrder(o, req.user); });
     /* one review: the restaurant (stars), the courier or the waiter (stars), and each dish (👍 / 👎) — liked dishes rise in «Popular» */
@@ -916,6 +937,9 @@
       /* when the dish is shown first on the home screen: breakfast / lunch / dinner / night (empty = guessed from the dish) */
       if (b.meals != null) x.meals = (Array.isArray(b.meals) ? b.meals : []).filter(function (m, i, a) { return ["b", "l", "d", "n"].indexOf(m) >= 0 && a.indexOf(m) === i; });
       if (b.oldPrice !== undefined) { var op = b.oldPrice ? int(b.oldPrice) : null; if (op !== null && !(op >= 1 && op <= 500000)) E(400, "BAD_PRICE"); x.oldPrice = op; }
+      /* the shop's own promise for this article: a guarantee (months) and a right to return it (days); empty = none */
+      if (b.warrantyMonths !== undefined) { var wm = b.warrantyMonths === null || b.warrantyMonths === "" ? 0 : int(b.warrantyMonths); if (!(wm >= 0 && wm <= 120)) E(400, "BAD_WARRANTY"); x.warrantyMonths = wm || null; }
+      if (b.returnDays !== undefined) { var rd = b.returnDays === null || b.returnDays === "" ? 0 : int(b.returnDays); if (!(rd >= 0 && rd <= 90)) E(400, "BAD_WARRANTY"); x.returnDays = rd || null; }
       return x;
     }
     /* purchase price and minimum stock never leave the shop's own screens */

@@ -109,4 +109,21 @@ t('минтақа: ҳар бир қисмнинг ўз етказиш нархи
   err(q(la + 0.025, ln), 'OUT_OF_AREA');
   ok(call('POST', '/admin/restaurants/r1/zone', { zone: [] }, A)); });
 
+t('кафолат ва баргардонидан: мол учун ёқилади, мижоз сўров юборади, дўкон ҳал қилади', () => {
+  ok(call('PATCH', '/restaurant/products/r1p2', { warrantyMonths: 12, returnDays: 7 }, R1));
+  const one = [{ productId: 'r1p2', qty: 3 }];
+  const o = ok(call('POST', '/orders', { restaurantId: 'r1', items: one, address: addr, paymentMethod: 'cash', comment: 'gw' }, friend));
+  err(call('POST', `/orders/${o.id}/claim`, { productId: 'r1p2', kind: 'return', text: 'не подошло' }, friend), 'NOT_DELIVERED');
+  deliver(o.id);
+  err(call('POST', `/orders/${o.id}/claim`, { productId: 'r1p2', kind: 'return', text: '' }, friend), 'BAD_CLAIM');
+  const o2 = ok(call('POST', `/orders/${o.id}/claim`, { productId: 'r1p2', kind: 'return', text: 'не подошло' }, friend)); assert.equal(o2.claims.length, 1);
+  err(call('POST', `/orders/${o.id}/claim`, { productId: 'r1p2', kind: 'warranty', text: 'сломалось' }, friend), 'CLAIM_OPEN');
+  const list = ok(call('GET', '/restaurant/claims', null, R1)); assert.equal(list[0].kind, 'return'); assert.ok(list[0].customer.phone);
+  ok(call('POST', `/restaurant/claims/${list[0].id}`, { status: 'done' }, R1));
+  now += 8 * 864e5; err(call('POST', `/orders/${o.id}/claim`, { productId: 'r1p2', kind: 'return', text: 'ещё раз' }, friend), 'CLAIM_EXPIRED');
+  ok(call('POST', `/orders/${o.id}/claim`, { productId: 'r1p2', kind: 'warranty', text: 'сломалось' }, friend));
+  now -= 8 * 864e5; ok(call('PATCH', '/restaurant/products/r1p2', { warrantyMonths: null, returnDays: null }, R1));
+  const o3 = ok(call('POST', '/orders', { restaurantId: 'r1', items: one, address: addr, paymentMethod: 'cash', comment: 'gw2' }, friend)); deliver(o3.id);
+  err(call('POST', `/orders/${o3.id}/claim`, { productId: 'r1p2', kind: 'return', text: 'не подошло' }, friend), 'NO_GUARANTEE'); });
+
 console.log(`\n${pass} tests passed`);

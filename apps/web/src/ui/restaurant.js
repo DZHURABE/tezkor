@@ -343,6 +343,9 @@
       '<label class="f">' + t("menu.name") + '<input name="name" required maxlength="60" value="' + esc(tx(p.name)) + '" placeholder="' + sCfg().ph + '"></label>' +
       '<label class="f">' + t("menu.category") + '<select name="categoryId">' + myCats().map(function (c) { return '<option value="' + c.id + '"' + (c.id === p.categoryId ? " selected" : "") + ">" + esc(tx(c.name)) + "</option>"; }).join("") + "</select></label>" +
       varBox(p) + '<label class="f vplain">' + t("menu.price") + '<input name="price" inputmode="numeric"' + (vs.length ? "" : " required") + ' value="' + esc(p.price) + '"></label>' +
+      /* the shop's own promise for this article — only where the owner wants it */
+      '<div class="gwbox"><b>' + I("shield", 16) + " " + t("gw.title") + '</b><p class="fine">' + t("gw.hint") + '</p><div class="grid2"><label class="f">' + t("gw.warranty") + '<input name="warrantyMonths" inputmode="numeric" maxlength="3" value="' + esc(p.warrantyMonths || "") + '" placeholder="' + t("gw.none") + '"></label>' +
+        '<label class="f">' + t("gw.return") + '<input name="returnDays" inputmode="numeric" maxlength="2" value="' + esc(p.returnDays || "") + '" placeholder="' + t("gw.none") + '"></label></div></div>' +
       '<details class="catmore"' + (many ? " open" : "") + "><summary>" + t("cf.more") + '</summary><div class="stack"><label class="f">' + t("menu.desc") + '<input name="desc" maxlength="140" value="' + esc(tx(p.desc)) + '"></label><div class="grid3"><label class="f">' + t("menu.oldPrice") + '<input name="oldPrice" inputmode="numeric" placeholder="' + t("menu.oldPriceHint") + '" value="' + esc(p.oldPrice || "") + '"></label>' +
       '<label class="f">' + t(sCfg().spec) + '<input name="weight" maxlength="20" value="' + esc(p.weight) + '" placeholder="' + sCfg().specPh + '"></label><label class="f">' + t("sh.stock") + '<input name="stock" inputmode="numeric" value="' + esc(p.stock == null ? "" : p.stock) + '" placeholder="' + t("sh.stockPh") + '"></label></div>' + catFields(p, true) +
       '<label class="check"><input type="checkbox" name="popular"' + (p.popular ? " checked" : "") + "><span>" + t("menu.popular") + "</span></label></div></details>"; }
@@ -393,6 +396,7 @@
   SF.forms.prod = function (fd, f) { var body = { name: fd.name, desc: fd.desc, price: Number(fd.price), weight: fd.weight, categoryId: fd.categoryId, kind: fd.kind, popular: !!fd.popular,
       oldPrice: fd.oldPrice ? Number(fd.oldPrice) : null, photo: SF.state.pphoto || null, meals: ["b", "l", "d", "n"].filter(function (m) { return fd["meal_" + m]; }) };
     if (isShopU()) { ["model", "barcode", "sku", "unit", "origin", "photoSource"].forEach(function (k) { body[k] = fd[k] || ""; }); ["cost", "minStock"].forEach(function (k) { var v = String(fd[k] || "").replace(/\D/g, ""); body[k] = v === "" ? null : Number(v); }); }
+    if (isShopU()) { ["warrantyMonths", "returnDays"].forEach(function (k) { var v = String(fd[k] || "").replace(/\D/g, ""); body[k] = v === "" ? null : Number(v); }); }
     if (isShopU()) { body.kind = "box"; body.brand = fd.brand || ""; body.stock = String(fd.stock || "").trim() === "" ? null : Number(String(fd.stock).replace(/\D/g, "")); }
     if (isShopU()) { var vr = Array.prototype.map.call(f.querySelectorAll(".vrow"), function (row) { var vs = row.querySelector("[data-vs]").value.replace(/\D/g, ""); return { id: row.querySelector("[data-vi]").value || undefined, label: row.querySelector("[data-vl]").value.trim(), price: Number(row.querySelector("[data-vp]").value.replace(/\D/g, "")), stock: vs === "" ? null : Number(vs) }; });
       body.variants = vr; if (vr.length) delete body.price; }
@@ -597,4 +601,19 @@
   SF.actions.possend = function () { var st = pos(), items = Object.keys(st.items).filter(function (k) { return st.items[k] > 0; }).map(function (k) { return { productId: k, qty: st.items[k] }; }); if (!items.length) return;
     return api().post("/restaurant/pos", { items: items, tableId: st.table || null, method: st.method }).then(function (o) { var tbl = st.table; SF.state.pos = { items: {}, method: st.method, q: "", table: "" };
       SF.toast(tbl ? t("pos.sent", { n: o.number }) : t("pos.sold", { sum: money(o.subtotal) })); if (tbl) SF.go("/rest/hall"); else SF.render({ quiet: true }); }); };
+
+  /* guarantee and return requests from customers */
+  R("/rest/claims", { title: "cl.nav", live: true, render: function () {
+    return api().get("/restaurant/claims").then(function (list) {
+      var open = list.filter(function (c) { return c.status === "open"; }), rest = list.filter(function (c) { return c.status !== "open"; });
+      var row = function (c) { return '<article class="card clcard cl-' + c.status + '"><header><b class="num">№' + c.number + '</b><span class="pill ' + (c.kind === "return" ? "p-warn" : "p-info") + '">' + I(c.kind === "return" ? "route" : "shield", 12) + t(c.kind === "return" ? "cl.return" : "cl.warranty") + '</span><small class="muted">' + SF.whenText(c.at) + "</small></header>" +
+        "<b>" + esc(SF.tx(c.name)) + (c.qty > 1 ? " × " + c.qty : "") + '</b><p class="muted">«' + esc(c.text) + "»</p>" +
+        (c.customer ? '<div class="hrow"><span class="grow">' + esc(c.customer.name) + ' · <span class="num">' + esc(SF.phone(c.customer.phone)) + "</span></span>" + SF.callBtn(c.customer.name, c.customer.phone, t("cl.call")) + "</div>" : "") +
+        (c.status === "open" ? '<div class="row2"><button class="btn ghost" data-act="clset" data-id="' + c.id + '" data-v="rejected">' + I("x", 16) + t("cl.no") + '</button><button class="btn ok" data-act="clset" data-id="' + c.id + '" data-v="done">' + I("check", 16) + t("cl.done") + "</button></div>"
+          : '<p class="fine">' + I(c.status === "done" ? "check" : "x", 14) + " " + t(c.status === "done" ? "cl.isDone" : "cl.isNo") + (c.answer ? " — " + esc(c.answer) : "") + "</p>") + "</article>"; };
+      return '<section class="card stack"><h2 class="h2">' + I("shield", 22) + " " + t("cl.nav") + '</h2><p class="muted">' + t("cl.sub") + "</p></section>" +
+        (list.length ? (open.length ? '<h3 class="sect">' + t("cl.open", { n: open.length }) + "</h3>" + open.map(row).join("") : "") + (rest.length ? '<h3 class="sect">' + t("cl.closed") + "</h3>" + rest.map(row).join("") : "") : '<section class="card empty"><p class="muted">' + t("cl.empty") + "</p></section>");
+    }); } });
+  SF.actions.clset = function (el) { var v = el.dataset.v, ans = v === "rejected" ? (window.prompt(t("cl.why")) || "") : "";
+    return api().post("/restaurant/claims/" + el.dataset.id, { status: v, answer: ans }).then(function () { SF.toast(t("btn.saved")); SF.render({ quiet: true }); }); };
 })();

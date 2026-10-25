@@ -36,10 +36,14 @@
     var q = SF.cart.qty(p.id), off = SF.sale(p);
     return '<div class="pcard' + (p.available ? "" : " off") + (compact ? " mini" : "") + '">' + favBtn("p", p.id) + '<button class="pimg' + (p.photo ? " hasph" : "") + '" style="--tone:' + esc(p.restaurant ? p.restaurant.tone : SF.state.tone || "#F2EFEA") + '" data-act="prod" data-id="' + p.id + '" aria-label="' + esc(tx(p.name)) + '">' + SF.pic(p, compact ? 92 : 118) +
       (off ? '<span class="chip sale">−' + off + "%</span>" : p.popular ? '<span class="chip hot">' + I("fire", 12) + t("prod.hit") + "</span>" : "") + "</button>" +
-      '<div class="pbody">' + (p.brand ? '<small class="pbrand">' + esc(p.brand) + "</small>" : "") + '<b class="pname">' + esc(tx(p.name)) + likeChip(p) + "</b>" + (p.stock != null && p.available && p.stock <= 5 ? '<span class="stockl">' + t("sh.left", { n: p.stock }) + "</span>" : "") + (compact && p.restaurant ? '<span class="pdesc">' + esc(tx(p.restaurant.name)) + "</span>" : '<span class="pdesc">' + esc(tx(p.desc)) + "</span>") +
+      '<div class="pbody">' + (p.brand ? '<small class="pbrand">' + esc(p.brand) + "</small>" : "") + '<b class="pname">' + esc(tx(p.name)) + likeChip(p) + "</b>" + (p.stock != null && p.available && p.stock <= 5 ? '<span class="stockl">' + t("sh.left", { n: p.stock }) + "</span>" : "") + gwChips(p, true) + (compact && p.restaurant ? '<span class="pdesc">' + esc(tx(p.restaurant.name)) + "</span>" : '<span class="pdesc">' + esc(tx(p.desc)) + "</span>") +
       '<div class="prow"><span class="price num">' + (hasV(p) ? '<small class="vfrom">' + t("var.from") + "</small> " : "") + money(p.price) + (off ? "<s>" + money(p.oldPrice) + "</s>" : "") + (p.weight && !hasV(p) ? '<small>' + esc(p.weight) + "</small>" : "") + "</span>" + (p.available ? (hasV(p) ? varBtn(p) : stepper(p, q)) : '<span class="pill p-mut">' + t("prod.soldout") + "</span>") + "</div></div></div>";
   }
   SF.prodCard = prodCard; SF.rememberProducts = remember;
+  /* «Guarantee 12 months» / «Return 14 days» — only on articles where the shop promised it */
+  function gwChips(p, small) { if (!p.warrantyMonths && !p.returnDays) return "";
+    return '<span class="gwchips' + (small ? " sm" : "") + '">' + (p.warrantyMonths ? '<span class="gwc w">' + I("shield", 12) + t(small ? "gw.wShort" : "gw.wLong", { n: p.warrantyMonths }) + "</span>" : "") + (p.returnDays ? '<span class="gwc r">' + I("route", 12) + t(small ? "gw.rShort" : "gw.rLong", { n: p.returnDays }) + "</span>" : "") + "</span>"; }
+  SF.gwChips = gwChips;
   SF.actions.brandf = function (el) { SF.state.brandF = { r: el.dataset.r, b: el.dataset.v }; SF.render({ quiet: true }); };
   SF.actions.fav = function (el) { var u = SF.state.user; if (!SF.isBuyer(u)) { SF.toast(t("fav.login"), "info"); SF.state.after = SF.path(); SF.go("/login"); return; }
     var on = !isFav(el.dataset.t, el.dataset.id); el.classList.toggle("on", on); el.setAttribute("aria-pressed", on);
@@ -229,7 +233,7 @@
     var tone = p.restaurant ? p.restaurant.tone : SF.state.tone || "#F2EFEA", cur = p;
     if (hasV(p)) { SF.state.vprod = p.id; var fv = p.variants.filter(function (x) { return x.available !== false && x.stock !== 0; })[0] || p.variants[0]; SF.state.vsel = fv.id; cur = cache[p.id + "~" + fv.id] || p; SF.state.mq = Math.min(SF.state.mq, cur.stock != null ? Math.max(1, cur.stock) : 50); }
     SF.modal('<button class="mx" data-act="closemodal" aria-label="' + t("btn.close") + '">' + I("x", 20) + '</button><div class="phero' + (p.photo ? " hasph" : "") + '" style="--tone:' + esc(tone) + '">' + SF.pic(p, 220) + "</div>" +
-      '<div class="pinfo"><h2 class="h2">' + esc(tx(p.name)) + '</h2><p class="muted">' + esc(tx(p.desc)) + "</p>" + (p.weight && !hasV(p) ? '<span class="chip">' + esc(p.weight) + "</span>" : "") + (hasV(p) ? vChips(p) : "") +
+      '<div class="pinfo"><h2 class="h2">' + esc(tx(p.name)) + '</h2><p class="muted">' + esc(tx(p.desc)) + "</p>" + (p.weight && !hasV(p) ? '<span class="chip">' + esc(p.weight) + "</span>" : "") + gwChips(p) + (p.warrantyMonths || p.returnDays ? '<p class="fine gwnote">' + I("info", 14) + " " + t("gw.how") + "</p>" : "") + (hasV(p) ? vChips(p) : "") +
       (p.available ? '<div class="pbuy"><div class="stepper big"><button data-act="mq" data-v="-1" aria-label="' + t("a.less") + '">' + I("minus", 18) + '</button><b class="num" id="mqv">' + SF.state.mq + '</b><button data-act="mq" data-v="1" aria-label="' + t("a.more") + '">' + I("plus", 18) + "</button></div>" +
         '<button class="btn primary grow" data-act="addmq" data-id="' + cur.id + '">' + t("prod.add") + ' · <span class="num" id="mqs">' + money(cur.price * SF.state.mq) + "</span></button></div>" : '<div class="msg err">' + t("prod.soldout") + "</div>") + "</div>", "prod");
   }
@@ -468,7 +472,7 @@
       var conf = fresh ? '<section class="card confirm2"><span class="okmark">' + I("check", 34) + '</span><div class="grow"><h1 class="h2">' + t("ok.title") + '</h1><p class="muted">' + (o.status === "scheduled" ? t("co.schedFor", { time: SF.whenText(o.scheduledAt) }) : t("ok.sub", { name: esc(tx(r.name)) })) + '</p></div><div class="onum"><small>' + t("ok.number") + '</small><b class="num">№' + o.number + "</b></div></section>" : "";
       var html = '<a class="backlink" href="#/orders">' + I("chevL", 18) + t("nav.orders") + "</a>" + conf + '<div class="two track"><div class="stack">' +
         (moving ? map + courierCard(o) + status : status + (fin ? "" : courierCard(o)) + map) +
-        (done && !o.review ? reviewForm(o) : "") + (o.review ? '<section class="card"><h3>' + t("rv.thanks") + "</h3>" + SF.stars(o.review.rating) + (o.review.comment ? '<p class="muted">«' + esc(o.review.comment) + "»</p>" : "") + "</section>" : "") +
+        (done ? claimCard(o) : "") + (done && !o.review ? reviewForm(o) : "") + (o.review ? '<section class="card"><h3>' + t("rv.thanks") + "</h3>" + SF.stars(o.review.rating) + (o.review.comment ? '<p class="muted">«' + esc(o.review.comment) + "»</p>" : "") + "</section>" : "") +
         '</div><div class="stack">' + timeline(o) +
         '<section class="card help"><h3>' + t("track.help") + '</h3><div class="hrow"><span class="grow"><b>' + esc(tx(r.name)) + '</b><small class="muted">' + t("track.callRest") + "</small></span>" + (fin || done ? "" : SF.callBtn(tx(r.name), r.phone, t("track.callRest"))) + "</div>" +
         '<div class="hrow"><span class="grow"><b>' + esc(SF.brand()) + '</b><small class="muted">' + t("foot.support") + "</small></span>" + SF.callBtn(SF.brand(), SF.state.pub.supportPhone, t("foot.support")) + "</div>" +
@@ -638,4 +642,20 @@
     });
   } });
   SF.after.push(function (m) { if (SF.state.justPlaced && !(m && m.params && m.params.id === SF.state.justPlaced)) SF.state.justPlaced = null; });
+
+  /* a delivered order: articles with a guarantee or a return right get their buttons while the promise lasts */
+  function claimCard(o) { var DAY = 864e5, base = o.deliveredAt || o.updatedAt, now = Date.now(), cl = o.claims || [];
+    var rows = o.items.filter(function (it) { return it.warrantyMonths || it.returnDays; }).map(function (it) {
+      var mine = cl.filter(function (c) { return c.productId === it.productId; }), openC = mine.filter(function (c) { return c.status === "open"; })[0];
+      var rU = it.returnDays ? base + it.returnDays * DAY : 0, wU = it.warrantyMonths ? base + it.warrantyMonths * 30 * DAY : 0, d = function (x) { var z = new Date(x); return ("0" + z.getDate()).slice(-2) + "." + ("0" + (z.getMonth() + 1)).slice(-2) + "." + z.getFullYear(); };
+      var btns = openC ? '<p class="msg info">' + I("clock", 14) + " " + t("cl.waiting") + "</p>" :
+        (rU > now ? '<button class="btn sm ghost" data-act="claim" data-o="' + o.id + '" data-p="' + esc(it.productId) + '" data-k="return">' + I("route", 14) + t("gw.btnRet", { d: d(rU) }) + "</button>" : "") +
+        (wU > now ? '<button class="btn sm ghost" data-act="claim" data-o="' + o.id + '" data-p="' + esc(it.productId) + '" data-k="warranty">' + I("shield", 14) + t("gw.btnWar", { d: d(wU) }) + "</button>" : "") ||
+        '<p class="fine">' + t("gw.over") + "</p>";
+      var hist = mine.filter(function (c) { return c.status !== "open"; }).map(function (c) { return '<p class="fine">' + I(c.status === "done" ? "check" : "x", 12) + " " + t(c.kind === "return" ? "cl.return" : "cl.warranty") + ": " + t(c.status === "done" ? "cl.isDone" : "cl.isNo") + (c.answer ? " — " + esc(c.answer) : "") + "</p>"; }).join("");
+      return '<div class="clrow"><b>' + esc(tx(it.name)) + '</b><div class="clbtns">' + btns + "</div>" + hist + "</div>"; });
+    return rows.length ? '<section class="card stack"><h3>' + I("shield", 18) + " " + t("gw.title") + "</h3>" + rows.join("") + "</section>" : ""; }
+  SF.actions.claim = function (el) { var k = el.dataset.k;
+    SF.modal('<button class="mx" data-act="closemodal" aria-label="' + t("btn.close") + '">' + I("x", 20) + '</button><form class="stack" data-form="claim" data-o="' + esc(el.dataset.o) + '" data-p="' + esc(el.dataset.p) + '" data-k="' + k + '"><h2 class="h2">' + t(k === "return" ? "cl.askRet" : "cl.askWar") + '</h2><p class="muted">' + t("cl.askSub") + '</p><label class="f">' + t("cl.reason") + '<textarea name="text" rows="3" maxlength="300" required placeholder="' + t(k === "return" ? "cl.phRet" : "cl.phWar") + '"></textarea></label><button class="btn primary block lg">' + I("check", 18) + t("cl.send") + "</button></form>"); };
+  SF.forms.claim = function (fd, f) { return api().post("/orders/" + f.dataset.o + "/claim", { productId: f.dataset.p, kind: f.dataset.k, text: fd.text }).then(function () { SF.closeModal(); SF.toast(t("cl.sent")); SF.render({ quiet: true }); }); };
 })();
