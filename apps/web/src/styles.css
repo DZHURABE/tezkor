@@ -2464,3 +2464,5 @@ body{font-size:15.5px;letter-spacing:-.005em;-webkit-font-smoothing:antialiased;
 .apppage{max-width:640px;margin:0 auto}
 .apphero{display:flex;gap:14px;align-items:center}
 .apppage .howto{margin:0;padding-left:20px;display:grid;gap:6px}
+.soundok{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:12px;background:var(--green-soft,#E3F3EA);color:var(--green-text,#0A7D4B);font-weight:700;font-size:13.5px}
+.soundok span{flex:1}

@@ -13,7 +13,11 @@
   function acked() { if (SF.state.ackedFor !== ackKey()) { SF.state.ackedFor = ackKey(); SF.state.acked = SF.ls.get(ackKey(), {}) || {}; } return SF.state.acked; }
   function ctx() { try { ac = ac || new (window.AudioContext || window.webkitAudioContext)(); if (ac.state === "suspended") ac.resume(); } catch (e) { ac = null; } return ac; }
   SF.soundOn = function () { return !!ac && ac.state === "running"; };
-  document.addEventListener("pointerdown", function () { if (ac && ac.state !== "running") ac.resume(); }, true);
+  /* browsers play sound only after the person has tapped once: the first tap anywhere opens the sound, quietly */
+  function unlock() { var u = SF.state.user; if (!u || !KEYS[roleOf(u)]) { if (ac && ac.state !== "running") ac.resume(); return; }
+    var a = ctx(); if (!a) return; try { var b = a.createBuffer(1, 1, 22050), s = a.createBufferSource(); s.buffer = b; s.connect(a.destination); s.start(0); } catch (e) {}
+    if (a.state === "running" && document.querySelector(".soundbar")) setTimeout(function () { document.querySelectorAll(".soundbar").forEach(function (x) { x.remove(); }); }, 200); }
+  document.addEventListener("pointerdown", unlock, true); document.addEventListener("keydown", unlock, true);
 
   /* bell: a sine with a soft overtone and a long decay, like a marimba/bell */
   function bell(a, out, freq, at, len, vol) {
@@ -81,11 +85,14 @@
   }
 
   /* called after every notifications poll */
+  /* the admin who runs his own shop rings like a shop */
+  function roleOf(u) { return u && u.role === "admin" && u.restaurantId ? "restaurant" : u && u.role; }
+  SF.alarmRole = roleOf;
   SF.alarmCheck = function (notes) {
-    var u = SF.state.user, keys = u && KEYS[u.role];
+    var u = SF.state.user, keys = u && KEYS[roleOf(u)];
     if (u && u.role === "courier") notes.filter(function (n) { return n.key === "n.ready" && !acked()[n.id]; }).forEach(function (n) { ack([n.id]); SF.chime(); });
     /* a guest at a table calls the waiter / asks for the bill */
-    if (u && u.role === "restaurant") notes.filter(function (n) { return (n.key === "n.waiter" || n.key === "n.bill") && !acked()[n.id]; }).forEach(function (n) { ack([n.id]); SF.chime(); });
+    if (roleOf(u) === "restaurant") notes.filter(function (n) { return (n.key === "n.waiter" || n.key === "n.bill") && !acked()[n.id]; }).forEach(function (n) { ack([n.id]); SF.chime(); });
     if (!keys) { if (cur) close(); return; }
     var pending = notes.filter(function (n) { return keys.indexOf(n.key) >= 0 && !acked()[n.id] && n.orderId; });
     if (u.role === "courier" && (!u.courier || !u.courier.online)) pending = [];
@@ -93,9 +100,9 @@
     if (busy || (cur && pending.some(function (n) { return n.orderId === cur.order.id; }))) return;
     busy = true;
     SF.api.get("/orders/" + pending[0].orderId).then(function (o) {
-      busy = false; var live = u.role === "courier" ? !o.courierId && (o.status === "cooking" || o.status === "ready") : o.status === "pending";
+      busy = false; var live = roleOf(u) === "courier" ? !o.courierId && (o.status === "cooking" || o.status === "ready") : o.status === "pending";
       if (!live) { ack(pending.filter(function (n) { return n.orderId === o.id; }).map(function (n) { return n.id; })); return; }
-      show(u.role, o, pending);
+      show(roleOf(u), o, pending);
     }).catch(function () { busy = false; ack([pending[0].id]); });
   };
 
@@ -111,12 +118,13 @@
 
   /* one tap turns sound (and notifications) on; the bar shows on partner screens until then */
   SF.soundBar = function () {
-    if (SF.soundOn()) return "";
+    if (SF.soundOn()) return '<div class="soundok">' + I("bell", 16) + "<span>" + t("al.okLine") + '</span><button type="button" class="link sm" data-act="soundtest">' + t("al.test") + "</button></div>";
     return '<section class="soundbar"><span class="sb-ic">' + I("bell", 22) + '</span><div class="grow"><b>' + t("al.barTitle") + "</b><small>" + t("al.barSub") + '</small></div><button type="button" class="btn primary" data-act="soundon">' + t("al.barBtn") + "</button></section>";
   };
+  SF.actions.soundtest = function () { if (!ctx()) { SF.toast(t("al.noSound"), "err"); return; } ring(roleOf(SF.state.user) === "courier" ? "courier" : "restaurant"); SF.toast(t("al.testHint"), "info"); };
   SF.actions.soundon = function () {
     if (!ctx()) { SF.toast(t("al.noSound"), "err"); return; }
-    ring(SF.state.user && SF.state.user.role === "courier" ? "courier" : "restaurant");
+    ring(roleOf(SF.state.user) === "courier" ? "courier" : "restaurant");
     if (window.Notification && Notification.permission === "default") try { Notification.requestPermission(); } catch (e) {}
     keepAwake(); SF.toast(t("al.on")); setTimeout(function () { SF.render({ quiet: true }); }, 300);
   };
@@ -125,7 +133,7 @@
     if (!("wakeLock" in navigator) || wake) return;
     navigator.wakeLock.request("screen").then(function (w) { wake = w; w.addEventListener("release", function () { wake = null; }); }).catch(function () {});
   }
-  document.addEventListener("visibilitychange", function () { if (!document.hidden && SF.state.user && KEYS[SF.state.user.role] && SF.soundOn()) keepAwake(); });
+  document.addEventListener("visibilitychange", function () { if (!document.hidden && SF.state.user && KEYS[roleOf(SF.state.user)] && SF.soundOn()) keepAwake(); });
   /* Android app: while a shop, the owner's shop or an online courier is signed in, the phone stays «on duty» —
      new orders ring loud even when the app is closed or the screen is off (DutyService in the APK) */
   var dutySig = null;
