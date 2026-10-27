@@ -7,16 +7,23 @@ def verCode = (project.findProperty("versionCode") ?: "1").toString().toInteger(
 
 android {
     namespace "tj.tezkor.app"
-    compileSdk 34
+    compileSdk 36
     defaultConfig {
         applicationId "tj.tezkor.app"
         minSdk 24
-        targetSdk 34
+        targetSdk 36
         versionCode verCode
         versionName "1." + verCode
         resValue "string", "app_url", appUrl
     }
     signingConfigs {
+        /* Google Play: the upload key lives only in GitHub Secrets (never in this public repository) */
+        upload {
+            storeFile file(System.getenv("TEZKOR_UPLOAD_KEYSTORE") ?: "../missing-upload.jks")
+            storePassword System.getenv("TEZKOR_UPLOAD_PASSWORD") ?: ""
+            keyAlias "tezkor-upload"
+            keyPassword System.getenv("TEZKOR_UPLOAD_PASSWORD") ?: ""
+        }
         release {
             storeFile file(System.getenv("TEZKOR_KEYSTORE") ?: "../tezkor-release.jks")
             storePassword System.getenv("TEZKOR_KEYSTORE_PASSWORD") ?: "tezkor-2026"
@@ -27,7 +34,7 @@ android {
     buildTypes {
         release {
             minifyEnabled false
-            signingConfig signingConfigs.release
+            signingConfig project.hasProperty("playUpload") ? signingConfigs.upload : signingConfigs.release
         }
     }
     lint {

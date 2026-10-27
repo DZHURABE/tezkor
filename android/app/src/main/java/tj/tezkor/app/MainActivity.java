@@ -55,7 +55,21 @@ public class MainActivity extends Activity {
 
         web = new WebView(this);
         web.setBackgroundColor(Color.parseColor("#F4F1EC"));
-        setContentView(web);
+        /* Android 15+ draws the app under the status and navigation bars: keep the page between two colored strips */
+        final android.widget.LinearLayout root = new android.widget.LinearLayout(this);
+        root.setOrientation(android.widget.LinearLayout.VERTICAL);
+        final View top = new View(this), bottom = new View(this);
+        top.setBackgroundColor(Color.parseColor("#E8590C")); bottom.setBackgroundColor(Color.parseColor("#F4F1EC"));
+        root.addView(top, new android.widget.LinearLayout.LayoutParams(-1, 0));
+        root.addView(web, new android.widget.LinearLayout.LayoutParams(-1, 0, 1f));
+        root.addView(bottom, new android.widget.LinearLayout.LayoutParams(-1, 0));
+        if (Build.VERSION.SDK_INT >= 30) root.setOnApplyWindowInsetsListener((v, ins) -> {
+            android.graphics.Insets b = ins.getInsets(android.view.WindowInsets.Type.systemBars() | android.view.WindowInsets.Type.displayCutout());
+            android.graphics.Insets ime = ins.getInsets(android.view.WindowInsets.Type.ime());
+            top.getLayoutParams().height = b.top; bottom.getLayoutParams().height = Math.max(b.bottom, ime.bottom);
+            root.setPadding(b.left, 0, b.right, 0); top.requestLayout(); bottom.requestLayout();
+            return android.view.WindowInsets.CONSUMED; });
+        setContentView(root);
 
         WebSettings s = web.getSettings();
         s.setJavaScriptEnabled(true);
@@ -282,7 +296,9 @@ public class MainActivity extends Activity {
         if (pm == null || pm.isIgnoringBatteryOptimizations(getPackageName())) return;
         runOnUiThread(() -> {
             try {
-                startActivity(new Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:" + getPackageName())));
+                /* the app's own settings page: «Battery» → «Unrestricted» (no special permission needed) */
+                android.widget.Toast.makeText(MainActivity.this, "Батарея → «Без ограничений», чтобы заказы звонили всегда", android.widget.Toast.LENGTH_LONG).show();
+                startActivity(new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + getPackageName())));
             } catch (Exception ignored) { }
         });
     }

@@ -79,7 +79,7 @@ public class DutyService extends Service {
         if (!p.getBoolean("on", false) || p.getString("token", null) == null) { stopSelf(); return START_NOT_STICKY; }
         channels();
         Notification n = dutyNotification();
-        if (Build.VERSION.SDK_INT >= 29) startForeground(ID_DUTY, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC);
+        if (Build.VERSION.SDK_INT >= 34) startForeground(ID_DUTY, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
         else startForeground(ID_DUTY, n);
         if (wake == null) {
             PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);

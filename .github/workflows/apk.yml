@@ -22,7 +22,7 @@ jobs:
           java-version: 17
       - uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: "8.9"
+          gradle-version: "8.13"
       - name: Build APK
         run: |
           gradle -p android assembleRelease --no-daemon \
@@ -33,6 +33,25 @@ jobs:
         with:
           name: tezkor-apk
           path: apps/web/public/tezkor.apk
+      # Google Play: the same app as an .aab signed with the private upload key (GitHub Secrets)
+      - name: Build AAB for Google Play
+        env:
+          UPLOAD_B64: ${{ secrets.TEZKOR_UPLOAD_KEYSTORE_B64 }}
+          TEZKOR_UPLOAD_PASSWORD: ${{ secrets.TEZKOR_UPLOAD_PASSWORD }}
+        run: |
+          if [ -z "$UPLOAD_B64" ]; then echo "No upload key in GitHub Secrets — AAB skipped"; exit 0; fi
+          echo "$UPLOAD_B64" | base64 -d > "$RUNNER_TEMP/upload.jks"
+          export TEZKOR_UPLOAD_KEYSTORE="$RUNNER_TEMP/upload.jks"
+          gradle -p android bundleRelease --no-daemon -PplayUpload=1 \
+            -PappUrl="${{ vars.APP_URL || 'https://tezkor-v9wd.onrender.com' }}" \
+            -PversionCode=${{ github.run_number }}
+          mkdir -p play && cp android/app/build/outputs/bundle/release/app-release.aab "play/tezkor-${{ github.run_number }}.aab"
+          rm -f "$RUNNER_TEMP/upload.jks"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tezkor-play-aab
+          path: play/*.aab
+          if-no-files-found: ignore
       - name: Put the APK on the site
         run: |
           git config user.name "tezkor-bot"
