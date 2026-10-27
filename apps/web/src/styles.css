@@ -2443,3 +2443,11 @@ body{font-size:15.5px;letter-spacing:-.005em;-webkit-font-smoothing:antialiased;
 .clbtns{display:flex;flex-wrap:wrap;gap:8px}
 .clcard header{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.clcard header small{margin-left:auto}
 .clcard{display:grid;gap:8px}.clcard.cl-done,.clcard.cl-rejected{opacity:.75}
+/* home: services that are «coming soon» — a row of small tiles under the working ones */
+.hm-soon{display:flex;gap:10px;overflow-x:auto;scrollbar-width:none;margin-top:12px;padding:2px 0 4px}
+.hm-soon::-webkit-scrollbar{display:none}
+.hm-soont{flex:0 0 auto;display:grid;justify-items:center;gap:6px;width:92px;padding:12px 6px 10px;border-radius:18px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:inherit;cursor:pointer;position:relative}
+.hm-soont b{font-size:12.5px;line-height:1.15;text-align:center}
+.hm-soont .sve{width:46px;height:46px;border-radius:14px;opacity:.9;filter:saturate(.8)}
+.hm-soont .soonb{font-size:10px;padding:2px 6px}
+.hm-soont:active{transform:scale(.97)}
