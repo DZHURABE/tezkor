@@ -161,6 +161,8 @@ async function main() {
   /* table QR stickers: /t/<code> opens the restaurant menu for that table (no sign-up) */
   { const tm = req.method === "GET" && url.pathname.match(/^\/t\/([A-Za-z0-9_-]{4,40})\/?$/);
     if (tm) { res.writeHead(302, { Location: "/#/t/" + tm[1], "Cache-Control": "no-store" }); return res.end(); } }
+  if (req.method === "GET" && (url.pathname === "/privacy" || url.pathname === "/delete-account")) { let phone = ""; try { phone = (api.handle("GET", "/settings/public", null, null).body.data || {}).supportPhone || ""; } catch {}
+    return send(res, 200, (url.pathname === "/privacy" ? site.privacyPage : site.deletePage)(site.baseUrl(req), { phone }), "text/html; charset=utf-8"); }
   if (req.method === "GET" && url.pathname === "/robots.txt") return send(res, 200, site.robots(site.baseUrl(req)), "text/plain; charset=utf-8");
   if (req.method === "GET" && url.pathname === "/sitemap.xml") return send(res, 200, site.sitemap(site.baseUrl(req)), "application/xml; charset=utf-8");
   if (req.method === "GET") return sendPage(req, res, site.baseUrl(req));

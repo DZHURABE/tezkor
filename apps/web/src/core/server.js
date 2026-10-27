@@ -1217,6 +1217,11 @@
       save(); return pubUser(u); });
     route("DELETE", "/admin/users/:id", ["admin"], function (req, b, q, p) { var u = find(db.users, p.id); if (!u || u.deleted) E(404, "NOT_FOUND");
       if (u.role === "admin") E(409, "CANNOT_BLOCK_SELF"); if (u.id === req.user.id) E(409, "CANNOT_BLOCK_SELF");
+      removeUser(u); return true; });
+    /* anyone can delete his own account from the profile (Google Play rule); past orders stay in the books without the person's data */
+    route("POST", "/auth/me/delete", "*", function (req, b) { var u = req.user; if (u.role === "admin") E(409, "CANNOT_BLOCK_SELF");
+      if (!checkPw(str((b || {}).password), u.pass)) E(401, "BAD_CREDENTIALS"); removeUser(u); return true; });
+    function removeUser(u) {
       if (u.role === "restaurant" && !u.staff && find(db.restaurants, u.restaurantId)) E(409, "IS_OWNER");
       if (u.courier && activeOf(u.id)) E(409, "HAS_ACTIVE_ORDER");
       if (u.role === "customer" && db.orders.some(function (o) { return o.customerId === u.id && Rules.ACTIVE.indexOf(o.status) >= 0; })) E(409, "HAS_ACTIVE_ORDER");
@@ -1224,7 +1229,7 @@
       var used = db.orders.some(function (o) { return o.customerId === u.id || o.courierId === u.id; });
       if (!used) { db.users.splice(db.users.indexOf(u), 1); }
       else { u.deleted = true; u.active = false; u.phone = "x" + u.phone + "_" + u.id; u.name = u.name; u.addresses = []; u.favs = []; u.avatar = null; if (u.courier) u.courier.online = false; }
-      save(); return true; });
+      save(); }
     function newCourier(b, city, restaurantId) { var name = str(b.name, 60), phone = Rules.normPhone(b.phone);
       if (name.length < 2) E(400, "BAD_NAME"); if (!phone) E(400, "BAD_PHONE"); if (db.users.some(function (u) { return u.phone === phone; })) E(409, "PHONE_TAKEN");
       var tmp = newPassword(), u = { id: id("u"), role: "courier", name: name, phone: phone, pass: hashPw(tmp), mustChange: true, active: true, cityId: city.id, createdAt: clock(), lang: "tg",

@@ -70,4 +70,8 @@
     SF.api.setToken(null); SF.ls.set("token", null); SF.state.user = null; SF.state.notes = []; SF.state.co = null; SF.go("/"); };
   SF.actions.logout = function () { SF.logout(); };
   SF.demoBlock = demoBlock;
+
+  /* delete my account (Google Play rule): password, then the account and personal data are gone */
+  SF.actions.delacc = function () { SF.modal('<button class="mx" data-act="closemodal" aria-label="' + t("btn.close") + '">' + SF.icon("x", 20) + '</button><form class="stack" data-form="delacc"><h2 class="h2">' + t("da.title") + '</h2><p class="muted">' + t("da.text") + '</p><label class="f">' + t("auth.password") + '<input type="password" name="password" required autocomplete="current-password"></label><button class="btn block lg dabtn">' + t("da.btn") + "</button></form>"); };
+  SF.forms.delacc = function (fd) { return SF.api.post("/auth/me/delete", { password: fd.password }).then(function () { SF.closeModal(); SF.logout(true); SF.toast(t("da.done")); }); };
 })();

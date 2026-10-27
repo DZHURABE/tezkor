@@ -136,4 +136,11 @@ t('минтақа: участкани вақтинча ўчириш, ҳамма�
   ok(call('POST', '/admin/restaurants/r1/zone', { zone: z(false, false) }, A)); ok(q(la, ln)); ok(q(la + 0.05, ln));
   ok(call('POST', '/admin/restaurants/r1/zone', { zone: [] }, A)); });
 
+t('аккаунтни ўзи ўчириш (Google Play талаби)', () => {
+  const tk = ok(call('POST', '/auth/register', { name: 'Ўчирилади', phone: '93 711 22 33', password: '5555' })).token;
+  err(call('POST', '/auth/me/delete', { password: 'xxxx' }, tk), 'BAD_CREDENTIALS');
+  ok(call('POST', '/auth/me/delete', { password: '5555' }, tk));
+  err(call('POST', '/auth/login', { phone: '93 711 22 33', password: '5555' }), 'PHONE_UNKNOWN');
+  err(call('POST', '/auth/me/delete', { password: '1234' }, A), 'CANNOT_BLOCK_SELF'); });
+
 console.log(`\n${pass} tests passed`);

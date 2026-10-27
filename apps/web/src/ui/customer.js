@@ -567,6 +567,8 @@
           prow("help", t("pf.support"), 'data-act="call" data-name="' + esc(SF.brand()) + '" data-phone="' + esc(pub.supportPhone || "") + '" data-sub="' + esc(t("foot.support")) + '"') +
           (pub.demo ? prow("users", t("profile.demo"), 'data-act="demo"') : "") +
         '</nav><nav class="plist card">' + prow("logout", t("auth.logout"), 'data-act="logout"', "", "danger") + "</nav>" +
+        (SF.state.user.role !== "admin" ? '<button type="button" class="link sm delacc" data-act="delacc">' + t("da.link") + "</button>" : "") +
+        '<a class="link sm delacc" href="/privacy" target="_blank" rel="noopener">' + t("da.privacy") + "</a>" +
         (b ? '<p class="pver">' + esc(SF.brand()) + " · " + t("pf.version") + " " + b.slice(0, 4) + "." + b.slice(4, 6) + "." + b.slice(6, 8) + "</p>" : "") + "</div>";
     });
   } });
