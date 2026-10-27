@@ -1327,7 +1327,7 @@
       if (!(la > 36 && la < 41.5 && ln > 67 && ln < 75.5)) E(400, "BAD_COORDS"); var c = { id: id("c"), name: L(n), lat: la, lng: ln, active: true }; db.cities.push(c); save(); return c; });
     /* the delivery area of a town: points the admin taps on the map (3–200); an empty list goes back to the circle */
     /* the first corner of each part carries its name and its own delivery price */
-    function partMeta(q, x, head) { if (!head) return; var n = str(x.n, 40); if (n) q.n = n; if (x.fee !== "" && x.fee != null && isFinite(Number(x.fee))) { var f = Math.round(Number(x.fee)); if (f < 0 || f > 1000) E(400, "BAD_ZONE"); q.fee = f; } }
+    function partMeta(q, x, head) { if (!head) return; var n = str(x.n, 40); if (n) q.n = n; if (x.off) q.off = 1; if (x.fee !== "" && x.fee != null && isFinite(Number(x.fee))) { var f = Math.round(Number(x.fee)); if (f < 0 || f > 1000) E(400, "BAD_ZONE"); q.fee = f; } }
     function setZone(o, b) { var pts = Array.isArray(b.zone) ? b.zone : [];
       if (!pts.length) { delete o.zone; save(); return; }
       if (pts.length < 3 || pts.length > 600) E(400, "BAD_ZONE");

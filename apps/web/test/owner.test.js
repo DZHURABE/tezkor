@@ -126,4 +126,14 @@ t('кафолат ва баргардонидан: мол учун ёқилад�
   const o3 = ok(call('POST', '/orders', { restaurantId: 'r1', items: one, address: addr, paymentMethod: 'cash', comment: 'gw2' }, friend)); deliver(o3.id);
   err(call('POST', `/orders/${o3.id}/claim`, { productId: 'r1p2', kind: 'return', text: 'не подошло' }, friend), 'NO_GUARANTEE'); });
 
+t('минтақа: участкани вақтинча ўчириш, ҳаммасини ўчириш ва ёқиш', () => {
+  const r1 = ok(call('GET', '/restaurants/r1')), la = r1.lat, ln = r1.lng, sq = (c, d, extra) => [Object.assign({ lat: c[0] - d, lng: c[1] - d }, extra), { lat: c[0] - d, lng: c[1] + d }, { lat: c[0] + d, lng: c[1] + d }, { lat: c[0] + d, lng: c[1] - d }];
+  const q = (lat, lng) => call('POST', '/orders/quote', { restaurantId: 'r1', items, address: { text: 'x', lat, lng } }, friend);
+  const z = (offA, offB) => sq([la, ln], 0.01, offA ? { off: 1 } : {}).concat(sq([la + 0.05, ln], 0.01, Object.assign({ cut: 1 }, offB ? { off: 1 } : {})));
+  ok(call('POST', '/admin/restaurants/r1/zone', { zone: z(false, true) }, A)); ok(q(la, ln)); err(q(la + 0.05, ln), 'OUT_OF_AREA');
+  const saved = ok(call('POST', '/admin/restaurants/r1/zone', { zone: z(true, true) }, A)); assert.equal(saved.zone.filter(x => x.off).length, 2);
+  err(q(la, ln), 'OUT_OF_AREA'); err(q(la + 0.05, ln), 'OUT_OF_AREA');
+  ok(call('POST', '/admin/restaurants/r1/zone', { zone: z(false, false) }, A)); ok(q(la, ln)); ok(q(la + 0.05, ln));
+  ok(call('POST', '/admin/restaurants/r1/zone', { zone: [] }, A)); });
+
 console.log(`\n${pass} tests passed`);

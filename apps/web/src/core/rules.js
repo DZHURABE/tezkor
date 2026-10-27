@@ -95,9 +95,10 @@
       if ((a.lat > p.lat) !== (b.lat > p.lat) && p.lng < (b.lng - a.lng) * (p.lat - a.lat) / (b.lat - a.lat) + a.lng) inside = !inside; }
     return inside; }
   /* which part holds the point: { i, name, fee } or null; fee is the part's own delivery price (null = by distance) */
-  function zonePartOf(p, poly) { var ps = zoneParts(poly); for (var i = 0; i < ps.length; i++) if (ps[i].length >= 3 && inOne(p, ps[i])) { var h = ps[i][0]; return { i: i, name: h.n || "", fee: typeof h.fee === "number" ? h.fee : null }; } return null; }
+  function zonePartOf(p, poly) { var ps = zoneParts(poly); for (var i = 0; i < ps.length; i++) if (ps[i].length >= 3 && !ps[i][0].off && inOne(p, ps[i])) { var h = ps[i][0]; return { i: i, name: h.n || "", fee: typeof h.fee === "number" ? h.fee : null }; } return null; }
+  /* a part switched off for now (off:1) takes no orders; all parts off — nowhere */
   function inPolygon(p, poly) { var parts = zoneParts(poly).filter(function (x) { return x.length >= 3; }); if (!parts.length) return true;
-    return parts.some(function (x) { return inOne(p, x); }); }
+    return parts.some(function (x) { return !x[0].off && inOne(p, x); }); }
 
   return { inPolygon: inPolygon, zoneParts: zoneParts, zonePartOf: zonePartOf, ROLES: ROLES, ORDER_FLOW: ORDER_FLOW, ACTIVE: ACTIVE, FINAL: FINAL, canTransition: canTransition,
     distanceKm: distanceKm, deliveryFee: deliveryFee, promoDiscount: promoDiscount, split: split,

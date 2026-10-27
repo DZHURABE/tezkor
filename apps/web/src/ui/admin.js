@@ -372,9 +372,9 @@
   /* one editor for both: a town's area and a restaurant's own area */
   /* the delivery area editor: one or more parts (villages), each with its own name and, if wanted, its own delivery price */
   function zfromFlat(flat) { var parts = [];
-    (flat || []).forEach(function (x, i) { if (!i || x.cut) parts.push({ n: x.n || "", fee: typeof x.fee === "number" ? String(x.fee) : "", pts: [] }); parts[parts.length - 1].pts.push({ lat: x.lat, lng: x.lng }); });
+    (flat || []).forEach(function (x, i) { if (!i || x.cut) parts.push({ n: x.n || "", fee: typeof x.fee === "number" ? String(x.fee) : "", off: !!x.off, pts: [] }); parts[parts.length - 1].pts.push({ lat: x.lat, lng: x.lng }); });
     return parts; }
-  function zflat(z) { var out = []; z.parts.forEach(function (pt, pi) { pt.pts.forEach(function (q, i) { var o = { lat: q.lat, lng: q.lng, _p: pi, _i: i }; if (!i) { if (pi) o.cut = 1; if (pt.n) o.n = pt.n; if (pt.fee !== "") o.fee = +pt.fee; } out.push(o); }); }); return out; }
+  function zflat(z) { var out = []; z.parts.forEach(function (pt, pi) { pt.pts.forEach(function (q, i) { var o = { lat: q.lat, lng: q.lng, _p: pi, _i: i }; if (!i) { if (pi) o.cut = 1; if (pt.n) o.n = pt.n; if (pt.fee !== "") o.fee = +pt.fee; if (pt.off) o.off = 1; } out.push(o); }); }); return out; }
   function zd(a, b) { var k = Math.cos(a.lat * Math.PI / 180); return Math.hypot(a.lat - b.lat, (a.lng - b.lng) * k); }
   /* a new corner goes where it lengthens the outline least: corners tapped out of order never make crossed lines */
   function zinsert(pts, p) { if (pts.length < 3) { pts.push(p); return; } var best = pts.length, bc = Infinity;
@@ -421,11 +421,13 @@
   function zlist() { var el = document.getElementById("zparts"), z = SF.state.zoneEdit; if (!el || !z) return;
     if (!z.parts.length) { el.innerHTML = '<p class="fine">' + I("info", 14) + " " + t("zn.start") + "</p>"; return; }
     el.innerHTML = z.parts.map(function (pt, i) { var on = i === z.cur, n = pt.pts.length;
-      return '<div class="zprow' + (on ? " on" : "") + '"><button type="button" class="zpsel" data-act="zsel" data-i="' + i + '" aria-pressed="' + on + '"><b>' + (i + 1) + "</b>" + (on ? I("edit", 14) : "") + "</button>" +
+      return '<div class="zprow' + (on ? " on" : "") + (pt.off ? " poff" : "") + '"><button type="button" class="zpsel" data-act="zsel" data-i="' + i + '" aria-pressed="' + on + '"><b>' + (i + 1) + "</b>" + (on ? I("edit", 14) : "") + "</button>" +
         '<label class="f grow"><span>' + t("zn.pname") + ' <small class="muted num">' + (n < 3 ? t("zn.pfew", { n: n }) : t("zn.pdots", { n: n })) + '</small></span><input data-input="zpn" data-i="' + i + '" maxlength="40" value="' + esc(pt.n) + '" placeholder="' + t("zn.pnamePh", { n: i + 1 }) + '"></label>' +
         '<label class="f zpfee"><span>' + t("zn.pfee") + '</span><input data-input="zpf" data-i="' + i + '" inputmode="numeric" value="' + esc(pt.fee) + '" placeholder="' + t("zn.pfeePh") + '"></label>' +
+        '<button type="button" class="switch zpsw' + (pt.off ? "" : " on") + '" role="switch" aria-checked="' + !pt.off + '" data-act="zpoff" data-i="' + i + '" title="' + t(pt.off ? "zn.pOff" : "zn.pOn") + '" aria-label="' + t("zn.pSwitch") + '"></button>' +
         '<button type="button" class="btn sm ghost zpdel" data-act="zpdel" data-i="' + i + '" aria-label="' + t("btn.delete") + '">' + I("trash", 16) + "</button></div>"; }).join("") +
-      '<p class="fine">' + I("info", 14) + " " + t("zn.feeHow") + "</p>"; }
+      (z.parts.length > 1 ? '<div class="zball"><button type="button" class="btn sm ghost" data-act="zpall" data-v="on">' + I("check", 14) + t("zn.allOn") + '</button><button type="button" class="btn sm ghost" data-act="zpall" data-v="off">' + I("x", 14) + t("zn.allOff") + "</button></div>" : "") +
+      '<p class="fine">' + I("info", 14) + " " + t("zn.feeHow") + " " + t("zn.offHow") + "</p>"; }
   SF.after.push(function () { if (document.getElementById("zparts")) zlist(); });
   function zredraw() { var z = SF.state.zoneEdit; if (z) SF.redrawMap(z.key); zlist(); }
   SF.inputs.zpn = function (v, el) { var z = SF.state.zoneEdit; if (z && z.parts[+el.dataset.i]) { z.parts[+el.dataset.i].n = v; SF.redrawMap(z.key); } };
@@ -434,6 +436,12 @@
   SF.actions.zpart = function () { var z = SF.state.zoneEdit; if (!z) return; var last = z.parts[z.parts.length - 1];
     if (last && last.pts.length < 3) { z.cur = z.parts.length - 1; zlist(); SF.toast(t("zn.need", { n: last.pts.length }), "err"); return; }
     if (z.parts.length >= 12) return; z.parts.push({ n: "", fee: "", pts: [] }); z.cur = z.parts.length - 1; zredraw(); SF.toast(t("zn.partNext", { n: z.cur + 1 })); };
+  /* switch a part off for today (no orders go there) and back on — saved at once */
+  function zquick(z) { if (z.parts.some(function (pt) { return pt.pts.length < 3; })) { SF.toast(t("zn.offSaveLater"), "info"); return; }
+    var flat = zflat(z).map(function (x) { var q = { lat: x.lat, lng: x.lng }; if (x.cut) q.cut = 1; if (x.n) q.n = x.n; if (x.fee != null) q.fee = x.fee; if (x.off) q.off = 1; return q; });
+    return api().post(z.url, { zone: flat }).then(function () { SF.toast(t("btn.saved")); }, function (e) { SF.toast(SF.err(e), "err"); }); }
+  SF.actions.zpoff = function (el) { var z = SF.state.zoneEdit, pt = z && z.parts[+el.dataset.i]; if (!pt) return; pt.off = !pt.off; zredraw(); return zquick(z); };
+  SF.actions.zpall = function (el) { var z = SF.state.zoneEdit; if (!z) return; var off = el.dataset.v === "off"; z.parts.forEach(function (pt) { pt.off = off; }); zredraw(); return zquick(z); };
   SF.actions.zpdel = function (el) { var z = SF.state.zoneEdit; if (!z) return; z.parts.splice(+el.dataset.i, 1); z.cur = Math.max(0, Math.min(z.cur, z.parts.length - 1)); zredraw(); };
   SF.actions.zundo = function () { var z = SF.state.zoneEdit; if (!z) return; var p = z.hist.pop();
     if (p) z.parts.forEach(function (pt) { var k = pt.pts.indexOf(p); if (k >= 0) pt.pts.splice(k, 1); });
@@ -447,7 +455,7 @@
     z.parts = z.parts.filter(function (pt) { return pt.pts.length; });
     var bad = z.parts.filter(function (pt) { return pt.pts.length < 3; })[0];
     if (bad) { z.cur = z.parts.indexOf(bad); zlist(); SF.toast(t("zn.need", { n: bad.pts.length }), "err"); return; }
-    var flat = zflat(z).map(function (x) { var q = { lat: x.lat, lng: x.lng }; if (x.cut) q.cut = 1; if (x.n) q.n = x.n; if (x.fee != null) q.fee = x.fee; return q; });
+    var flat = zflat(z).map(function (x) { var q = { lat: x.lat, lng: x.lng }; if (x.cut) q.cut = 1; if (x.n) q.n = x.n; if (x.fee != null) q.fee = x.fee; if (x.off) q.off = 1; return q; });
     if (!flat.length && !z.moved) { SF.toast(t("zn.need", { n: 0 }), "err"); return; }
     return pin.then(function () { return flat.length ? api().post(z.url, { zone: flat }) : null; }).then(function () { return zdone(z); }); };
   SF.actions.zcircle = function () { var z = SF.state.zoneEdit; if (!z) return; return api().post(z.url, { zone: [] }).then(function () { return zdone(z); }); };

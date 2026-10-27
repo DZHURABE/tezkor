@@ -2451,3 +2451,9 @@ body{font-size:15.5px;letter-spacing:-.005em;-webkit-font-smoothing:antialiased;
 .hm-soont .sve{width:46px;height:46px;border-radius:14px;opacity:.9;filter:saturate(.8)}
 .hm-soont .soonb{font-size:10px;padding:2px 6px}
 .hm-soont:active{transform:scale(.97)}
+.hm-soonh{display:flex;align-items:center;gap:8px;margin:16px 0 0;font-weight:800;font-size:15px}
+/* delivery parts switched off for now */
+.zprow.poff{opacity:.6}.zprow.poff .zpsel{text-decoration:line-through}
+.zpsw{flex:none;align-self:center}
+.zball{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.tm-zone.tm-edit.off{stroke:#9AA6A1;stroke-dasharray:6 6;fill:rgba(154,166,161,.12)}

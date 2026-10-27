@@ -79,7 +79,7 @@
         /* the services: one big card for the first, neat cards with a line about each for the rest (no round stickers) */
         /* services not started yet (taxi, pharmacy…): a short row of «Скоро» tiles under the working ones */
         var svOff = SF.SERVICES.filter(function (x) { return !(SF.svcOn(x[0]) && x[3]); });
-        var soonRow = svOff.length ? '<div class="hm-soon" aria-label="' + t("sv.soon") + '">' + svOff.map(function (x) { return '<button type="button" class="hm-soont" data-act="soon" data-k="' + x[0] + '" style="--sb:' + x[2] + '">' + SF.svVis(x[0], false) + "<b>" + t("svs." + x[0]) + "</b>" + SF.soonBadge(true) + "</button>"; }).join("") + "</div>" : "";
+        var soonRow = svOff.length ? '<p class="hm-soonh">' + SF.soonBadge(true) + " " + t("sv.soonTitle") + '</p><div class="hm-soon" aria-label="' + t("sv.soonTitle") + '">' + svOff.map(function (x) { return '<button type="button" class="hm-soont" data-act="soon" data-k="' + x[0] + '" style="--sb:' + x[2] + '">' + SF.svVis(x[0], false) + "<b>" + t("svs." + x[0]) + "</b>" + SF.soonBadge(true) + "</button>"; }).join("") + "</div>" : "";
         var svc = !svOn.length && !svOff.length ? "" : '<section class="hm-svc"><div class="hm-h"><div><h2>' + t("sv.title") + '</h2></div><a href="#/services">' + t("sa.allR") + I("chevR", 14) + "</a></div>" +
           '<nav class="svb n' + svOn.length + '" aria-label="' + t("sv.title") + '">' + svOn.map(function (x, i) {
             return '<a href="#' + x[3] + '" class="svb-t svb-' + x[0] + (i === 0 ? " big" : "") + '" style="--i:' + i + ';--sb:' + x[2] + '">' + SF.svVis(x[0], false) +
