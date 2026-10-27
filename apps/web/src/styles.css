@@ -2457,3 +2457,10 @@ body{font-size:15.5px;letter-spacing:-.005em;-webkit-font-smoothing:antialiased;
 .zpsw{flex:none;align-self:center}
 .zball{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .tm-zone.tm-edit.off{stroke:#9AA6A1;stroke-dasharray:6 6;fill:rgba(154,166,161,.12)}
+/* «Скачать приложение» */
+.hm-app{display:inline-flex;align-items:center;justify-content:center;gap:6px;text-decoration:none}
+.hm-app span{display:none}
+@media (min-width:460px){.hm-app{width:auto!important;padding:0 12px}.hm-app span{display:inline;font-weight:700;font-size:13px}}
+.apppage{max-width:640px;margin:0 auto}
+.apphero{display:flex;gap:14px;align-items:center}
+.apppage .howto{margin:0;padding-left:20px;display:grid;gap:6px}

@@ -72,7 +72,7 @@
         /* the top row lives inside the green hero on phones (the empty white header bar is gone): logo · town · day/night · bell */
         var hbar = '<div class="hm-bar"><a href="#/" class="hm-logo" aria-label="' + esc(SF.brand()) + '">' + SF.mark(40) + "</a>" +
           '<button type="button" class="hm-city" data-act="city"><small>' + t("profile.city") + "</small><b>" + I("pin", 15) + "<span>" + esc(city ? tx(city.name) : "") + "</span>" + I("chevD", 14) + "</b></button>" +
-          '<span class="hm-acts">' + SF.themeBtn("hm-ib") + (u ? SF.bell().replace('class="iconbtn"', 'class="iconbtn hm-ib"') : '<a class="hm-login" href="#/login">' + t("auth.login") + "</a>") + "</span></div>";
+          '<span class="hm-acts">' + (SF.appBtn ? SF.appBtn("hm-ib hm-app") : "") + SF.themeBtn("hm-ib") + (u ? SF.bell().replace('class="iconbtn"', 'class="iconbtn hm-ib"') : '<a class="hm-login" href="#/login">' + t("auth.login") + "</a>") + "</span></div>";
         var hero = '<section class="hm-hero"><i class="hm-orn" aria-hidden="true"></i>' + hbar +
           '<div class="hm-hi"><p>' + t(greet) + (first ? ", <b>" + first + "</b>" : "") + "</p><h1>" + t("hm.title") + "</h1></div>" +
           '<form class="hm-search" data-form="search" role="search">' + I("search", 20) + '<input name="q" placeholder="' + t("sa.searchPh") + '" aria-label="' + t("sa.searchPh") + '" enterkeyhint="search"><button class="hm-go" aria-label="' + t("btn.find") + '">' + I("chevR", 18) + "</button></form></section>";

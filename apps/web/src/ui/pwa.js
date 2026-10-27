@@ -39,10 +39,11 @@
   };
   /* a slim bar on the home screen: «put Тезкор on your phone» — one tap; closed for a week when dismissed */
   SF.installBar = function () {
-    if (inApk || standalone || (!enabled && !apkOn())) return "";
+    if (inApk || standalone) return "";
     if (SF.ls.get("instx", 0) > Date.now()) return "";
-    return '<div class="instbar"><span class="iic">' + SF.mark(34) + '</span><div class="grow"><b>' + t("ib.t") + "</b><small>" + t("ib.s") + '</small></div><button type="button" class="btn primary sm" data-act="' + (apkOn() ? "apkgo" : "install") + '">' + I("download", 15) + t("ib.btn") + '</button><button type="button" class="iconbtn instx" data-act="instx" aria-label="' + t("btn.close") + '">' + I("x", 16) + "</button></div>"; };
-  SF.actions.instx = function (el) { SF.ls.set("instx", Date.now() + 7 * 864e5); var b = el.closest(".instbar"); if (b) b.remove(); };
+    return '<div class="instbar"><span class="iic">' + SF.mark(34) + '</span><div class="grow"><b>' + t("ib.t") + "</b><small>" + t("ib.s") + '</small></div><button type="button" class="btn primary sm" data-act="appgo">' + I("download", 15) + t("ib.btn") + '</button><button type="button" class="iconbtn instx" data-act="instx" aria-label="' + t("btn.close") + '">' + I("x", 16) + "</button></div>"; };
+  SF.actions.appgo = function () { var e = SF.state.installEvt; if (e) return SF.actions.install(); SF.go("/app"); };
+  SF.actions.instx = function (el) { SF.ls.set("instx", Date.now() + 2 * 864e5); var b = el.closest(".instbar"); if (b) b.remove(); };
   SF.actions.apkgo = function () { var a = document.createElement("a"); a.href = "/tezkor.apk"; a.download = "tezkor.apk"; a.className = "apklink"; document.body.appendChild(a); a.click(); a.remove(); };
   /* send the app to a friend: system share sheet, or copy the link */
   SF.actions.shareapp = function () { var u = location.origin + "/", d = { title: SF.brand(), text: t("ib.share"), url: u };
@@ -59,4 +60,22 @@
     SF.modal('<button class="mx" data-act="closemodal" aria-label="' + t("btn.close") + '">' + I("x", 20) + '</button><div class="stack"><h2 class="h2">' + t("pwa.title") + "</h2>" +
       '<ol class="howto"><li>' + t(ios ? "pwa.ios1" : "pwa.and1") + "</li><li>" + t(ios ? "pwa.ios2" : "pwa.and2") + "</li><li>" + t("pwa.step3") + "</li></ol></div>");
   };
+
+  /* «Скачать приложение»: one page that always works — install from the browser, or the Android file (loud alarms for shops and couriers) */
+  var android = /android/i.test(navigator.userAgent), yandex = /YaBrowser|YaApp/i.test(navigator.userAgent);
+  SF.appBtn = function (cls) { if (inApk || standalone) return ""; return '<a class="' + (cls || "hm-app") + '" href="#/app" aria-label="' + t("app.get") + '">' + I("download", 18) + "<span>" + t("app.short") + "</span></a>"; };
+  SF.route("/app", { title: "app.get", render: function () {
+    if (inApk || standalone) return '<section class="card stack center"><span class="okmark">' + I("check", 30) + '</span><h2 class="h2">' + t("app.have") + "</h2></section>";
+    var ev = SF.state.installEvt;
+    return '<div class="apppage stack"><section class="card apphero"><span class="iic">' + SF.mark(64) + '</span><div><h1 class="h2">' + t("app.title") + '</h1><p class="muted">' + t("app.sub") + "</p></div></section>" +
+      /* 1. from the browser — no file, no warnings */
+      '<section class="card stack"><h3>' + I("phone", 18) + " " + t("app.web") + '</h3><p class="muted">' + t("app.webSub") + "</p>" +
+        (ev ? '<button type="button" class="btn primary block lg" data-act="install">' + I("plus", 18) + t("pwa.btn") + "</button>" :
+          '<ol class="howto">' + (ios ? "<li>" + t("pwa.ios1") + "</li><li>" + t("pwa.ios2") + "</li>" : yandex ? "<li>" + t("app.ya1") + "</li><li>" + t("app.ya2") + "</li>" : "<li>" + t("pwa.and1") + "</li><li>" + t("pwa.and2") + "</li>") + "<li>" + t("pwa.step3") + "</li></ol>" +
+          (!ios && !yandex ? '<p class="fine">' + I("info", 14) + " " + t("app.chrome") + "</p>" : "")) + "</section>" +
+      /* 2. the Android file */
+      (ios ? "" : '<section class="card stack"><h3>' + I("bell", 18) + " " + t("app.apk") + '</h3><p class="muted">' + t("app.apkSub") + '</p><a class="btn ok block lg apklink" href="/tezkor.apk" download="tezkor.apk">' + I("download", 18) + t("app.apkBtn") + "</a>" +
+        '<p class="fine">' + t("apk.safe") + "</p></section>") +
+      '<section class="card stack"><b>' + t("app.share") + '</b><small class="muted">' + t("ib.share") + '</small><button type="button" class="btn ghost block" data-act="shareapp">' + I("send", 16) + t("app.shareBtn") + "</button></section></div>";
+  } });
 })();
