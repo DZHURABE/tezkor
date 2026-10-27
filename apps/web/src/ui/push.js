@@ -32,7 +32,12 @@
   SF.pushCard = function () {
     var me = SF.state.user; if (!me) return "";
     var inApk = SF.inApk, row = function (cls, ic, title, sub, btn) { return '<section class="pushcard ' + cls + '"><span class="sb-ic">' + I(ic, 22) + '</span><div class="grow"><b>' + title + "</b><small>" + sub + "</small></div>" + (btn || "") + "</section>"; };
-    if (!sup) return row("bad", "info", t(inApk ? "push.apkT" : "push.noT"), t(inApk ? "push.apkS" : ios && !standalone ? "push.ios" : "push.noS"));
+    /* the Android app rings by itself (DutyService): show whether this phone is on duty; an old APK without it is asked to update */
+    if (inApk) { var A = window.TezkorApp, ver = ""; try { ver = A && A.version ? A.version() : ""; } catch (e) {}
+      if (!A || !A.startDuty) return row("bad", "info", t("push.apkOldT"), t("push.apkOldS"), '<a class="btn primary sm apklink" href="/tezkor.apk" download="tezkor.apk">' + I("download", 14) + t("app.apkBtn") + "</a>");
+      var on = false; try { on = !!(A.onDuty && A.onDuty()); } catch (e) {}
+      return row(on ? "ok" : "warn", on ? "check" : "bell", t(on ? "push.dutyOnT" : "push.dutyOffT"), t(on ? "push.dutyOnS" : "push.dutyOffS") + (ver ? " · v" + SF.esc(ver) : "")); }
+    if (!sup) return row("bad", "info", t("push.noT"), t(ios && !standalone ? "push.ios" : "push.noS"));
     if (SF.state.pushKey === undefined) { key().then(function (k) { SF.state.pushKey = k || null; SF.render({ quiet: true }); }); return ""; }
     if (!SF.state.pushKey) return "";
     if (Notification.permission === "denied") return row("bad", "info", t("push.blockedT"), t("push.blockedS"));
