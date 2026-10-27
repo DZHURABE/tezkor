@@ -68,6 +68,8 @@ public class MainActivity extends Activity {
 
         web.addJavascriptInterface(new Bridge(), "TezkorApp");
         web.setWebViewClient(new Client());
+        /* a file link (the new APK) is handed to the browser, which downloads it */
+        web.setDownloadListener((url, ua, cd, mime, len) -> { try { startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url))); } catch (ActivityNotFoundException ignored) { } });
         web.setWebChromeClient(new Chrome());
 
         askPermissions();

@@ -26,6 +26,8 @@
   /* inside the Android app (APK) there is nothing to install */
   var inApk = /TezkorApp\//.test(navigator.userAgent);
   SF.inApk = inApk;
+  /* inside the app the page cannot download files: the APK opens in the phone's browser (Chrome), which downloads it */
+  SF.apkExternal = function () { return "intent://" + location.host + "/tezkor.apk#Intent;scheme=https;action=android.intent.action.VIEW;S.browser_fallback_url=" + encodeURIComponent(location.origin + "/tezkor.apk") + ";end"; };
   /* the browser install (no «dangerous file» warning) always wins; the APK is only the fallback when the browser cannot install */
   function apkOn() { return !!(SF.state.pub && SF.state.pub.apk) && !ios && !enabled; }
   /* the card is shown on the home screen and in profiles; hidden inside the installed app */
