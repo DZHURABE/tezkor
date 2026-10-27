@@ -1,5 +1,5 @@
 plugins { id "com.android.application" }
-/* Google Play: AAB is built in GitHub Actions with the upload key from Secrets */
+/* Google Play: AAB is built in GitHub Actions with the upload key from Secrets (TEZKOR_UPLOAD_*) */
 
 /* The address of the live site the app opens. Set it when building:
    gradle assembleRelease -PappUrl=https://tezkor.tj  (GitHub Actions passes the APP_URL repository variable) */
