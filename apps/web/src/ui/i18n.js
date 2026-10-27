@@ -1204,4 +1204,6 @@ SF.I18N = {};
   K("app.apkSub", "Сигнали баланд ҳатто вақте экран хомӯш аст. Файли tezkor.apk боргирӣ мешавад.", "Громкий сигнал о заказе, даже когда экран выключен. Скачается файл tezkor.apk.", "A loud order alarm even with the screen off. Downloads tezkor.apk.");
   K("app.apkBtn", "Боргирии APK", "Скачать APK", "Download APK"); K("app.share", "Ба дӯстон фиристед", "Отправьте друзьям", "Send to friends"); K("app.shareBtn", "Фиристодан", "Отправить", "Send");
   K("app.have", "Барнома аллакай насб шудааст", "Приложение уже установлено", "The app is already installed");
+  K("pwa.and1", "Дар Chrome тугмаи ⋮ (боло, рост)-ро пахш кунед ва меню-ро то поён кашед", "В Chrome нажмите ⋮ (вверху справа) и прокрутите меню вниз", "In Chrome tap ⋮ (top right) and scroll the menu down");
+  K("pwa.and2", "«Установить и создать ярлык» (ё «Установить приложение» / «Добавить на главный экран»)-ро интихоб кунед", "Выберите «Установить и создать ярлык» (или «Установить приложение» / «Добавить на главный экран»)", "Choose “Install / Create shortcut” (or “Install app” / “Add to Home screen”)");
 })();
