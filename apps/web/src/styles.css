@@ -2469,3 +2469,14 @@ body{font-size:15.5px;letter-spacing:-.005em;-webkit-font-smoothing:antialiased;
 .delacc{display:block;margin:6px auto 0;color:var(--muted);text-decoration:underline}
 .dabtn{background:#D7263D;color:#fff}
 .phbtns{display:flex;flex-wrap:wrap;gap:8px}.phbtns label.btn{cursor:pointer}
+/* phone: the panel top bar never runs off the screen — title shortens, language shows only the flag */
+html,body{max-width:100%;overflow-x:clip}
+.ptop h1{flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ptop .topact{flex:none;gap:6px}
+@media (max-width:520px){
+  .ptop{gap:8px}
+  .ptop .iconbtn,.ctop .iconbtn{width:40px;height:40px}
+  .ptop .lang,.ctop .lang{max-width:64px;padding-right:4px}
+  .ptop .lang select,.ctop .lang select{width:100%;min-width:0;color:transparent;text-shadow:none}
+  .ptop .lang select option,.ctop .lang select option{color:var(--ink)}
+}

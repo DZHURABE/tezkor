@@ -80,6 +80,11 @@ public class MainActivity extends Activity {
         s.setGeolocationEnabled(true);
         s.setMediaPlaybackRequiresUserGesture(false);   // the order bell must ring without a tap
         s.setAllowFileAccess(false);
+        /* a phone app, not a web page: the phone's big-font setting does not blow the screen up, no pinch zoom, no sideways scroll */
+        s.setTextZoom(100);
+        s.setSupportZoom(false); s.setBuiltInZoomControls(false); s.setDisplayZoomControls(false);
+        s.setUseWideViewPort(true); s.setLoadWithOverviewMode(true);
+        web.setHorizontalScrollBarEnabled(false); web.setOverScrollMode(View.OVER_SCROLL_NEVER);
         s.setUserAgentString(s.getUserAgentString() + " TezkorApp/" + BuildInfo.version(this));
 
         web.addJavascriptInterface(new Bridge(), "TezkorApp");
