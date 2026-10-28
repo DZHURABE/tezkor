@@ -2850,3 +2850,15 @@ html,body{margin:0}
   .hx-svc.hx5{gap:8px 4px}
   .hx-tri{gap:6px}
 }
+/* hero v3b: the whole night-city picture with the courier is visible (no heavy dark cover), fades into the page at the bottom */
+.hx-hero.hx3{background:#0B0E14}
+.hx3 .hx-art{position:absolute;top:0;left:0;right:0;width:100%;height:calc(100% - 52px);min-height:0;object-fit:cover;object-position:68% 20%;opacity:1}
+.hx3 .hx-shade{background:linear-gradient(90deg,rgba(8,10,16,.72) 0%,rgba(8,10,16,.35) 38%,rgba(8,10,16,0) 58%),linear-gradient(0deg,#0B0E14 52px,rgba(11,14,20,.85) 70px,rgba(11,14,20,0) 140px)}
+.hx3 .hx-hi{max-width:56%}
+.hx3 .hx-hi h1{text-transform:none;font-size:22px;line-height:1.02}
+@media (max-width:760px){.hx3 .hx-hi h1{font-size:20px}.hx3 .hx-hi{max-width:55%}.hx3 .hx-hi p{font-size:10.5px}}
+.hx3 .hx-art{height:auto;aspect-ratio:840/362;object-fit:cover;object-position:right top}
+.hx3 .hx-shade{background:linear-gradient(90deg,rgba(8,10,16,.7) 0%,rgba(8,10,16,.3) 36%,rgba(8,10,16,0) 55%)}
+.hx3 .hx-shade::after{content:"";position:absolute;left:0;right:0;top:0;aspect-ratio:840/362;background:linear-gradient(0deg,#0B0E14 0%,rgba(11,14,20,0) 22%)}
+:root.inapp-full .hx3 .hx-art{width:100%;top:0}
+.hx-hero.hx3 .hx-art{height:auto!important;bottom:auto;aspect-ratio:840/362;object-position:center top}
