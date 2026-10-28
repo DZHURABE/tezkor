@@ -70,19 +70,18 @@
         var svOn = SF.SERVICES.filter(function (x) { return SF.svcOn(x[0]) && x[3]; });
         var city = (SF.state.cities || []).filter(function (c) { return c.id === SF.state.cityId; })[0];
         /* the top row lives inside the green hero on phones (the empty white header bar is gone): logo · town · day/night · bell */
-        var hbar = '<div class="hm-bar"><a href="#/" class="hm-logo" aria-label="' + esc(SF.brand()) + '">' + SF.mark(40) + "</a>" +
-          '<button type="button" class="hm-city" data-act="city"><small>' + t("profile.city") + "</small><b>" + I("pin", 15) + "<span>" + esc(city ? tx(city.name) : "") + "</span>" + I("chevD", 14) + "</b></button>" +
+        /* ===== a calm, compact top (like a native app): logo · town · icons, a small greeting, a slim search ===== */
+        var hbar = '<div class="hm-bar"><a href="#/" class="hm-logo" aria-label="' + esc(SF.brand()) + '">' + SF.mark(30) + "</a>" +
+          '<button type="button" class="hm-city" data-act="city"><small>' + t("profile.city") + "</small><b><span>" + esc(city ? tx(city.name) : "") + "</span>" + I("chevD", 13) + "</b></button>" +
           '<span class="hm-acts">' + (SF.appBtn ? SF.appBtn("hm-ib hm-app") : "") + SF.themeBtn("hm-ib") + (u ? SF.bell().replace('class="iconbtn"', 'class="iconbtn hm-ib"') : '<a class="hm-login" href="#/login">' + t("auth.login") + "</a>") + "</span></div>";
-        var hero = '<section class="hm-hero"><i class="hm-orn" aria-hidden="true"></i>' + hbar +
-          '<div class="hm-hi"><p>' + t(greet) + (first ? ", <b>" + first + "</b>" : "") + "</p><h1>" + t("hm.title") + "</h1></div>" +
-          '<form class="hm-search" data-form="search" role="search">' + I("search", 20) + '<input name="q" placeholder="' + t("sa.searchPh") + '" aria-label="' + t("sa.searchPh") + '" enterkeyhint="search"><button class="hm-go" aria-label="' + t("btn.find") + '">' + I("chevR", 18) + "</button></form></section>";
-        /* the services: one big card for the first, neat cards with a line about each for the rest (no round stickers) */
-        /* the services: one compact grid of small tiles (like Yandex Go) — the working ones first, the «soon» ones after, dimmed with a small badge */
+        var hero = '<section class="hm-top">' + hbar + (first ? '<p class="hm-hi2">' + t(greet) + ", <b>" + first + "</b></p>" : "") +
+          '<form class="hm-search2" data-form="search" role="search">' + I("search", 17) + '<input name="q" placeholder="' + t("sa.searchPh") + '" aria-label="' + t("sa.searchPh") + '" enterkeyhint="search"></form></section>';
+        /* the services: one quiet row of small flat icons; «soon» ones are grey with a small word under the name — no stickers */
         var svOff = SF.SERVICES.filter(function (x) { return !(SF.svcOn(x[0]) && x[3]); });
-        var tile = function (x, on) { return (on ? '<a href="#' + x[3] + '"' : '<button type="button" data-act="soon" data-k="' + x[0] + '"') + ' class="hm-gt' + (on ? "" : " soon") + '" style="--sb:' + x[2] + '">' +
-          SF.svVis(x[0], false) + "<b>" + t("svs." + x[0]) + "</b>" + (on ? "" : '<i class="hm-gsoon">' + t("sv.soonS") + "</i>") + (on ? "</a>" : "</button>"); };
-        var svc = !svOn.length && !svOff.length ? "" : '<section class="hm-svc"><div class="hm-h"><div><h2>' + t("sv.title") + '</h2></div><a href="#/services">' + t("sa.allR") + I("chevR", 14) + "</a></div>" +
-          '<nav class="hm-grid" aria-label="' + t("sv.title") + '">' + svOn.map(function (x) { return tile(x, true); }).join("") + svOff.map(function (x) { return tile(x, false); }).join("") + "</nav></section>";
+        var tile = function (x, on) { var L = SV_LOOK[x[0]] || ["#9AA6A1", "#5E6964", "grid"];
+          return (on ? '<a href="#' + x[3] + '"' : '<button type="button" data-act="soon" data-k="' + x[0] + '"') + ' class="hm-s' + (on ? "" : " soon") + '">' +
+            '<span class="hm-sic" style="--c:' + L[1] + '" aria-hidden="true">' + I(L[2], 20) + "</span><b>" + t("svs." + x[0]) + "</b>" + (on ? "" : "<small>" + t("sv.soonS").toLowerCase() + "</small>") + (on ? "</a>" : "</button>"); };
+        var svc = !svOn.length && !svOff.length ? "" : '<nav class="hm-srow" aria-label="' + t("sv.title") + '">' + svOn.map(function (x) { return tile(x, true); }).join("") + svOff.map(function (x) { return tile(x, false); }).join("") + "</nav>";
         var slides = banners.map(function (b) { return SF.bannerHtml(b, "a"); });
         var ban = !slides.length ? "" : '<section class="hm-offers"><div class="banners hm-ban" id="banners" aria-label="' + t("home.offers") + '">' + slides.join("") + "</div>" + (slides.length > 1 ? '<div class="bdots" aria-hidden="true">' + slides.map(function (b, i) { return '<i class="' + (i ? "" : "on") + '"></i>'; }).join("") + "</div>" : "") + "</section>";
         function sect(title, sub, href, body, cls) { return '<section class="hm-sect' + (cls ? " " + cls : "") + '"><div class="hm-h"><div><h2>' + title + "</h2>" + (sub ? "<p>" + sub + "</p>" : "") + "</div>" + (href ? '<a href="#' + href + '">' + t("sa.allR") + I("chevR", 14) + "</a>" : "") + "</div>" + body + "</section>"; }

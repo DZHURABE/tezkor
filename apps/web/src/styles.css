@@ -2510,3 +2510,92 @@ html,body{max-width:100%;overflow-x:clip}
   .tcreate span .ic{width:22px;height:22px}
   .tcreate{font-size:10px;min-height:44px}
 }
+/* ================= REFINED HOME (2026-10): small, calm, native-app feel ================= */
+.hm-top{display:flex;flex-direction:column;gap:10px;padding:10px 0 2px}
+.hm-top .hm-bar{display:flex;align-items:center;gap:8px;margin:0}
+.hm-top .hm-logo{display:flex}
+.hm-top .hm-city{display:flex;flex-direction:column;align-items:flex-start;border:0;background:none;padding:0;font:inherit;color:var(--ink);line-height:1.15;cursor:pointer}
+.hm-top .hm-city small{font-size:11px;color:var(--muted);font-weight:500}
+.hm-top .hm-city b{display:flex;align-items:center;gap:2px;font-size:14px;font-weight:600}
+.hm-top .hm-acts{margin-left:auto;display:flex;align-items:center;gap:4px}
+.hm-top .hm-ib,.hm-top .iconbtn.hm-ib{width:36px!important;height:36px!important;border-radius:10px!important;background:transparent!important;border:0!important;box-shadow:none!important;color:var(--ink)!important}
+.hm-top .hm-ib .ic{width:20px;height:20px}
+.hm-top .hm-login{font-size:13px;font-weight:600;color:#fff;background:var(--brand);padding:7px 12px;border-radius:10px;text-decoration:none}
+.hm-hi2{margin:0;font-size:13px;color:var(--muted)}.hm-hi2 b{color:var(--ink);font-weight:600}
+.hm-search2{display:flex;align-items:center;gap:8px;height:38px;padding:0 12px;border-radius:11px;background:var(--surface-2);color:var(--muted);border:1px solid var(--line)}
+.hm-search2 input{flex:1;min-width:0;border:0;background:none;outline:none;font:inherit;font-size:14px;color:var(--ink)}
+.hm-srow{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;margin:14px -4px 0;padding:0 4px 2px}
+.hm-srow::-webkit-scrollbar{display:none}
+.hm-s{flex:0 0 62px;display:flex;flex-direction:column;align-items:center;gap:5px;border:0;background:none;padding:2px 0;font:inherit;color:var(--ink);text-decoration:none;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.hm-s:active .hm-sic{transform:scale(.92)}
+.hm-sic{display:grid;place-items:center;width:42px;height:42px;border-radius:12px;background:var(--c);color:#fff;transition:transform .15s}
+.hm-sic .ic{width:20px;height:20px;stroke-width:1.8}
+.hm-s b{font-size:11px;font-weight:500;line-height:1.15;max-width:62px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hm-s.soon .hm-sic{background:var(--surface-2);color:var(--muted);border:1px solid var(--line)}
+.hm-s.soon b{color:var(--muted)}
+.hm-s small{font-size:9px;font-weight:600;color:#E5484D;margin-top:-3px}
+/* sections, banner, shop and goods: smaller and lighter on phones */
+@media (max-width:760px){
+  .hm .hm-h{margin:0 0 8px!important;align-items:baseline}
+  .hm .hm-h h2,.hm .sect2 h2,.hm .sasect h2{font:600 16px/1.2 var(--fb)!important;letter-spacing:0!important}
+  .hm .hm-h p,.hm .sect2 .muted{font-size:12px!important}
+  .hm .hm-h a{font-size:13px!important;font-weight:500!important;padding:0!important;background:none!important;color:var(--brand-text)!important}
+  .hm-svc,.hm-sect,.hm-offers,.hm .sasect{margin-top:18px!important}
+  .hm .hm-ban .banner{height:120px!important;border-radius:14px!important}
+  .hm .banner b{font-size:16px!important}.hm .banner span{font-size:12px!important}
+  .hm .bdots{margin-top:6px}
+  /* own shop card */
+  .hm .ownshop{padding:0!important;background:none!important;border:0!important;box-shadow:none!important}
+  .hm .ownshop .osline{padding:10px 12px!important;border-radius:14px!important;min-height:0!important;gap:10px!important}
+  .hm .ownshop .oslogo{width:36px!important;height:36px!important;border-radius:10px!important}
+  .hm .ownshop .osline b{font:600 15px/1.2 var(--fb)!important}
+  .hm .ownshop .osline small{font-size:12px!important}
+  .hm .ownshop .osgo{font-size:12.5px!important;padding:6px 10px!important;border-radius:9px!important}
+  .hm .osrow,.hm .goodsrow{gap:8px!important;padding:8px 0 4px!important}
+  .hm .osi,.hm .goodsrow .gwrap{flex:0 0 132px!important;width:132px!important;animation:none!important}
+  /* product cards inside the home rows */
+  .hm .pcard{border-radius:12px!important;box-shadow:none!important;border:1px solid var(--line)}
+  .hm .pcard .pimg{aspect-ratio:1/1!important}
+  .hm .pcard .chip{font-size:10px!important;padding:2px 6px!important;top:6px!important;left:6px!important}
+  .hm .pcard .fav,.hm .pcard .favbtn{width:28px!important;height:28px!important;top:6px!important;right:6px!important}
+  .hm .pbody{padding:7px 8px 8px!important;gap:2px!important}
+  .hm .pbrand{font-size:10px!important;letter-spacing:.02em}
+  .hm .pname{font-size:12.5px!important;font-weight:500!important;line-height:1.25!important;-webkit-line-clamp:2}
+  .hm .pdesc{display:none!important}
+  .hm .prow{margin-top:4px!important;gap:4px!important;align-items:center}
+  .hm .price{font-size:14px!important;font-weight:600!important}
+  .hm .price small,.hm .vfrom{font-size:10px!important}
+  .hm .prow .btn,.hm .prow .varbtn,.hm .stepper button{height:28px!important;min-height:28px!important;padding:0 9px!important;font-size:12px!important;border-radius:8px!important;box-shadow:none!important}
+  .hm .stepper{height:28px!important}
+  .hm .gshop{font-size:11px!important}
+  /* listings */
+  .hm .adtiles{gap:8px!important}
+  .hm .adtile{border-radius:12px!important;box-shadow:none!important;border:1px solid var(--line)}
+  .hm .adtile .atbody b{font-size:14px!important;font-weight:600!important}
+  .hm .adtile .atbody span{font-size:12px!important}
+  .hm .adtile .atbody small{font-size:10.5px!important}
+  /* bottom bar: flat and thin, everywhere on phones */
+  .tabbar,.tabbar.show{left:0!important;right:0!important;bottom:0!important;border-radius:0!important;border:0!important;border-top:1px solid var(--line)!important;box-shadow:none!important;padding:4px 4px calc(4px + env(safe-area-inset-bottom,0px))!important;background:var(--surface)!important}
+  .tabbar a{min-height:46px!important;font-size:10px!important;font-weight:500!important}
+  .tabbar a .ic{padding:0!important;background:none!important;width:22px!important;height:22px!important}
+  .tabbar a.on{color:var(--brand)!important;font-weight:600!important}
+  .tcreate{min-height:46px!important;font-size:10px!important;font-weight:500!important;justify-content:center!important}
+  .tcreate span{width:34px!important;height:28px!important;margin:0!important;border-radius:9px!important;box-shadow:none!important}
+  .tcreate span .ic{width:18px!important;height:18px!important}
+  .cartfab{bottom:calc(64px + env(safe-area-inset-bottom,0px))!important}
+}
+@media (max-width:760px){
+  .hm .addbtn{width:28px!important;height:28px!important;border-radius:8px!important;box-shadow:none!important}
+  .hm .addbtn .ic{width:16px;height:16px}
+  .hm .stockl{font-size:10px!important;padding:1px 6px!important;margin-top:2px}
+  .hm .pcard .prow{min-height:0!important}
+  .hm .nophoto2{font-size:11px!important}
+  .hm .adtiles{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+  .hm .adtile .atimg{aspect-ratio:4/3!important;height:auto!important}
+  .hm .adtile .atsvc{display:none!important}
+  .hm .adtile .atbody{padding:7px 9px 9px!important;gap:1px!important}
+  .hm .banner{padding:14px 16px!important}
+  .hm .banner b{font-size:15px!important}
+  .hm .banner .bgo{font-size:12px!important;padding:6px 10px!important;margin-top:6px!important}
+  .hm .banner .bart{transform:scale(.8);transform-origin:right center}
+}
