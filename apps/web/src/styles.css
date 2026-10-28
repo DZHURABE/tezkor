@@ -2596,3 +2596,66 @@ html,body{max-width:100%;overflow-x:clip}
 .hx-art{top:64px;width:54%;-webkit-mask-image:linear-gradient(90deg,transparent 0,rgba(0,0,0,.35) 18%,#000 45%);mask-image:linear-gradient(90deg,transparent 0,rgba(0,0,0,.35) 18%,#000 45%)}
 .hx-hi{max-width:64%}.hx-hi h1,.hx-hi p,.hx-hi small{text-shadow:0 2px 12px rgba(0,0,0,.6)}
 .hx-s .sve.svgr{box-shadow:none}.hx-s .sve.svgr::after{display:none}
+/* HX: small and dense on phones — the screen is full, like the owner's picture */
+@media (max-width:760px){
+  .hx-hero{padding:10px 12px 12px;min-height:0;border-radius:0 0 20px 20px;margin:-8px -16px 0}
+  .hx-bar{gap:8px}.hx-logo .tzmark{width:36px;height:36px}
+  .hx-brand>b{font-size:19px}.hx-city{font-size:12px;margin-top:2px}.hx-city .ic{width:13px;height:13px}
+  .hx-ib,.hx-acts .iconbtn.hx-ib{width:32px!important;height:32px!important;border-radius:10px!important}
+  .hx-ib .ic{width:17px;height:17px}.hx-acts{gap:5px}
+  .hx-login{font-size:12px;padding:6px 10px;border-radius:9px}
+  .hx-art{top:46px;width:50%;max-width:200px}
+  .hx-hi{margin-top:12px;max-width:62%}
+  .hx-hi small{font-size:10.5px;margin-bottom:2px}
+  .hx-hi h1{font-size:19px;line-height:1.05}
+  .hx-hi p{font-size:11px;margin-top:5px}
+  .hx-search{height:40px;margin-top:12px;padding:0 4px 0 12px;gap:8px}
+  .hx-search .ic{width:16px;height:16px}.hx-search input{font-size:13px}
+  .hx-go{width:32px;height:32px}.hx-go .ic{width:15px;height:15px}
+  .hx-svc{gap:6px;margin-top:10px}
+  .hx-s{flex:0 0 58px;height:70px;padding:6px 2px 6px;border-radius:13px;gap:3px}
+  .hx-s img{width:36px;height:36px}.hx-s .sve{width:34px;height:34px;border-radius:10px}.hx-s .sve .ic{width:18px;height:18px}
+  .hx-s b{font-size:9.5px;font-weight:600}
+  .hx-soon{top:3px;right:3px;font-size:7px;padding:2px 3px;border-radius:4px}
+  .hx .hm-offers{margin-top:10px!important}
+  .hx .hm-ban .banner{height:112px!important;border-radius:14px!important;padding:12px 14px!important}
+  .hx .banner b{font-size:15px!important}.hx .banner span{font-size:11px!important}
+  .hx .banner .bgo{font-size:11px!important;padding:5px 10px!important;margin-top:4px!important}
+  .hx .banner .bart{transform:scale(.7)!important;transform-origin:right center}
+  .hx .bdots{margin-top:5px!important}
+  .hx-sec{margin-top:12px}
+  .hx-h{margin-bottom:7px}
+  .hx-h h2{font-size:15px}
+  .hx-h a{font-size:11px;padding:4px 8px}.hx-h a .ic{width:12px;height:12px}
+  .hx-row{gap:7px}
+  .hx-shop{flex:0 0 132px;border-radius:12px}
+  .hx-scov{height:72px}
+  .hx-sb{padding:6px 8px 7px;gap:3px}
+  .hx-sb>b{font-size:12px}
+  .hx-sm{font-size:10.5px;gap:3px}.hx-star .ic{width:11px;height:11px}
+  .hx-sm em{font-size:8.5px;padding:2px 5px}
+  .hx-hrs{font-size:10px}.hx-hrs .ic{width:11px;height:11px}
+  .hx-good{flex:0 0 104px;border-radius:12px;padding-bottom:6px}
+  .hx-gimg{height:88px}
+  .hx-good .favbtn{width:24px;height:24px;top:4px;right:4px}.hx-good .favbtn .ic{width:13px;height:13px}
+  .hx-gn{margin:6px 7px 0;font-size:11px;min-height:27px}
+  .hx-gp{margin:1px 7px 5px;font-size:13px}
+  .hx-gbar{margin:auto 6px 0;height:26px;border-radius:8px;font-size:11px}
+  .hx-gbar .ic{width:13px;height:13px}.hx-gbar button{width:22px;height:22px}
+  .hx-off{font-size:9px;left:4px;bottom:4px}
+  .hx-duo{gap:7px;margin-top:12px}
+  .hx-t{min-height:56px;padding:8px;border-radius:14px;gap:6px}
+  .hx-ti{width:28px;height:28px;border-radius:8px}.hx-ti .ic{width:16px;height:16px}
+  .hx-t b{font-size:11.5px}.hx-t small{font-size:9.5px}
+  .hx .hm-sect,.hx .sasect{margin-top:12px!important}
+  .hx .hm-h h2{font:800 15px/1.2 var(--fd)!important}.hx .hm-h p{font-size:11px!important}
+  .hx .adtiles{gap:7px!important}
+  .hx .adtile{border-radius:12px!important}
+  .hx .adtile .atimg{aspect-ratio:4/3!important;height:auto!important}
+  .hx .adtile .atbody b{font-size:13px!important}.hx .adtile .atbody span{font-size:11px!important}.hx .adtile .atbody small{font-size:10px!important}
+  .hx .adtile .atsvc{font-size:9px!important;padding:2px 6px!important}
+  .tabbar a{font-size:10px!important;min-height:44px!important}
+  .tcreate span{width:44px!important;height:44px!important;margin-top:-16px!important}
+}
+@media (max-width:760px){.hx-s{min-width:0;max-width:58px;width:58px}.hx-s b{max-width:54px}}
+.hx-s .sve{display:grid;place-items:center;flex:none}
