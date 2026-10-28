@@ -75,15 +75,19 @@
         var hbar = '<div class="hx-bar"><a href="#/" class="hx-logo" aria-label="' + esc(SF.brand()) + '">' + SF.mark(46) + "</a>" +
           '<div class="hx-brand"><b>' + esc(SF.brand()) + '</b><button type="button" class="hx-city" data-act="city">' + I("pin", 15) + "<span>" + esc(city ? tx(city.name) : "") + "</span>" + I("chevD", 14) + "</button></div>" +
           '<span class="hx-acts">' + (SF.appBtn ? SF.appBtn("hx-ib hm-app") : "") + SF.themeBtn("hx-ib") + (u ? SF.bell().replace('class="iconbtn"', 'class="iconbtn hx-ib"') : '<a class="hx-login" href="#/login">' + t("auth.login") + "</a>") + "</span></div>";
-        var hero = '<section class="hx-hero">' + (art.hero ? '<img class="hx-art" src="' + art.hero + '" alt="">' : "") + '<i class="hx-shade" aria-hidden="true"></i>' + hbar +
+        var A2 = SF.ART2 || {};
+        /* quick chips under the search: discounts + the shop categories */
+        var chipsH = '<div class="hx-chips"><a href="#/shops/goods?sale=1" class="hx-chip hot">' + I("tag", 13) + t("hx.saleT") + "</a>" + (SF.state.shopCats || []).slice(0, 8).map(function (c) { return '<a href="#/shops/goods?cat=' + encodeURIComponent(c.id) + '" class="hx-chip">' + esc(tx(c.name)) + "</a>"; }).join("") + "</div>";
+        var hero = '<section class="hx-hero hx3">' + (A2.hero || art.hero ? '<img class="hx-art" src="' + (A2.hero || art.hero) + '" alt="">' : "") + '<i class="hx-shade" aria-hidden="true"></i>' + hbar +
           '<div class="hx-hi">' + (first ? '<small>' + t(greet) + ", " + first + "</small>" : "") + "<h1>" + t("hx.t1") + "<em>" + t("hx.t2") + "</em></h1><p>" + t("hx.sub") + "</p></div>" +
-          '<form class="hx-search" data-form="search" role="search">' + I("search", 20) + '<input name="q" placeholder="' + t("hx.searchPh") + '" aria-label="' + t("hx.searchPh") + '" enterkeyhint="search"><button class="hx-go" aria-label="' + t("btn.find") + '">' + I("chevR", 18) + "</button></form></section>";
+          '<form class="hx-search" data-form="search" role="search">' + I("search", 20) + '<input name="q" placeholder="' + t("hx.searchPh") + '" aria-label="' + t("hx.searchPh") + '" enterkeyhint="search"><button class="hx-go" aria-label="' + t("btn.find") + '">' + I("chevR", 18) + "</button></form>" + chipsH + "</section>";
         /* ===== the services: a row of tiles with 3D pictures; «soon» ones dimmed with a small word ===== */
         var svOff = SF.SERVICES.filter(function (x) { return !(SF.svcOn(x[0]) && x[3]); });
-        var tile = function (x, on) { var ph = ((SF.state.pub || {}).svcPhotos || {})[x[0]], pic = ph || art.svc[x[0]];
+        var tile = function (x, on) { var ph = ((SF.state.pub || {}).svcPhotos || {})[x[0]], pic = ph || A2[x[0]] || art.svc[x[0]];
           return (on ? '<a href="#' + x[3] + '"' : '<button type="button" data-act="soon" data-k="' + x[0] + '"') + ' class="hx-s' + (on ? "" : " soon") + '">' +
-            (pic ? '<img src="' + esc(pic) + '" alt="" loading="lazy">' : SF.svVis(x[0], false)) + "<b>" + t("svs." + x[0]) + "</b>" + (on ? "" : '<i class="hx-soon">' + t("sv.soonS") + "</i>") + (on ? "</a>" : "</button>"); };
-        var svc = !svOn.length && !svOff.length ? "" : '<nav class="hx-svc" aria-label="' + t("sv.title") + '">' + svOn.map(function (x) { return tile(x, true); }).join("") + svOff.map(function (x) { return tile(x, false); }).join("") + "</nav>";
+            (pic ? '<img src="' + esc(pic) + '" alt="" loading="lazy">' : SF.svVis(x[0], false)) + "<b>" + t("svs." + x[0]) + "</b><small>" + t("hxd." + x[0]) + "</small>" + (on ? "" : '<i class="hx-soon">' + t("sv.soonS") + "</i>") + (on ? "</a>" : "</button>"); };
+        var svc = !svOn.length && !svOff.length ? "" : '<nav class="hx-svc hx5" aria-label="' + t("sv.title") + '">' + svOn.map(function (x) { return tile(x, true); }).join("") + svOff.map(function (x) { return tile(x, false); }).join("") +
+          '<a href="#/services" class="hx-s hx-more">' + (A2.more ? '<img src="' + A2.more + '" alt="">' : "") + "<b>" + t("hx.more") + "</b><small>" + t("hxd.more") + "</small></a></nav>";
         /* ===== nearby shops: cover, name, rating, open now, hours ===== */
         var shops = (shopList || []).slice().sort(function (a, b) { return (b.own ? 1 : 0) - (a.own ? 1 : 0) || (b.isOpenNow ? 1 : 0) - (a.isOpenNow ? 1 : 0) || (b.rating || 0) - (a.rating || 0); }).slice(0, 10);
         var shopCard = function (r) { var open = r.isOpenNow !== false, pic = r.cover || r.logo, hrs = r.hours ? (r.hours.from === r.hours.to ? t("hr.allDay") : esc(r.hours.from) + " – " + esc(r.hours.to)) : "";
@@ -95,11 +99,12 @@
         var popG = [];
         if (ownShop && ownShop.products) { var ap = ownShop.products.filter(function (x) { return x.available; }); popG = ap.filter(function (x) { return x.popular; }).concat(ap.filter(function (x) { return !x.popular; })).map(function (x) { return Object.assign({}, x, { restaurant: x.restaurant || { id: ownShop.id, name: ownShop.name } }); }); SF.rememberProducts(ownShop.products); }
         ((newGoods && newGoods.list) || []).forEach(function (x) { if (!popG.some(function (y) { return y.id === x.id; })) popG.push(x); });
-        popG = popG.slice(0, 16); SF.rememberProducts(popG);
-        var goodsH = popG.length ? '<section class="hx-sec"><div class="hx-h"><h2>' + t("hx.popular") + '</h2><a href="#/shops/goods">' + t("sa.allR") + I("chevR", 14) + '</a></div><div class="hx-row">' + popG.map(function (p) { return SF.hxGood(p); }).join("") + "</div></section>" : "";
+        popG = popG.filter(function (x) { return x.oldPrice > x.price; }).concat(popG.filter(function (x) { return !(x.oldPrice > x.price); })).slice(0, 16); SF.rememberProducts(popG); var anySale = popG.some(function (x) { return x.oldPrice > x.price; });
+        var goodsH = popG.length ? '<section class="hx-sec"><div class="hx-h"><h2>' + t(anySale ? "hx.deals" : "hx.popular") + '</h2><a href="#/shops/goods' + (anySale ? "?sale=1" : "") + '">' + t("sa.allR") + I("chevR", 14) + '</a></div><div class="hx-row">' + popG.map(function (p) { return SF.hxGood(p); }).join("") + "</div></section>" : "";
         /* ===== two bright tiles ===== */
-        var tiles2 = '<section class="hx-duo"><a class="hx-t hx-t1" href="#/shops/goods?sale=1"><span class="hx-ti">' + I("tag", 26) + '</span><span><b>' + t("hx.saleT") + "</b><small>" + t("hx.saleS") + "</small></span>" + I("chevR", 16) + "</a>" +
-          '<button type="button" class="hx-t hx-t2" data-act="create"><span class="hx-ti">' + I("plus", 26) + '</span><span><b>' + t("hx.postT") + "</b><small>" + t("hx.postS") + "</small></span>" + I("chevR", 16) + "</button></section>";
+        var tiles2 = '<section class="hx-tri"><a class="hx-p hx-p1" href="#/shops/goods?sale=1"><span><b>' + t("hx.saleT") + "</b><small>" + t("hx.saleS") + "</small></span>" + (A2.sale ? '<img src="' + A2.sale + '" alt="">' : I("tag", 30)) + "</a>" +
+          '<button type="button" class="hx-p hx-p2" data-act="create"><span><b>' + t("hx.postT") + "</b><small>" + t("hx.postS") + "</small></span>" + (A2.ads ? '<img src="' + A2.ads + '" alt="">' : I("plus", 30)) + "</button>" +
+          '<a class="hx-p hx-p3" href="#/shops"><span><b>' + t("hx.allShops") + "</b><small>" + t("hx.allShopsS") + "</small></span>" + (A2.shops ? '<img src="' + A2.shops + '" alt="">' : I("store", 30)) + "</a></section>";
         var slides = banners.map(function (b) { return SF.bannerHtml(b, "a"); });
         var ban = !slides.length ? "" : '<section class="hm-offers"><div class="banners hm-ban" id="banners" aria-label="' + t("home.offers") + '">' + slides.join("") + "</div>" + (slides.length > 1 ? '<div class="bdots" aria-hidden="true">' + slides.map(function (b, i) { return '<i class="' + (i ? "" : "on") + '"></i>'; }).join("") + "</div>" : "") + "</section>";
         function sect(title, sub, href, body, cls) { return '<section class="hm-sect' + (cls ? " " + cls : "") + '"><div class="hm-h"><div><h2>' + title + "</h2>" + (sub ? "<p>" + sub + "</p>" : "") + "</div>" + (href ? '<a href="#' + href + '">' + t("sa.allR") + I("chevR", 14) + "</a>" : "") + "</div>" + body + "</section>"; }
@@ -111,7 +116,7 @@
         var goods = ((newGoods && newGoods.list) || []).filter(function (x) { return !ownShop || x.restaurantId !== ownShop.id; }).slice(0, 16); SF.rememberProducts(goods);
         var gdH = goods.length ? sect(t("sv.shops"), t("hm.goodsSub"), "/shops/goods", '<div class="hscroll goodsrow onerow">' + goods.map(goodCard).join("") + "</div>") : "";
         var store = SF.ownShopHero ? SF.ownShopHero(ownShop) : "";
-        return '<div class="sahome hm hx">' + (SF.installBar ? SF.installBar() : "") + hero + svc + ban + shopsH + goodsH + tiles2 + adsH + (SF.soonBlock ? SF.soonBlock() : "") + (SF.svcOn("food") ? promo + popH : "") + "</div>";
+        return '<div class="sahome hm hx">' + (SF.installBar ? SF.installBar() : "") + hero + svc + ban + tiles2 + shopsH + goodsH + adsH + (SF.soonBlock ? SF.soonBlock() : "") + (SF.svcOn("food") ? promo + popH : "") + "</div>";
       });
     });
   }
@@ -144,7 +149,7 @@
       q ? '<span class="hx-gbar"><button type="button" data-act="dec" data-id="' + p.id + '" aria-label="' + t("a.less") + '">' + I("minus", 16) + '</button><b class="num">' + q + '</b><button type="button" data-act="add" data-id="' + p.id + '" aria-label="' + t("a.more") + '">' + I("plus", 16) + "</button></span>"
         : '<button type="button" class="hx-gbar one" data-act="add" data-id="' + p.id + '">' + I("plus", 16) + t("hx.toCart") + "</button>";
     return '<div class="hx-good"><button type="button" class="hx-gimg" data-act="prod" data-id="' + p.id + '" aria-label="' + esc(tx(p.name)) + '">' + SF.pic(p, 110) + (off ? '<i class="hx-off">−' + off + "%</i>" : "") + "</button>" +
-      (SF.favBtn ? SF.favBtn("p", p.id) : "") + '<span class="hx-gn">' + esc(tx(p.name)) + (p.weight && !hasV ? " " + esc(p.weight) : "") + '</span><b class="hx-gp num">' + (hasV ? t("var.from") + " " : "") + money(p.price) + "</b>" + bar + "</div>"; };
+      (SF.favBtn ? SF.favBtn("p", p.id) : "") + '<span class="hx-gn">' + esc(tx(p.name)) + (p.weight && !hasV ? " " + esc(p.weight) : "") + '</span><b class="hx-gp num">' + (hasV ? t("var.from") + " " : "") + money(p.price) + (p.oldPrice > p.price ? ' <s class="hx-old">' + money(p.oldPrice) + "</s>" : "") + "</b>" + bar + "</div>"; };
   function goodCard(p) { return '<div class="gwrap">' + SF.prodCard(p) + '<a class="gshop" href="#/r/' + p.restaurant.id + '">' + I("store", 12) + esc(tx(p.restaurant.name)) + "</a></div>"; }
   SF.route("/shops/goods", { title: "sv.shops", render: function (p, q) {
     if (!SF.svcOn("shops") && !(SF.state.user && SF.state.user.role === "admin")) { SF.go("/"); return ""; }
