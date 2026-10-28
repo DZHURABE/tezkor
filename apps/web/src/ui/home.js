@@ -137,6 +137,7 @@
   function gcurQ() { return SF.match(SF.path()).query || {}; }
   function gapi(q, off) { return "/shops/goods?cityId=" + encodeURIComponent(SF.state.cityId) + SF.areaQ() + (q.q ? "&q=" + encodeURIComponent(q.q) : "") + (q.cat ? "&cat=" + q.cat : "") + (q.brand ? "&brand=" + encodeURIComponent(q.brand) : "") + (q.min ? "&priceMin=" + q.min : "") + (q.max ? "&priceMax=" + q.max : "") + (q.sale ? "&sale=1" : "") + (q.sort ? "&sort=" + q.sort : "") + "&offset=" + off + "&limit=20"; }
   SF.goodCard = function (p) { return goodCard(p); };
+  SF.after.push(function () { if (SF.barTone) SF.barTone(); });
   /* a product on the home row: picture, heart, name, price, and an orange «− 1 +» bar */
   SF.hxGood = function (p) { var q = SF.cart.qty(p.id), hasV = p.variants && p.variants.length, off = SF.sale ? SF.sale(p) : 0;
     var bar = !p.available ? '<span class="hx-gbar off">' + t("prod.soldout") + "</span>" : hasV ? '<button type="button" class="hx-gbar" data-act="prod" data-id="' + p.id + '">' + t("var.choose") + "</button>" :

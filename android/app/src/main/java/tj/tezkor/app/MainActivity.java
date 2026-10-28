@@ -65,12 +65,22 @@ public class MainActivity extends Activity {
         root.addView(top, new android.widget.LinearLayout.LayoutParams(-1, 0));
         root.addView(web, new android.widget.LinearLayout.LayoutParams(-1, 0, 1f));
         root.addView(bottom, new android.widget.LinearLayout.LayoutParams(-1, 0));
-        if (Build.VERSION.SDK_INT >= 30) root.setOnApplyWindowInsetsListener((v, ins) -> {
-            android.graphics.Insets b = ins.getInsets(android.view.WindowInsets.Type.systemBars() | android.view.WindowInsets.Type.displayCutout());
-            android.graphics.Insets ime = ins.getInsets(android.view.WindowInsets.Type.ime());
-            top.getLayoutParams().height = b.top; bottom.getLayoutParams().height = Math.max(b.bottom, ime.bottom);
-            root.setPadding(b.left, 0, b.right, 0); top.requestLayout(); bottom.requestLayout();
-            return android.view.WindowInsets.CONSUMED; });
+        /* full screen: the page runs up under the status bar (the home picture reaches the clock and battery);
+           the page gets the bar's height as --sat and keeps its own text clear of it */
+        getWindow().setStatusBarColor(Color.TRANSPARENT);
+        if (Build.VERSION.SDK_INT >= 30) getWindow().setDecorFitsSystemWindows(false);
+        else getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN);
+        root.setOnApplyWindowInsetsListener((v, ins) -> {
+            int t, bt, l, r, kb;
+            if (Build.VERSION.SDK_INT >= 30) {
+                android.graphics.Insets b = ins.getInsets(android.view.WindowInsets.Type.systemBars() | android.view.WindowInsets.Type.displayCutout());
+                android.graphics.Insets ime = ins.getInsets(android.view.WindowInsets.Type.ime());
+                t = b.top; bt = b.bottom; l = b.left; r = b.right; kb = ime.bottom;
+            } else { t = ins.getSystemWindowInsetTop(); bt = ins.getSystemWindowInsetBottom(); l = ins.getSystemWindowInsetLeft(); r = ins.getSystemWindowInsetRight(); kb = 0; }
+            top.getLayoutParams().height = 0; bottom.getLayoutParams().height = Math.max(bt, kb);
+            root.setPadding(l, 0, r, 0); top.requestLayout(); bottom.requestLayout();
+            satPx = Math.round(t / getResources().getDisplayMetrics().density); pushSat();
+            return Build.VERSION.SDK_INT >= 30 ? android.view.WindowInsets.CONSUMED : ins.consumeSystemWindowInsets(); });
         setContentView(root);
 
         WebSettings s = web.getSettings();
@@ -213,12 +223,25 @@ public class MainActivity extends Activity {
         }
 
         @JavascriptInterface
+        public void statusBar(final boolean lightIcons) { statusIcons(lightIcons); }
+
+        @JavascriptInterface
         public String version() {
             return BuildInfo.version(MainActivity.this);
         }
     }
 
+    private int satPx = 0;
+    private void pushSat() { if (web != null) web.post(() -> web.evaluateJavascript("document.documentElement.style.setProperty('--sat','" + satPx + "px');document.documentElement.classList.add('inapp-full')", null)); }
+    /** white or dark clock and battery icons, as the page asks (white over the dark home picture) */
+    void statusIcons(boolean light) { runOnUiThread(() -> {
+        if (Build.VERSION.SDK_INT >= 30) { android.view.WindowInsetsController c = getWindow().getInsetsController(); if (c != null) c.setSystemBarsAppearance(light ? 0 : android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS, android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS); }
+        else if (Build.VERSION.SDK_INT >= 23) { View d = getWindow().getDecorView(); int f = d.getSystemUiVisibility(); d.setSystemUiVisibility(light ? f & ~View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR : f | View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR); } }); }
+
     private class Client extends WebViewClient {
+        @Override
+        public void onPageFinished(WebView view, String url) { super.onPageFinished(view, url); pushSat(); }
+
         @Override
         public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest req) {
             Uri u = req.getUrl();

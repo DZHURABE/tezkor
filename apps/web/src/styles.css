@@ -2659,3 +2659,14 @@ html,body{max-width:100%;overflow-x:clip}
 }
 @media (max-width:760px){.hx-s{min-width:0;max-width:58px;width:58px}.hx-s b{max-width:54px}}
 .hx-s .sve{display:grid;place-items:center;flex:none}
+/* full screen inside the app (APK): the page sits under the status bar; --sat = its height */
+:root.inapp-full body{padding-top:var(--sat,0px)}
+:root.inapp-full body::before{content:"";position:fixed;left:0;right:0;top:0;height:var(--sat,0px);z-index:1000;background:var(--bg);pointer-events:none}
+:root.inapp-full.on-home body::before{background:#121416}
+:root.inapp-full .hx-hero{margin-top:calc(-8px - var(--sat,0px));padding-top:calc(10px + var(--sat,0px))}
+:root.inapp-full .ptop,:root.inapp-full .ctop{top:var(--sat,0px)}
+:root.inapp-full.on-home body::before{display:none}
+:root.inapp-full .hx-art{top:calc(var(--sat,0px) + 8px)}
+@media (max-width:760px){.hx-hero{margin-top:-30px}}
+:root.inapp-full .hx-hero{margin-top:calc(-30px - var(--sat,0px))}
+:root.inapp-full .hx-art{top:2px;width:56%}
