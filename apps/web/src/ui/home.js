@@ -83,7 +83,7 @@
           '<form class="hx-search" data-form="search" role="search">' + I("search", 20) + '<input name="q" placeholder="' + t("hx.searchPh") + '" aria-label="' + t("hx.searchPh") + '" enterkeyhint="search"><button class="hx-go" aria-label="' + t("btn.find") + '">' + I("chevR", 18) + "</button></form>" + chipsH + "</section>";
         /* ===== the services: a row of tiles with 3D pictures; «soon» ones dimmed with a small word ===== */
         var svOff = SF.SERVICES.filter(function (x) { return !(SF.svcOn(x[0]) && x[3]); });
-        var tile = function (x, on) { var ph = ((SF.state.pub || {}).svcPhotos || {})[x[0]], pic = ph || A2[x[0]] || art.svc[x[0]];
+        var tile = function (x, on) { var ph = ((SF.state.pub || {}).svcPhotos || {})[x[0]], pic = A2[x[0]] || art.svc[x[0]] || ph;
           return (on ? '<a href="#' + x[3] + '"' : '<button type="button" data-act="soon" data-k="' + x[0] + '"') + ' class="hx-s' + (on ? "" : " soon") + '">' +
             (pic ? '<img src="' + esc(pic) + '" alt="" loading="lazy">' : SF.svVis(x[0], false)) + "<b>" + t("svs." + x[0]) + "</b><small>" + t("hxd." + x[0]) + "</small>" + (on ? "" : '<i class="hx-soon">' + t("sv.soonS") + "</i>") + (on ? "</a>" : "</button>"); };
         var svc = !svOn.length && !svOff.length ? "" : '<nav class="hx-svc hx5" aria-label="' + t("sv.title") + '">' + svOn.map(function (x) { return tile(x, true); }).join("") + svOff.map(function (x) { return tile(x, false); }).join("") +
