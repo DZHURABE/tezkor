@@ -2480,3 +2480,33 @@ html,body{max-width:100%;overflow-x:clip}
   .ptop .lang select,.ctop .lang select{width:100%;min-width:0;color:transparent;text-shadow:none}
   .ptop .lang select option,.ctop .lang select option{color:var(--ink)}
 }
+/* ===== compact home (phones): smaller hero, one grid of small service tiles, slimmer bottom bar ===== */
+.hm-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px 6px}
+@media (min-width:761px){.hm-grid{grid-template-columns:repeat(8,minmax(0,1fr))}}
+.hm-gt{position:relative;display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px 2px 6px;border:0;background:none;color:var(--ink);font:inherit;text-decoration:none;cursor:pointer;border-radius:14px;-webkit-tap-highlight-color:transparent}
+.hm-gt:active{transform:scale(.95)}
+.hm-gt .sve{display:grid;place-items:center;width:50px;height:50px;border-radius:16px;flex:none}.hm-gt .sve .ic{width:24px;height:24px}
+.hm-gt b{font-size:11.5px;font-weight:600;line-height:1.2;text-align:center;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hm-gt.soon .sve{filter:saturate(.35);opacity:.6}.hm-gt.soon b{color:var(--muted)}
+.hm-gsoon{position:absolute;top:2px;right:calc(50% - 34px);font-style:normal;font-size:9px;font-weight:800;line-height:1;padding:3px 5px;border-radius:999px;background:#E5383B;color:#fff;box-shadow:0 0 0 2px var(--bg)}
+@media (max-width:760px){
+  .hm-hero{padding:12px 14px 14px;border-radius:0 0 22px 22px}
+  .hm-bar{margin-bottom:6px}
+  .hm-hi p{font-size:13px}
+  .hm-hi h1{font-size:21px;margin:2px 0 10px;letter-spacing:-.4px}
+  .hm-search{min-height:44px;border-radius:14px;padding:0 4px 0 12px;gap:8px}
+  .hm-search input{font-size:15px}
+  .hm-search .hm-go{width:36px;height:36px;border-radius:11px}
+  .hm-ib,.hm .hm-ib{width:38px!important;height:38px!important;border-radius:12px!important}
+  .hm-logo .tzmark{width:34px;height:34px}
+  .hm-city b{font-size:15px}
+  .hm .hm-h h2,.sahome .hm-h h2,.hm-sect .hm-h h2{font-size:18px;letter-spacing:-.2px}
+  .hm .hm-h a{font-size:13px;padding:5px 10px}
+  .hm-svc,.hm-sect,.hm-offers{margin-top:14px!important}
+  .hm .hm-ban .banner{height:140px}
+  .tabbar a{font-size:10px;min-height:44px}
+  .tabbar a .ic{padding:4px 12px;width:20px;height:20px}
+  .tcreate span{width:44px;height:44px;margin-top:-16px}
+  .tcreate span .ic{width:22px;height:22px}
+  .tcreate{font-size:10px;min-height:44px}
+}

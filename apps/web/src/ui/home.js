@@ -77,13 +77,12 @@
           '<div class="hm-hi"><p>' + t(greet) + (first ? ", <b>" + first + "</b>" : "") + "</p><h1>" + t("hm.title") + "</h1></div>" +
           '<form class="hm-search" data-form="search" role="search">' + I("search", 20) + '<input name="q" placeholder="' + t("sa.searchPh") + '" aria-label="' + t("sa.searchPh") + '" enterkeyhint="search"><button class="hm-go" aria-label="' + t("btn.find") + '">' + I("chevR", 18) + "</button></form></section>";
         /* the services: one big card for the first, neat cards with a line about each for the rest (no round stickers) */
-        /* services not started yet (taxi, pharmacy…): a short row of «Скоро» tiles under the working ones */
+        /* the services: one compact grid of small tiles (like Yandex Go) — the working ones first, the «soon» ones after, dimmed with a small badge */
         var svOff = SF.SERVICES.filter(function (x) { return !(SF.svcOn(x[0]) && x[3]); });
-        var soonRow = svOff.length ? '<p class="hm-soonh">' + SF.soonBadge(true) + " " + t("sv.soonTitle") + '</p><div class="hm-soon" aria-label="' + t("sv.soonTitle") + '">' + svOff.map(function (x) { return '<button type="button" class="hm-soont" data-act="soon" data-k="' + x[0] + '" style="--sb:' + x[2] + '">' + SF.svVis(x[0], false) + "<b>" + t("svs." + x[0]) + "</b>" + SF.soonBadge(true) + "</button>"; }).join("") + "</div>" : "";
+        var tile = function (x, on) { return (on ? '<a href="#' + x[3] + '"' : '<button type="button" data-act="soon" data-k="' + x[0] + '"') + ' class="hm-gt' + (on ? "" : " soon") + '" style="--sb:' + x[2] + '">' +
+          SF.svVis(x[0], false) + "<b>" + t("svs." + x[0]) + "</b>" + (on ? "" : '<i class="hm-gsoon">' + t("sv.soonS") + "</i>") + (on ? "</a>" : "</button>"); };
         var svc = !svOn.length && !svOff.length ? "" : '<section class="hm-svc"><div class="hm-h"><div><h2>' + t("sv.title") + '</h2></div><a href="#/services">' + t("sa.allR") + I("chevR", 14) + "</a></div>" +
-          '<nav class="svb n' + svOn.length + '" aria-label="' + t("sv.title") + '">' + svOn.map(function (x, i) {
-            return '<a href="#' + x[3] + '" class="svb-t svb-' + x[0] + (i === 0 ? " big" : "") + '" style="--i:' + i + ';--sb:' + x[2] + '">' + SF.svVis(x[0], false) +
-              '<span class="svb-tx"><b>' + t("svs." + x[0]) + "</b><small>" + t("svd." + x[0]) + "</small>" + (i === 0 ? '<em>' + t("hm.svOpen") + I("chevR", 14) + "</em>" : "") + "</span></a>"; }).join("") + "</nav>" + soonRow + "</section>";
+          '<nav class="hm-grid" aria-label="' + t("sv.title") + '">' + svOn.map(function (x) { return tile(x, true); }).join("") + svOff.map(function (x) { return tile(x, false); }).join("") + "</nav></section>";
         var slides = banners.map(function (b) { return SF.bannerHtml(b, "a"); });
         var ban = !slides.length ? "" : '<section class="hm-offers"><div class="banners hm-ban" id="banners" aria-label="' + t("home.offers") + '">' + slides.join("") + "</div>" + (slides.length > 1 ? '<div class="bdots" aria-hidden="true">' + slides.map(function (b, i) { return '<i class="' + (i ? "" : "on") + '"></i>'; }).join("") + "</div>" : "") + "</section>";
         function sect(title, sub, href, body, cls) { return '<section class="hm-sect' + (cls ? " " + cls : "") + '"><div class="hm-h"><div><h2>' + title + "</h2>" + (sub ? "<p>" + sub + "</p>" : "") + "</div>" + (href ? '<a href="#' + href + '">' + t("sa.allR") + I("chevR", 14) + "</a>" : "") + "</div>" + body + "</section>"; }
