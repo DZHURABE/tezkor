@@ -2468,3 +2468,4 @@ body{font-size:15.5px;letter-spacing:-.005em;-webkit-font-smoothing:antialiased;
 .soundok span{flex:1}
 .delacc{display:block;margin:6px auto 0;color:var(--muted);text-decoration:underline}
 .dabtn{background:#D7263D;color:#fff}
+.phbtns{display:flex;flex-wrap:wrap;gap:8px}.phbtns label.btn{cursor:pointer}

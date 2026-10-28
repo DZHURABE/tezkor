@@ -1217,4 +1217,6 @@ SF.I18N = {};
   K("da.text", "Номи шумо, рақам, суроғаҳо ва дилхоҳҳо нест мешаванд. Фармоишҳои гузашта бе маълумоти шахсӣ барои ҳисоб мемонанд. Инро баргардонидан мумкин нест.", "Ваше имя, номер, адреса и избранное будут удалены. Прошлые заказы останутся в учёте без личных данных. Отменить нельзя.", "Your name, number, addresses and favourites are removed. Past orders stay in the books without personal data. This cannot be undone.");
   K("da.btn", "Ҳа, нест кунед", "Да, удалить", "Yes, delete"); K("da.done", "Аккаунт нест шуд", "Аккаунт удалён", "Account deleted");
   K("da.privacy", "Сиёсати махфият", "Политика конфиденциальности", "Privacy policy");
+  K("ph.camera", "Акс гирифтан", "Сфотографировать", "Take a photo"); K("ph.gallery", "Аз галерея", "Из галереи", "From gallery");
+  K("menu.photoSub", "Пахш кунед — камера кушода мешавад", "Нажмите — сразу откроется камера", "Tap — the camera opens");
 })();

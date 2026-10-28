@@ -37,6 +37,8 @@ import android.webkit.WebViewClient;
 public class MainActivity extends Activity {
     private static final String CHANNEL = "orders";
     private static final int REQ_FILE = 11;
+    private static final int REQ_CAMERA = 7731;
+    private Uri photoUri;
     private static final int REQ_PERMS = 12;
 
     private WebView web;
@@ -251,6 +253,21 @@ public class MainActivity extends Activity {
         public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback, FileChooserParams params) {
             if (fileCallback != null) fileCallback.onReceiveValue(null);
             fileCallback = callback;
+            /* «Сфотографировать» (capture): the camera opens at once and the full-size photo comes back (Android 10+) */
+            if (params.isCaptureEnabled() && Build.VERSION.SDK_INT >= 29) {
+                try {
+                    android.content.ContentValues cv = new android.content.ContentValues();
+                    cv.put(android.provider.MediaStore.Images.Media.DISPLAY_NAME, "tezkor_" + System.currentTimeMillis() + ".jpg");
+                    cv.put(android.provider.MediaStore.Images.Media.MIME_TYPE, "image/jpeg");
+                    cv.put(android.provider.MediaStore.Images.Media.RELATIVE_PATH, "Pictures/Tezkor");
+                    photoUri = getContentResolver().insert(android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI, cv);
+                    Intent cam = new Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE);
+                    cam.putExtra(android.provider.MediaStore.EXTRA_OUTPUT, photoUri);
+                    cam.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+                    startActivityForResult(cam, REQ_CAMERA);
+                    return true;
+                } catch (Exception e) { photoUri = null; }
+            }
             try {
                 startActivityForResult(params.createIntent(), REQ_FILE);
             } catch (ActivityNotFoundException e) {
@@ -264,6 +281,13 @@ public class MainActivity extends Activity {
     @Override
     protected void onActivityResult(int code, int result, Intent data) {
         super.onActivityResult(code, result, data);
+        if (code == REQ_CAMERA && fileCallback != null) {
+            Uri u = photoUri; photoUri = null;
+            if (result == RESULT_OK && u != null) fileCallback.onReceiveValue(new Uri[]{u});
+            else { if (u != null) try { getContentResolver().delete(u, null, null); } catch (Exception ignored) { } fileCallback.onReceiveValue(null); }
+            fileCallback = null;
+            return;
+        }
         if (code == REQ_FILE && fileCallback != null) {
             fileCallback.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(result, data));
             fileCallback = null;

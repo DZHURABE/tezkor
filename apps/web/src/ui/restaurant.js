@@ -383,7 +383,11 @@
       f("cost", "cf.cost", p.cost, 'inputmode="numeric"') + f("minStock", "cf.min", p.minStock, 'inputmode="numeric"') + f("origin", "cf.origin", p.origin, 'maxlength="40"') + f("photoSource", "cf.psrc", p.photoSource, 'maxlength="200"') + "</div>" + (inner ? "" : "</details>"); }
   function photoBox() { var ph = SF.state.pphoto;
     return '<label class="upload ph' + (ph ? " done" : "") + '">' + (ph ? '<img src="' + esc(ph) + '" alt="">' + "<span>" + I("check", 16) + t("menu.photoSet") + "</span><small>" + t("tr.change") + "</small>" : I("plus", 22) + "<b>" + t("menu.photo") + "</b><small>" + t("menu.photoSub") + "</small>") +
-      '<input type="file" accept="image/*" data-input="pphoto"></label>' + (ph ? '<button type="button" class="btn sm ghost" data-act="pphotodel">' + I("trash", 14) + t("btn.remove") + "</button>" : ""); }
+      '<input type="file" accept="image/*" capture="environment" data-input="pphoto"></label>' +
+      /* the big box opens the camera at once; the gallery is one tap away */
+      '<div class="phbtns"><label class="btn sm primary">' + I("camera", 16) + t("ph.camera") + '<input type="file" accept="image/*" capture="environment" data-input="pphoto" hidden></label>' +
+      '<label class="btn sm ghost">' + I("image", 16) + t("ph.gallery") + '<input type="file" accept="image/*" data-input="pphoto" hidden></label>' +
+      (ph ? '<button type="button" class="btn sm ghost" data-act="pphotodel">' + I("trash", 14) + t("btn.remove") + "</button>" : "") + "</div>"; }
   function pickPhoto(el, max, done) { var f = el.files && el.files[0]; if (!f) return;
     SF.shrinkImage(f, max, 0.8).then(done, function () { SF.toast(t("tr.notImage"), "err"); }); }
   SF.pickPhoto = pickPhoto;
