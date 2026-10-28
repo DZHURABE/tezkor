@@ -39,7 +39,7 @@
       '<div class="pbody">' + (p.brand ? '<small class="pbrand">' + esc(p.brand) + "</small>" : "") + '<b class="pname">' + esc(tx(p.name)) + likeChip(p) + "</b>" + (p.stock != null && p.available && p.stock <= 5 ? '<span class="stockl">' + t("sh.left", { n: p.stock }) + "</span>" : "") + gwChips(p, true) + (compact && p.restaurant ? '<span class="pdesc">' + esc(tx(p.restaurant.name)) + "</span>" : '<span class="pdesc">' + esc(tx(p.desc)) + "</span>") +
       '<div class="prow"><span class="price num">' + (hasV(p) ? '<small class="vfrom">' + t("var.from") + "</small> " : "") + money(p.price) + (off ? "<s>" + money(p.oldPrice) + "</s>" : "") + (p.weight && !hasV(p) ? '<small>' + esc(p.weight) + "</small>" : "") + "</span>" + (p.available ? (hasV(p) ? varBtn(p) : stepper(p, q)) : '<span class="pill p-mut">' + t("prod.soldout") + "</span>") + "</div></div></div>";
   }
-  SF.prodCard = prodCard; SF.rememberProducts = remember; SF.favBtn = favBtn;
+  SF.prodCard = prodCard; SF.rememberProducts = remember;
   /* «Guarantee 12 months» / «Return 14 days» — only on articles where the shop promised it */
   function gwChips(p, small) { if (!p.warrantyMonths && !p.returnDays) return "";
     return '<span class="gwchips' + (small ? " sm" : "") + '">' + (p.warrantyMonths ? '<span class="gwc w">' + I("shield", 12) + t(small ? "gw.wShort" : "gw.wLong", { n: p.warrantyMonths }) + "</span>" : "") + (p.returnDays ? '<span class="gwc r">' + I("route", 12) + t(small ? "gw.rShort" : "gw.rLong", { n: p.returnDays }) + "</span>" : "") + "</span>"; }

@@ -45,14 +45,14 @@
       return cached.h; }
     return fresh.then(keep);
   } });
-  function homeBuild() { var q = {}, shopList = [];
+  function homeBuild() { var q = {};
     var cq = "cityId=" + encodeURIComponent(SF.state.cityId) + SF.areaQ(), soft = function (u) { return api().get(u).catch(function () { return null; }); };
     /* every listing service that is on: the newest ads of all of them go into one grid of squares */
     var listSv = Object.keys(SF.LISTINGS || {}).filter(function (k) { return SF.svcOn(k); });
     var adsAll = Promise.all(listSv.map(function (k) { return soft("/ads/search?svc=" + k + "&sort=new&limit=12"); })).then(function (rs) { var l = []; rs.forEach(function (r) { if (r && r.list) l = l.concat(r.list); });
       return { list: l.sort(function (a, b) { return (b.vip ? 1 : 0) - (a.vip ? 1 : 0) || (b.publishedAt || b.createdAt) - (a.publishedAt || a.createdAt); }).slice(0, 12) }; });
     return Promise.all([api().get("/banners"), SF.svcOn("food") ? api().get("/restaurants?" + cq) : Promise.resolve([]), adsAll, SF.svcOn("shops") ? soft("/shops/goods?limit=16&sort=new&" + cq) : null,
-      soft("/restaurants?kind=shop&" + cq).then(function (l) { shopList = l || []; var o = shopList.filter(function (x) { return x.own; })[0]; return o ? soft("/restaurants/" + o.id) : null; })]).then(function (res) {
+      soft("/restaurants?kind=shop&" + cq).then(function (l) { var o = (l || []).filter(function (x) { return x.own; })[0]; return o ? soft("/restaurants/" + o.id) : null; })]).then(function (res) {
       var banners = res[0], rests = res[1], newAds = res[2], newGoods = res[3], ownShop = res[4];
       /* no extra request per restaurant: the list already says enough for the home screen (it used to ask 12 more times) */
       return Promise.resolve(rests.slice(0, 12)).then(function (full) {
@@ -70,41 +70,19 @@
         var svOn = SF.SERVICES.filter(function (x) { return SF.svcOn(x[0]) && x[3]; });
         var city = (SF.state.cities || []).filter(function (c) { return c.id === SF.state.cityId; })[0];
         /* the top row lives inside the green hero on phones (the empty white header bar is gone): logo · town · day/night · bell */
-        /* ===== the top: a photo of a full shopping bag, the brand, the town, a big promise and a white search ===== */
-        var art = SF.ART || { svc: {} };
-        var hbar = '<div class="hx-bar"><a href="#/" class="hx-logo" aria-label="' + esc(SF.brand()) + '">' + SF.mark(46) + "</a>" +
-          '<div class="hx-brand"><b>' + esc(SF.brand()) + '</b><button type="button" class="hx-city" data-act="city">' + I("pin", 15) + "<span>" + esc(city ? tx(city.name) : "") + "</span>" + I("chevD", 14) + "</button></div>" +
-          '<span class="hx-acts">' + (SF.appBtn ? SF.appBtn("hx-ib hm-app") : "") + SF.themeBtn("hx-ib") + (u ? SF.bell().replace('class="iconbtn"', 'class="iconbtn hx-ib"') : '<a class="hx-login" href="#/login">' + t("auth.login") + "</a>") + "</span></div>";
-        var A2 = SF.ART2 || {};
-        /* quick chips under the search: discounts + the shop categories */
-        var chipsH = '<div class="hx-chips"><a href="#/shops/goods?sale=1" class="hx-chip hot">' + I("tag", 13) + t("hx.saleT") + "</a>" + (SF.state.shopCats || []).slice(0, 8).map(function (c) { return '<a href="#/shops/goods?cat=' + encodeURIComponent(c.id) + '" class="hx-chip">' + esc(tx(c.name)) + "</a>"; }).join("") + "</div>";
-        var hero = '<section class="hx-hero hx3">' + (A2.hero || art.hero ? '<img class="hx-art" src="' + (A2.hero || art.hero) + '" alt="">' : "") + '<i class="hx-shade" aria-hidden="true"></i>' + hbar +
-          '<div class="hx-hi">' + (first ? '<small>' + t(greet) + ", " + first + "</small>" : "") + "<h1>" + t("hx.t1") + "<em>" + t("hx.t2") + "</em></h1><p>" + t("hx.sub") + "</p></div>" +
-          '<form class="hx-search" data-form="search" role="search">' + I("search", 20) + '<input name="q" placeholder="' + t("hx.searchPh") + '" aria-label="' + t("hx.searchPh") + '" enterkeyhint="search"><button class="hx-go" aria-label="' + t("btn.find") + '">' + I("chevR", 18) + "</button></form>" + chipsH + "</section>";
-        /* ===== the services: a row of tiles with 3D pictures; «soon» ones dimmed with a small word ===== */
+        var hbar = '<div class="hm-bar"><a href="#/" class="hm-logo" aria-label="' + esc(SF.brand()) + '">' + SF.mark(40) + "</a>" +
+          '<button type="button" class="hm-city" data-act="city"><small>' + t("profile.city") + "</small><b>" + I("pin", 15) + "<span>" + esc(city ? tx(city.name) : "") + "</span>" + I("chevD", 14) + "</b></button>" +
+          '<span class="hm-acts">' + (SF.appBtn ? SF.appBtn("hm-ib hm-app") : "") + SF.themeBtn("hm-ib") + (u ? SF.bell().replace('class="iconbtn"', 'class="iconbtn hm-ib"') : '<a class="hm-login" href="#/login">' + t("auth.login") + "</a>") + "</span></div>";
+        var hero = '<section class="hm-hero"><i class="hm-orn" aria-hidden="true"></i>' + hbar +
+          '<div class="hm-hi"><p>' + t(greet) + (first ? ", <b>" + first + "</b>" : "") + "</p><h1>" + t("hm.title") + "</h1></div>" +
+          '<form class="hm-search" data-form="search" role="search">' + I("search", 20) + '<input name="q" placeholder="' + t("sa.searchPh") + '" aria-label="' + t("sa.searchPh") + '" enterkeyhint="search"><button class="hm-go" aria-label="' + t("btn.find") + '">' + I("chevR", 18) + "</button></form></section>";
+        /* the services: one big card for the first, neat cards with a line about each for the rest (no round stickers) */
+        /* the services: one compact grid of small tiles (like Yandex Go) — the working ones first, the «soon» ones after, dimmed with a small badge */
         var svOff = SF.SERVICES.filter(function (x) { return !(SF.svcOn(x[0]) && x[3]); });
-        var tile = function (x, on) { var ph = ((SF.state.pub || {}).svcPhotos || {})[x[0]], pic = A2[x[0]] || art.svc[x[0]] || ph;
-          return (on ? '<a href="#' + x[3] + '"' : '<button type="button" data-act="soon" data-k="' + x[0] + '"') + ' class="hx-s' + (on ? "" : " soon") + '">' +
-            (pic ? '<img src="' + esc(pic) + '" alt="" loading="lazy">' : SF.svVis(x[0], false)) + "<b>" + t("svs." + x[0]) + "</b><small>" + t("hxd." + x[0]) + "</small>" + (on ? "" : '<i class="hx-soon">' + t("sv.soonS") + "</i>") + (on ? "</a>" : "</button>"); };
-        var svc = !svOn.length && !svOff.length ? "" : '<nav class="hx-svc hx5" aria-label="' + t("sv.title") + '">' + svOn.map(function (x) { return tile(x, true); }).join("") + svOff.map(function (x) { return tile(x, false); }).join("") +
-          '<a href="#/services" class="hx-s hx-more">' + (A2.more ? '<img src="' + A2.more + '" alt="">' : "") + "<b>" + t("hx.more") + "</b><small>" + t("hxd.more") + "</small></a></nav>";
-        /* ===== nearby shops: cover, name, rating, open now, hours ===== */
-        var shops = (shopList || []).slice().sort(function (a, b) { return (b.own ? 1 : 0) - (a.own ? 1 : 0) || (b.isOpenNow ? 1 : 0) - (a.isOpenNow ? 1 : 0) || (b.rating || 0) - (a.rating || 0); }).slice(0, 10);
-        var shopCard = function (r) { var open = r.isOpenNow !== false, pic = r.cover || r.logo, hrs = r.hours ? (r.hours.from === r.hours.to ? t("hr.allDay") : esc(r.hours.from) + " – " + esc(r.hours.to)) : "";
-          return '<a class="hx-shop" href="#/r/' + r.id + '"><span class="hx-scov">' + (pic ? '<img src="' + esc(pic) + '" alt="" loading="lazy">' : '<span class="hx-sph">' + I("store", 30) + "</span>") + "</span>" +
-            '<span class="hx-sb"><b>' + esc(tx(r.name)) + "</b><span class=\"hx-sm\">" + (r.rating ? '<i class="hx-star">' + I("star", 13) + "</i><b class=\"num\">" + Number(r.rating).toFixed(1) + "</b>" + (r.ratingCount ? '<small class="num">(' + r.ratingCount + ")</small>" : "") : "") +
-            '<em class="' + (open ? "on" : "off") + '">' + t(open ? "os.open" : "os.closed") + "</em></span>" + (hrs ? '<small class="hx-hrs num">' + I("clock", 13) + hrs + "</small>" : "") + "</span></a>"; };
-        var shopsH = shops.length ? '<section class="hx-sec"><div class="hx-h"><h2>' + t("hx.shops") + '</h2><a href="#/shops">' + t("sa.allR") + I("chevR", 14) + '</a></div><div class="hx-row">' + shops.map(shopCard).join("") + "</div></section>" : "";
-        /* ===== popular goods: the owner's shop first, then the others ===== */
-        var popG = [];
-        if (ownShop && ownShop.products) { var ap = ownShop.products.filter(function (x) { return x.available; }); popG = ap.filter(function (x) { return x.popular; }).concat(ap.filter(function (x) { return !x.popular; })).map(function (x) { return Object.assign({}, x, { restaurant: x.restaurant || { id: ownShop.id, name: ownShop.name } }); }); SF.rememberProducts(ownShop.products); }
-        ((newGoods && newGoods.list) || []).forEach(function (x) { if (!popG.some(function (y) { return y.id === x.id; })) popG.push(x); });
-        popG = popG.filter(function (x) { return x.oldPrice > x.price; }).concat(popG.filter(function (x) { return !(x.oldPrice > x.price); })).slice(0, 16); SF.rememberProducts(popG); var anySale = popG.some(function (x) { return x.oldPrice > x.price; });
-        var goodsH = popG.length ? '<section class="hx-sec"><div class="hx-h"><h2>' + t(anySale ? "hx.deals" : "hx.popular") + '</h2><a href="#/shops/goods' + (anySale ? "?sale=1" : "") + '">' + t("sa.allR") + I("chevR", 14) + '</a></div><div class="hx-row">' + popG.map(function (p) { return SF.hxGood(p); }).join("") + "</div></section>" : "";
-        /* ===== two bright tiles ===== */
-        var tiles2 = '<section class="hx-tri"><a class="hx-p hx-p1" href="#/shops/goods?sale=1"><span><b>' + t("hx.saleT") + "</b><small>" + t("hx.saleS") + "</small></span>" + (A2.sale ? '<img src="' + A2.sale + '" alt="">' : I("tag", 30)) + "</a>" +
-          '<button type="button" class="hx-p hx-p2" data-act="create"><span><b>' + t("hx.postT") + "</b><small>" + t("hx.postS") + "</small></span>" + (A2.ads ? '<img src="' + A2.ads + '" alt="">' : I("plus", 30)) + "</button>" +
-          '<a class="hx-p hx-p3" href="#/shops"><span><b>' + t("hx.allShops") + "</b><small>" + t("hx.allShopsS") + "</small></span>" + (A2.shops ? '<img src="' + A2.shops + '" alt="">' : I("store", 30)) + "</a></section>";
+        var tile = function (x, on) { return (on ? '<a href="#' + x[3] + '"' : '<button type="button" data-act="soon" data-k="' + x[0] + '"') + ' class="hm-gt' + (on ? "" : " soon") + '" style="--sb:' + x[2] + '">' +
+          SF.svVis(x[0], false) + "<b>" + t("svs." + x[0]) + "</b>" + (on ? "" : '<i class="hm-gsoon">' + t("sv.soonS") + "</i>") + (on ? "</a>" : "</button>"); };
+        var svc = !svOn.length && !svOff.length ? "" : '<section class="hm-svc"><div class="hm-h"><div><h2>' + t("sv.title") + '</h2></div><a href="#/services">' + t("sa.allR") + I("chevR", 14) + "</a></div>" +
+          '<nav class="hm-grid" aria-label="' + t("sv.title") + '">' + svOn.map(function (x) { return tile(x, true); }).join("") + svOff.map(function (x) { return tile(x, false); }).join("") + "</nav></section>";
         var slides = banners.map(function (b) { return SF.bannerHtml(b, "a"); });
         var ban = !slides.length ? "" : '<section class="hm-offers"><div class="banners hm-ban" id="banners" aria-label="' + t("home.offers") + '">' + slides.join("") + "</div>" + (slides.length > 1 ? '<div class="bdots" aria-hidden="true">' + slides.map(function (b, i) { return '<i class="' + (i ? "" : "on") + '"></i>'; }).join("") + "</div>" : "") + "</section>";
         function sect(title, sub, href, body, cls) { return '<section class="hm-sect' + (cls ? " " + cls : "") + '"><div class="hm-h"><div><h2>' + title + "</h2>" + (sub ? "<p>" + sub + "</p>" : "") + "</div>" + (href ? '<a href="#' + href + '">' + t("sa.allR") + I("chevR", 14) + "</a>" : "") + "</div>" + body + "</section>"; }
@@ -116,7 +94,7 @@
         var goods = ((newGoods && newGoods.list) || []).filter(function (x) { return !ownShop || x.restaurantId !== ownShop.id; }).slice(0, 16); SF.rememberProducts(goods);
         var gdH = goods.length ? sect(t("sv.shops"), t("hm.goodsSub"), "/shops/goods", '<div class="hscroll goodsrow onerow">' + goods.map(goodCard).join("") + "</div>") : "";
         var store = SF.ownShopHero ? SF.ownShopHero(ownShop) : "";
-        return '<div class="sahome hm hx">' + (SF.installBar ? SF.installBar() : "") + hero + svc + ban + tiles2 + shopsH + goodsH + adsH + (SF.soonBlock ? SF.soonBlock() : "") + (SF.svcOn("food") ? promo + popH : "") + "</div>";
+        return '<div class="sahome hm">' + (SF.installBar ? SF.installBar() : "") + hero + svc + ban + store + adsH + gdH + (SF.soonBlock ? SF.soonBlock() : "") + (SF.svcOn("food") ? promo + popH : "") + "</div>";
       });
     });
   }
@@ -142,14 +120,6 @@
   function gcurQ() { return SF.match(SF.path()).query || {}; }
   function gapi(q, off) { return "/shops/goods?cityId=" + encodeURIComponent(SF.state.cityId) + SF.areaQ() + (q.q ? "&q=" + encodeURIComponent(q.q) : "") + (q.cat ? "&cat=" + q.cat : "") + (q.brand ? "&brand=" + encodeURIComponent(q.brand) : "") + (q.min ? "&priceMin=" + q.min : "") + (q.max ? "&priceMax=" + q.max : "") + (q.sale ? "&sale=1" : "") + (q.sort ? "&sort=" + q.sort : "") + "&offset=" + off + "&limit=20"; }
   SF.goodCard = function (p) { return goodCard(p); };
-  SF.after.push(function () { if (SF.barTone) SF.barTone(); });
-  /* a product on the home row: picture, heart, name, price, and an orange «− 1 +» bar */
-  SF.hxGood = function (p) { var q = SF.cart.qty(p.id), hasV = p.variants && p.variants.length, off = SF.sale ? SF.sale(p) : 0;
-    var bar = !p.available ? '<span class="hx-gbar off">' + t("prod.soldout") + "</span>" : hasV ? '<button type="button" class="hx-gbar" data-act="prod" data-id="' + p.id + '">' + t("var.choose") + "</button>" :
-      q ? '<span class="hx-gbar"><button type="button" data-act="dec" data-id="' + p.id + '" aria-label="' + t("a.less") + '">' + I("minus", 16) + '</button><b class="num">' + q + '</b><button type="button" data-act="add" data-id="' + p.id + '" aria-label="' + t("a.more") + '">' + I("plus", 16) + "</button></span>"
-        : '<button type="button" class="hx-gbar one" data-act="add" data-id="' + p.id + '">' + I("plus", 16) + t("hx.toCart") + "</button>";
-    return '<div class="hx-good"><button type="button" class="hx-gimg" data-act="prod" data-id="' + p.id + '" aria-label="' + esc(tx(p.name)) + '">' + SF.pic(p, 110) + (off ? '<i class="hx-off">−' + off + "%</i>" : "") + "</button>" +
-      (SF.favBtn ? SF.favBtn("p", p.id) : "") + '<span class="hx-gn">' + esc(tx(p.name)) + (p.weight && !hasV ? " " + esc(p.weight) : "") + '</span><b class="hx-gp num">' + (hasV ? t("var.from") + " " : "") + money(p.price) + (p.oldPrice > p.price ? ' <s class="hx-old">' + money(p.oldPrice) + "</s>" : "") + "</b>" + bar + "</div>"; };
   function goodCard(p) { return '<div class="gwrap">' + SF.prodCard(p) + '<a class="gshop" href="#/r/' + p.restaurant.id + '">' + I("store", 12) + esc(tx(p.restaurant.name)) + "</a></div>"; }
   SF.route("/shops/goods", { title: "sv.shops", render: function (p, q) {
     if (!SF.svcOn("shops") && !(SF.state.user && SF.state.user.role === "admin")) { SF.go("/"); return ""; }

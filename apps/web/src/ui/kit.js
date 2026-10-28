@@ -231,12 +231,7 @@ var SF = (function () {
     /* the restaurant panel stays light (easier to read in the kitchen) unless the owner picked night himself */
     if (u && u.role === "restaurant" && !v) v = "light";
     if (v) d.setAttribute("data-theme", v); else d.removeAttribute("data-theme");
-    SF.barTone(); };
-  /* the phone's top bar: on the home picture it is dark with white icons (full screen); elsewhere it follows day / night */
-  SF.barTone = function () { var u = SF.state.user, home = !!document.querySelector(".hx-hero"), dark = SF.isDark() && !(u && u.role === "restaurant" && !SF.themePref());
-    document.documentElement.classList.toggle("on-home", home);
-    var m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute("content", home ? "#121416" : dark ? "#0F1312" : "#E8590C");
-    var A = window.TezkorApp; if (A && A.statusBar) try { A.statusBar(home || dark); } catch (e) {} };
+    var m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute("content", SF.isDark() && !(u && u.role === "restaurant" && !SF.themePref()) ? "#0F1312" : "#E8590C"); };
   SF.themeBtn = function (cls) { var dk = SF.isDark();
     return '<button type="button" class="iconbtn themebtn' + (cls ? " " + cls : "") + '" data-act="theme" aria-label="' + SF.t(dk ? "th.day" : "th.night") + '" title="' + SF.t(dk ? "th.day" : "th.night") + '"><span class="thi">' + SF.icon(dk ? "sun" : "moon", 20) + "</span></button>"; };
   SF.actions.theme = function () { var next = SF.isDark() ? "light" : "dark", d = document.documentElement;
