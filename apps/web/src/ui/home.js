@@ -45,14 +45,14 @@
       return cached.h; }
     return fresh.then(keep);
   } });
-  function homeBuild() { var q = {};
+  function homeBuild() { var q = {}, shopList = [];
     var cq = "cityId=" + encodeURIComponent(SF.state.cityId) + SF.areaQ(), soft = function (u) { return api().get(u).catch(function () { return null; }); };
     /* every listing service that is on: the newest ads of all of them go into one grid of squares */
     var listSv = Object.keys(SF.LISTINGS || {}).filter(function (k) { return SF.svcOn(k); });
     var adsAll = Promise.all(listSv.map(function (k) { return soft("/ads/search?svc=" + k + "&sort=new&limit=12"); })).then(function (rs) { var l = []; rs.forEach(function (r) { if (r && r.list) l = l.concat(r.list); });
       return { list: l.sort(function (a, b) { return (b.vip ? 1 : 0) - (a.vip ? 1 : 0) || (b.publishedAt || b.createdAt) - (a.publishedAt || a.createdAt); }).slice(0, 12) }; });
     return Promise.all([api().get("/banners"), SF.svcOn("food") ? api().get("/restaurants?" + cq) : Promise.resolve([]), adsAll, SF.svcOn("shops") ? soft("/shops/goods?limit=16&sort=new&" + cq) : null,
-      soft("/restaurants?kind=shop&" + cq).then(function (l) { var o = (l || []).filter(function (x) { return x.own; })[0]; return o ? soft("/restaurants/" + o.id) : null; })]).then(function (res) {
+      soft("/restaurants?kind=shop&" + cq).then(function (l) { shopList = l || []; var o = (l || []).filter(function (x) { return x.own; })[0]; return o ? soft("/restaurants/" + o.id) : null; })]).then(function (res) {
       var banners = res[0], rests = res[1], newAds = res[2], newGoods = res[3], ownShop = res[4];
       /* no extra request per restaurant: the list already says enough for the home screen (it used to ask 12 more times) */
       return Promise.resolve(rests.slice(0, 12)).then(function (full) {
@@ -95,7 +95,32 @@
         var goods = ((newGoods && newGoods.list) || []).filter(function (x) { return !ownShop || x.restaurantId !== ownShop.id; }).slice(0, 16); SF.rememberProducts(goods);
         var gdH = goods.length ? sect(t("sv.shops"), t("hm.goodsSub"), "/shops/goods", '<div class="hscroll goodsrow onerow">' + goods.map(goodCard).join("") + "</div>") : "";
         var store = SF.ownShopHero ? SF.ownShopHero(ownShop) : "";
-        return '<div class="sahome hm">' + (SF.installBar ? SF.installBar() : "") + hero + svc + ban + store + adsH + gdH + (SF.soonBlock ? SF.soonBlock() : "") + (SF.svcOn("food") ? promo + popH : "") + "</div>";
+        /* ======== home in the «store app» style: black page, round stories, app-icon shops, one big card, 3-column cards ======== */
+        var A2 = SF.ART2 || {};
+        var top = '<div class="al-top"><a href="#/" class="al-logo" aria-label="' + esc(SF.brand()) + '">' + SF.mark(46) + "</a>" +
+          '<div class="al-id"><b>' + esc(SF.brand()) + '</b><button type="button" class="al-city" data-act="city"><i class="al-dot"></i><span>' + esc(city ? tx(city.name) : t("profile.city")) + "</span>" + I("chevD", 13) + "</button></div>" +
+          '<span class="al-acts">' + SF.themeBtn("al-ib") + (u ? SF.bell().replace('class="iconbtn"', 'class="iconbtn al-ib"') : '<a class="al-login" href="#/login">' + t("auth.login") + "</a>") + "</span></div>";
+        var srch = '<form class="al-search" data-form="search" role="search">' + I("search", 20) + '<input name="q" placeholder="' + t("sa.searchPh") + '" aria-label="' + t("sa.searchPh") + '" enterkeyhint="search"></form>';
+        var circ = function (k, href, on) { var pic = A2[k]; return (on ? '<a href="#' + href + '"' : '<button type="button" data-act="soon" data-k="' + k + '"') + ' class="al-c' + (on ? "" : " soon") + '"><span class="al-ring"><span class="al-cin">' + (pic ? '<img src="' + pic + '" alt="" loading="lazy">' : SF.svVis(k, false)) + "</span>" + (on ? "" : '<i class="al-soon">' + t("sv.soonS") + "</i>") + "</span><b>" + t("svs." + k) + "</b>" + (on ? "</a>" : "</button>"); };
+        var stories = '<nav class="al-st" aria-label="' + t("sv.title") + '"><a href="#/services" class="al-c"><span class="al-ring"><span class="al-cin al-all">' + SF.mark(52) + "</span></span><b>" + t("hm.all") + "</b></a>" +
+          svOn.map(function (x) { return circ(x[0], x[3], true); }).join("") + svOff.map(function (x) { return circ(x[0], null, false); }).join("") + "</nav>";
+        var shopsS = (shopList || []).slice().sort(function (a, b) { return (b.own ? 1 : 0) - (a.own ? 1 : 0) || (b.isOpenNow ? 1 : 0) - (a.isOpenNow ? 1 : 0) || (b.rating || 0) - (a.rating || 0); }).slice(0, 14);
+        var apps = shopsS.length ? '<div class="al-apps">' + shopsS.map(function (r) { var pic = r.logo || r.cover;
+          return '<a class="al-app" href="#/r/' + r.id + '"><span class="al-ai"' + (pic ? "" : ' style="--tone:' + esc(r.tone || "#2B2F36") + '"') + ">" + (pic ? '<img src="' + esc(pic) + '" alt="" loading="lazy">' : "<b>" + esc(tx(r.name).slice(0, 2).toUpperCase()) + "</b>") + (r.isOpenNow === false ? "" : '<i class="al-open"></i>') + "</span><b>" + esc(tx(r.name)) + "</b></a>"; }).join("") +
+          '<a class="al-app" href="#/shops"><span class="al-ai al-more">' + (A2.more ? '<img src="' + A2.more + '" alt="">' : I("grid", 28)) + "</span><b>" + t("hm.all") + "</b></a></div>" : "";
+        var heroC = banners.map(function (b) { var href = b.restaurantId ? "/r/" + b.restaurantId : b.own ? "/shops" : "/";
+          return '<a class="al-hero" href="#' + href + '" style="--b:' + esc(b.tone || "#1B2233") + '">' + (b.photo ? '<img class="al-hbg" src="' + esc(b.photo) + '" alt="">' : '<span class="al-hart">' + SF.art(b.art, 120) + "</span>") + '<i class="al-hsh"></i>' +
+            '<span class="al-hl">' + SF.mark(40) + "<b>" + esc(tx(b.title)) + "</b></span><small>" + esc(tx(b.sub)) + '</small><span class="al-hb"><em class="al-pill">' + esc(SF.brand()) + '</em><em class="al-btn">' + t(b.restaurantId ? "h3.order" : "ad.go") + "</em></span></a>"; });
+        var heroS = heroC.length ? '<section class="al-heros"><div class="banners al-ban" id="banners" aria-label="' + t("home.offers") + '">' + heroC.join("") + "</div>" + (heroC.length > 1 ? '<div class="bdots al-dots" aria-hidden="true">' + heroC.map(function (b, i) { return '<i class="' + (i ? "" : "on") + '"></i>'; }).join("") + "</div>" : "") + "</section>" : "";
+        var allG = []; if (ownShop && ownShop.products) ownShop.products.filter(function (x) { return x.available; }).forEach(function (x) { allG.push(Object.assign({}, x, { restaurant: x.restaurant || { id: ownShop.id, name: ownShop.name } })); });
+        ((newGoods && newGoods.list) || []).forEach(function (x) { if (!allG.some(function (y) { return y.id === x.id; })) allG.push(x); });
+        allG = allG.slice(0, 18); SF.rememberProducts(allG);
+        var gCard = function (p) { var off = SF.sale ? SF.sale(p) : 0; return '<button type="button" class="al-g" data-act="prod" data-id="' + p.id + '"><span class="al-gi">' + SF.pic(p, 90) + (off ? '<i class="al-off">−' + off + "%</i>" : "") + '</span><b class="al-gn">' + esc(tx(p.name)) + '</b><em class="al-gp num">' + (p.variants && p.variants.length ? t("var.from") + " " : "") + money(p.price) + "</em></button>"; };
+        var head = function (title, n, href) { return '<div class="al-h"><h2>' + title + "</h2>" + (href ? '<a href="#' + href + '">' + (n ? '<span class="num">' + n + "</span>" : "") + I("chevR", 16) + "</a>" : "") + "</div>"; };
+        var goodsS = allG.length ? '<section class="al-sec">' + head(t("sv.shops"), allG.length, "/shops/goods") + '<div class="al-grid">' + allG.map(gCard).join("") + "</div></section>" : "";
+        var aCard = function (a) { var B = ((SF.LISTINGS || {})[a.svc] || (SF.LISTINGS || {}).ads || { base: "/ads" }).base; return '<a class="al-g" href="#' + B + "/" + a.id + '"><span class="al-gi">' + (a.photos && a.photos[0] ? '<img class="ph" src="' + esc(a.photos[0]) + '" alt="" loading="lazy">' : (A2[a.svc] ? '<img class="ph" src="' + A2[a.svc] + '" alt="">' : I("megaphone", 30))) + (a.vip ? '<i class="al-off">VIP</i>' : "") + '</span><b class="al-gn">' + esc(a.title) + '</b><em class="al-gp num">' + (a.price == null ? "—" : money(a.price)) + "</em></a>"; };
+        var adsS = ads.length ? '<section class="al-sec">' + head(t("sa.newAds"), (newAds.list || []).length, (SF.LISTINGS[listSv[0]] || { base: "/ads" }).base) + '<div class="al-grid">' + newAds.list.slice(0, 9).map(aCard).join("") + "</div></section>" : "";
+        return '<div class="sahome al">' + (SF.installBar ? SF.installBar() : "") + top + srch + stories + apps + heroS + goodsS + adsS + (SF.svcOn("food") ? popH : "") + "</div>";
       });
     });
   }

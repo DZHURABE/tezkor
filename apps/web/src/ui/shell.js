@@ -34,6 +34,7 @@
       '<nav class="tabbar" aria-label="' + t("nav.main") + '">' + tab("/", "home", "nav.home") + tab("/search", "search", "nav.search") +
         '<button type="button" class="tcreate" data-act="create" aria-label="' + t("sa.create") + '"><span>' + I("plus", 26) + "</span><b>" + t("sa.create") + "</b></button>" +
         tab("/orders", "receipt", "nav.orders") + tab(u ? "/profile" : "/login", "user", u ? "nav.profile" : "auth.login") + "</nav>" +
+        '<a href="#/cart" class="tcart" aria-label="' + t("nav.cart") + '">' + I("cart", 24) + (n ? '<i class="badge">' + n + "</i>" : "") + "</a>" +
       /* the cart left the bottom bar for «Create»: on phones a floating cart pill shows while something is in it */
       (n && !/^\/(cart|checkout|pay|r\/)/.test(path) ? '<a href="#/cart" class="cartfab"><span class="cfi">' + I("cart", 20) + '<i class="badge">' + n + "</i></span><b>" + t("nav.cart") + '</b><span class="num">' + SF.money(SF.state.cartSum || 0) + "</span>" + I("chevR", 16) + "</a>" : "");
   };
