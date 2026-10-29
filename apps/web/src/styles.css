@@ -2606,3 +2606,20 @@ html,body{max-width:100%;overflow-x:clip}
 .stv-pic img{width:100%;height:100%;object-fit:cover}
 .stv-tx h2{margin:0;font-size:24px;font-weight:800}.stv-tx p{margin:6px 0 0;opacity:.85;font-size:15px}
 .stv-go{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:16px;height:52px;border-radius:999px;background:linear-gradient(180deg,#FF8A3D,#E8590C);color:#fff;font-weight:800;font-size:16px;text-decoration:none}
+/* smaller, denser home on phones (owner: «майда») */
+@media (max-width:760px){
+  .al-logo .tzmark{width:38px;height:38px;border-radius:12px}.al-id>b{font-size:17px}.al-city{font-size:12px}
+  .al .al-ib{width:36px;height:36px}.al .al-ib .ic{width:18px;height:18px}
+  .al-search{height:40px;margin-top:10px;padding:0 13px}.al-search input{font-size:13.5px}.al-search .ic{width:17px;height:17px}
+  .al-st{gap:9px;margin-top:12px}.al-c{width:58px;gap:4px}.al-ring{width:56px;height:56px;padding:2px}.al-cin{border-width:2px}.al-c b{font-size:10.5px}
+  .al-all .tzmark{width:34px;height:34px}
+  .al-run{margin-top:12px}.al-track,.al-dup{gap:9px}.al-app{width:58px;gap:4px}.al-ai{width:54px;height:54px;border-radius:15px}.al-app>b{font-size:10.5px}.al-ai>b{font-size:17px}
+  .al-heros{margin-top:12px}.al-hero{min-height:140px;padding:13px;border-radius:20px;gap:6px}
+  .al-hl .tzmark{width:38px;height:38px;border-radius:11px}.al-hl b{font-size:17px}.al-hero small{font-size:12px}
+  .al-pill{font-size:12px;padding:6px 11px}.al-btn{font-size:13px;padding:7px 16px}
+  .al-sec{margin-top:16px}.al-h{margin-bottom:8px}.al-h h2{font-size:17px}.al-h a{font-size:12.5px}
+  .al-grid{gap:6px}.al-g{padding:6px 5px 8px;border-radius:16px;gap:4px}.al-gi{border-radius:12px}
+  .al-gn{font-size:11px}.al-gp{font-size:10.5px!important;padding:3px 7px!important}
+  .tabbar,.tabbar.show{height:56px;right:72px!important}.tcart{width:56px;height:56px}
+  .tcreate span{width:34px!important;height:34px!important}
+}
