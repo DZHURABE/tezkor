@@ -45,14 +45,14 @@
       return cached.h; }
     return fresh.then(keep);
   } });
-  function homeBuild() { var q = {}, shopList = [];
+  function homeBuild() { var q = {};
     var cq = "cityId=" + encodeURIComponent(SF.state.cityId) + SF.areaQ(), soft = function (u) { return api().get(u).catch(function () { return null; }); };
     /* every listing service that is on: the newest ads of all of them go into one grid of squares */
     var listSv = Object.keys(SF.LISTINGS || {}).filter(function (k) { return SF.svcOn(k); });
     var adsAll = Promise.all(listSv.map(function (k) { return soft("/ads/search?svc=" + k + "&sort=new&limit=12"); })).then(function (rs) { var l = []; rs.forEach(function (r) { if (r && r.list) l = l.concat(r.list); });
       return { list: l.sort(function (a, b) { return (b.vip ? 1 : 0) - (a.vip ? 1 : 0) || (b.publishedAt || b.createdAt) - (a.publishedAt || a.createdAt); }).slice(0, 12) }; });
     return Promise.all([api().get("/banners"), SF.svcOn("food") ? api().get("/restaurants?" + cq) : Promise.resolve([]), adsAll, SF.svcOn("shops") ? soft("/shops/goods?limit=16&sort=new&" + cq) : null,
-      soft("/restaurants?kind=shop&" + cq).then(function (l) { shopList = l || []; var o = (l || []).filter(function (x) { return x.own; })[0]; return o ? soft("/restaurants/" + o.id) : null; })]).then(function (res) {
+      soft("/restaurants?kind=shop&" + cq).then(function (l) { var o = (l || []).filter(function (x) { return x.own; })[0]; return o ? soft("/restaurants/" + o.id) : null; })]).then(function (res) {
       var banners = res[0], rests = res[1], newAds = res[2], newGoods = res[3], ownShop = res[4];
       /* no extra request per restaurant: the list already says enough for the home screen (it used to ask 12 more times) */
       return Promise.resolve(rests.slice(0, 12)).then(function (full) {
@@ -95,59 +95,10 @@
         var goods = ((newGoods && newGoods.list) || []).filter(function (x) { return !ownShop || x.restaurantId !== ownShop.id; }).slice(0, 16); SF.rememberProducts(goods);
         var gdH = goods.length ? sect(t("sv.shops"), t("hm.goodsSub"), "/shops/goods", '<div class="hscroll goodsrow onerow">' + goods.map(goodCard).join("") + "</div>") : "";
         var store = SF.ownShopHero ? SF.ownShopHero(ownShop) : "";
-        /* ======== home in the «store app» style: black page, round stories, app-icon shops, one big card, 3-column cards ======== */
-        var A2 = SF.ART2 || {};
-        var top = '<div class="al-top"><a href="#/" class="al-logo" aria-label="' + esc(SF.brand()) + '">' + SF.mark(46) + "</a>" +
-          '<div class="al-id"><b>' + esc(SF.brand()) + '</b><button type="button" class="al-city" data-act="city"><i class="al-dot"></i><span>' + esc(city ? tx(city.name) : t("profile.city")) + "</span>" + I("chevD", 13) + "</button></div>" +
-          '<span class="al-acts">' + SF.themeBtn("al-ib") + (u ? SF.bell().replace('class="iconbtn"', 'class="iconbtn al-ib"') : '<a class="al-login" href="#/login">' + t("auth.login") + "</a>") + "</span></div>";
-        var srch = '<form class="al-search" data-form="search" role="search">' + I("search", 20) + '<input name="q" placeholder="' + t("sa.searchPh") + '" aria-label="' + t("sa.searchPh") + '" enterkeyhint="search"></form>';
-        var circ = function (k, href, on) { var pic = A2[k]; return (on ? '<a href="#' + href + '"' : '<button type="button" data-act="soon" data-k="' + k + '"') + ' class="al-c' + (on ? "" : " soon") + '"><span class="al-ring"><span class="al-cin">' + (pic ? '<img src="' + pic + '" alt="" loading="lazy">' : SF.svVis(k, false)) + "</span>" + (on ? "" : '<i class="al-soon">' + t("sv.soonS") + "</i>") + "</span><b>" + t("svs." + k) + "</b>" + (on ? "</a>" : "</button>"); };
-        /* stories: round rings like Instagram; each offer (banner) is a story, tap opens it full screen and they run one after another */
-        SF._stories = banners.slice();
-        var stCirc = banners.map(function (b, i) { return '<button type="button" class="al-c" data-act="story" data-i="' + i + '"><span class="al-ring' + (SF.ls.get("st_" + b.id, 0) ? " seen" : "") + '"><span class="al-cin">' + (b.photo ? '<img src="' + esc(b.photo) + '" alt="" loading="lazy">' : '<span class="al-cart" style="--b:' + esc(b.tone || "#1B2233") + '">' + SF.art(b.art, 50) + "</span>") + "</span></span><b>" + esc(tx(b.title)) + "</b></button>"; });
-        var stories = '<nav class="al-st" aria-label="' + t("home.offers") + '"><a href="#/services" class="al-c"><span class="al-ring"><span class="al-cin al-all">' + SF.mark(52) + "</span></span><b>" + t("hm.all") + "</b></a>" + stCirc.join("") +
-          (stCirc.length ? "" : svOn.map(function (x) { return circ(x[0], x[3], true); }).join("")) + "</nav>";
-        /* a moving row of app icons: the services (3D pictures) and the shops; it runs by itself, stops while touched */
-        var shopsS = (shopList || []).slice().sort(function (a, b) { return (b.own ? 1 : 0) - (a.own ? 1 : 0) || (b.isOpenNow ? 1 : 0) - (a.isOpenNow ? 1 : 0) || (b.rating || 0) - (a.rating || 0); }).slice(0, 14);
-        var appItems = svOn.map(function (x) { return '<a class="al-app" href="#' + x[3] + '"><span class="al-ai">' + (A2[x[0]] ? '<img src="' + A2[x[0]] + '" alt="">' : SF.svVis(x[0], false)) + "</span><b>" + t("svs." + x[0]) + "</b></a>"; })
-          .concat(shopsS.map(function (r) { var pic = r.logo || r.cover;
-            return '<a class="al-app" href="#/r/' + r.id + '"><span class="al-ai">' + (pic ? '<img src="' + esc(pic) + '" alt="" loading="lazy">' : "<b>" + esc(tx(r.name).slice(0, 2).toUpperCase()) + "</b>") + (r.isOpenNow === false ? "" : '<i class="al-open"></i>') + "</span><b>" + esc(tx(r.name)) + "</b></a>"; }))
-          .concat(svOff.map(function (x) { return '<button type="button" class="al-app soon" data-act="soon" data-k="' + x[0] + '"><span class="al-ai">' + (A2[x[0]] ? '<img src="' + A2[x[0]] + '" alt="">' : SF.svVis(x[0], false)) + '<i class="al-soon">' + t("sv.soonS") + "</i></span><b>" + t("svs." + x[0]) + "</b></button>"; }));
-        var apps = appItems.length ? '<div class="al-apps al-run"><div class="al-track" style="--n:' + appItems.length + '">' + appItems.join("") + '<span class="al-dup" aria-hidden="true">' + appItems.join("") + "</span></div></div>" : "";
-        var heroC = banners.map(function (b) { var href = b.restaurantId ? "/r/" + b.restaurantId : b.own ? "/shops" : "/";
-          return '<a class="al-hero" href="#' + href + '" style="--b:' + esc(b.tone || "#1B2233") + '">' + (b.photo ? '<img class="al-hbg" src="' + esc(b.photo) + '" alt="">' : '<span class="al-hart">' + SF.art(b.art, 120) + "</span>") + '<i class="al-hsh"></i>' +
-            '<span class="al-hl">' + SF.mark(40) + "<b>" + esc(tx(b.title)) + "</b></span><small>" + esc(tx(b.sub)) + '</small><span class="al-hb"><em class="al-pill">' + esc(SF.brand()) + '</em><em class="al-btn">' + t(b.restaurantId ? "h3.order" : "ad.go") + "</em></span></a>"; });
-        var heroS = heroC.length ? '<section class="al-heros"><div class="banners al-ban" id="banners" aria-label="' + t("home.offers") + '">' + heroC.join("") + "</div>" + (heroC.length > 1 ? '<div class="bdots al-dots" aria-hidden="true">' + heroC.map(function (b, i) { return '<i class="' + (i ? "" : "on") + '"></i>'; }).join("") + "</div>" : "") + "</section>" : "";
-        var allG = []; if (ownShop && ownShop.products) ownShop.products.filter(function (x) { return x.available; }).forEach(function (x) { allG.push(Object.assign({}, x, { restaurant: x.restaurant || { id: ownShop.id, name: ownShop.name } })); });
-        ((newGoods && newGoods.list) || []).forEach(function (x) { if (!allG.some(function (y) { return y.id === x.id; })) allG.push(x); });
-        allG = allG.slice(0, 18); SF.rememberProducts(allG);
-        var gCard = function (p) { var off = SF.sale ? SF.sale(p) : 0; return '<button type="button" class="al-g" data-act="prod" data-id="' + p.id + '"><span class="al-gi">' + SF.pic(p, 90) + (off ? '<i class="al-off">−' + off + "%</i>" : "") + '</span><b class="al-gn">' + esc(tx(p.name)) + '</b><em class="al-gp num">' + (p.variants && p.variants.length ? t("var.from") + " " : "") + money(p.price) + "</em></button>"; };
-        var head = function (title, n, href) { return '<div class="al-h"><h2>' + title + "</h2>" + (href ? '<a href="#' + href + '">' + (n ? '<span class="num">' + n + "</span>" : "") + I("chevR", 16) + "</a>" : "") + "</div>"; };
-        var goodsS = allG.length ? '<section class="al-sec">' + head(t("sv.shops"), allG.length, "/shops/goods") + '<div class="al-grid">' + allG.map(gCard).join("") + "</div></section>" : "";
-        var aCard = function (a) { var B = ((SF.LISTINGS || {})[a.svc] || (SF.LISTINGS || {}).ads || { base: "/ads" }).base; return '<a class="al-g" href="#' + B + "/" + a.id + '"><span class="al-gi">' + (a.photos && a.photos[0] ? '<img class="ph" src="' + esc(a.photos[0]) + '" alt="" loading="lazy">' : (A2[a.svc] ? '<img class="ph" src="' + A2[a.svc] + '" alt="">' : I("megaphone", 30))) + (a.vip ? '<i class="al-off">VIP</i>' : "") + '</span><b class="al-gn">' + esc(a.title) + '</b><em class="al-gp num">' + (a.price == null ? "—" : money(a.price)) + "</em></a>"; };
-        var adsS = ads.length ? '<section class="al-sec">' + head(t("sa.newAds"), (newAds.list || []).length, (SF.LISTINGS[listSv[0]] || { base: "/ads" }).base) + '<div class="al-grid">' + newAds.list.slice(0, 9).map(aCard).join("") + "</div></section>" : "";
-        return '<div class="sahome al">' + (SF.installBar ? SF.installBar() : "") + top + srch + stories + apps + heroS + goodsS + adsS + (SF.svcOn("food") ? popH : "") + "</div>";
+        return '<div class="sahome hm">' + (SF.installBar ? SF.installBar() : "") + hero + svc + ban + store + adsH + gdH + (SF.soonBlock ? SF.soonBlock() : "") + (SF.svcOn("food") ? promo + popH : "") + "</div>";
       });
     });
   }
-
-  /* ---------- story viewer: full screen, bars on top, 5 s each, tap right = next, left = back, swipe down / × = close ---------- */
-  SF.actions.story = function (el) { var L = SF._stories || [], i = +el.dataset.i || 0; if (!L.length) return; var old = document.getElementById("stv"); if (old) old.remove();
-    var box = document.createElement("div"); box.id = "stv"; box.className = "stv"; document.body.appendChild(box); var tm = 0, y0 = null;
-    function close() { clearTimeout(tm); box.remove(); SF.render({ quiet: true }); }
-    function show(k) { if (k < 0) k = 0; if (k >= L.length) { close(); return; } i = k; var b = L[i]; SF.ls.set("st_" + b.id, 1); clearTimeout(tm);
-      var href = b.restaurantId ? "/r/" + b.restaurantId : b.own ? "/shops" : "";
-      box.innerHTML = '<div class="stv-bars">' + L.map(function (x, j) { return '<i class="' + (j < i ? "done" : j === i ? "run" : "") + '"><b></b></i>'; }).join("") + "</div>" +
-        '<div class="stv-top">' + SF.mark(34) + "<b>" + esc(SF.brand()) + '</b><button type="button" class="stv-x" aria-label="×">' + I("x", 24) + "</button></div>" +
-        '<div class="stv-pic" style="--b:' + esc(b.tone || "#1B2233") + '">' + (b.photo ? '<img src="' + esc(b.photo) + '" alt="">' : SF.art(b.art, 220)) + "</div>" +
-        '<div class="stv-tx"><h2>' + esc(tx(b.title)) + "</h2><p>" + esc(tx(b.sub)) + "</p>" + (href ? '<a class="stv-go" href="#' + href + '">' + t(b.restaurantId ? "h3.order" : "ad.go") + I("chevR", 18) + "</a>" : "") + "</div>";
-      box.querySelector(".stv-x").onclick = function (e) { e.stopPropagation(); close(); };
-      var go = box.querySelector(".stv-go"); if (go) go.onclick = function () { clearTimeout(tm); box.remove(); };
-      tm = setTimeout(function () { show(i + 1); }, 5000); }
-    box.addEventListener("click", function (e) { if (e.target.closest(".stv-go,.stv-x")) return; show(e.clientX < window.innerWidth / 3 ? i - 1 : i + 1); });
-    box.addEventListener("touchstart", function (e) { y0 = e.touches[0].clientY; }, { passive: true });
-    box.addEventListener("touchend", function (e) { if (y0 != null && e.changedTouches[0].clientY - y0 > 90) close(); y0 = null; });
-    show(i); };
 
   /* all services with a line about each */
   SF.route("/services", { title: "sa.all", render: function () {
